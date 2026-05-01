@@ -1,0 +1,218 @@
+<?php 
+$pageTitle = 'Clients';
+ob_start();
+?>
+
+<div x-data="clientList" class="space-y-6">
+    <div class="card">
+        <div class="card-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Liste des clients</h2>
+            <div class="flex items-center space-x-3">
+                <select class="input w-auto" onchange="window.location.href='?zone_id='+this.value">
+                    <option value="">Toutes les zones</option>
+                    <?php foreach ($zones as $zone): ?>
+                    <option value="<?= $zone['id'] ?>" <?= ($_GET['zone_id'] ?? '') == $zone['id'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($zone['nom']) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+                <button @click="openModal()" class="btn btn-primary">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Nouveau client
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>Téléphone</th>
+                            <th>Zone</th>
+                            <th>Adresse</th>
+                            <th class="text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($clients)): ?>
+                        <tr>
+                            <td colspan="5" class="text-center py-8 text-gray-500 dark:text-gray-400">
+                                Aucun client trouvé
+                            </td>
+                        </tr>
+                        <?php else: ?>
+                            <?php foreach ($clients as $client): ?>
+                            <tr>
+                                <td>
+                                    <div class="font-medium"><?= htmlspecialchars($client['nom']) ?></div>
+                                    <?php if ($client['email']): ?>
+                                    <div class="text-xs text-gray-500"><?= htmlspecialchars($client['email']) ?></div>
+                                    <?php endif; ?>
+                                </td>
+                                <td><?= htmlspecialchars($client['telephone'] ?? '-') ?></td>
+                                <td>
+                                    <span class="badge-info"><?= htmlspecialchars($client['zone_nom'] ?? 'Non définie') ?></span>
+                                </td>
+                                <td class="text-sm"><?= htmlspecialchars($client['adresse'] ?? '-') ?></td>
+                                <td class="text-right">
+                                    <div class="flex justify-end gap-2">
+                                        <a href="<?= url('clients/' . $client['id']) ?>" class="text-blue-500 hover:text-blue-700" title="Voir détails">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                        </a>
+                                        <button @click="editClient(<?= htmlspecialchars(json_encode($client)) ?>)" class="text-primary-600 hover:text-primary-700" title="Modifier">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                        </button>
+                                        <button @click="deleteClient(<?= $client['id'] ?>)" class="text-red-500 hover:text-red-700" title="Supprimer">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Client -->
+    <div x-show="isOpen" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-black bg-opacity-50" @click="close()"></div>
+            
+            <div class="modal-content relative w-full max-w-lg">
+                <div class="card">
+                    <div class="card-header flex items-center justify-between">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white" x-text="editMode ? 'Modifier le client' : 'Nouveau client'"></h3>
+                        <button @click="close()" class="text-gray-400 hover:text-gray-500">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <form @submit.prevent="save()">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="label">Nom *</label>
+                                    <input type="text" x-model="form.nom" class="input" required>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="label">Téléphone</label>
+                                        <input type="tel" x-model="form.telephone" class="input">
+                                    </div>
+                                    <div>
+                                        <label class="label">Email</label>
+                                        <input type="email" x-model="form.email" class="input">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="label">Zone *</label>
+                                    <select x-model="form.zone_id" class="input" required>
+                                        <option value="">Sélectionner</option>
+                                        <?php foreach ($zones as $zone): ?>
+                                        <option value="<?= $zone['id'] ?>"><?= htmlspecialchars($zone['nom']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="label">Adresse</label>
+                                    <textarea x-model="form.adresse" class="input" rows="2"></textarea>
+                                </div>
+                            </div>
+                            
+                            <div class="flex justify-end space-x-3 mt-6">
+                                <button type="button" @click="close()" class="btn btn-secondary">Annuler</button>
+                                <button type="submit" class="btn btn-primary" :disabled="loading">
+                                    <span x-show="!loading">Enregistrer</span>
+                                    <span x-show="loading">En cours...</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    if (Alpine.data('clientList')) return;
+    
+    Alpine.data('clientList', () => ({
+        isOpen: false,
+        editMode: false,
+        editId: null,
+        loading: false,
+        form: { nom: '', telephone: '', adresse: '', zone_id: '', email: '' },
+        
+        openModal() {
+            this.editMode = false;
+            this.editId = null;
+            this.form = { nom: '', telephone: '', adresse: '', zone_id: '', email: '' };
+            this.isOpen = true;
+        },
+        
+        close() { this.isOpen = false; },
+        
+        editClient(client) {
+            this.editMode = true;
+            this.editId = client.id;
+            this.form = { ...client };
+            this.isOpen = true;
+        },
+        
+        async save() {
+            const ok = await App.confirm({
+                title: this.editMode ? 'Modifier le client ?' : 'Créer le client ?',
+                message: this.editMode ? 'Confirmer la modification de ce client ?' : 'Confirmer la création de ce client ?',
+                confirmText: this.editMode ? 'Modifier' : 'Créer',
+                cancelText: 'Annuler',
+                type: 'info'
+            });
+            if (!ok) return;
+
+            this.loading = true;
+            try {
+                const url = this.editMode ? '/api/clients' : '/api/clients';
+                // L'API utilise l'ID dans le body si présent pour la mise à jour
+                const data = this.editMode ? { ...this.form, id: this.editId } : this.form;
+                await App.api(url, 'POST', data);
+                App.notify(this.editMode ? 'Client mis à jour' : 'Client créé');
+                setTimeout(() => location.reload(), 500);
+            } catch (e) {
+                App.notify(e.message, 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        async deleteClient(id) {
+            const ok = await App.confirm({
+                title: 'Supprimer le client ?',
+                message: 'Supprimer ce client ?',
+                confirmText: 'Supprimer',
+                cancelText: 'Annuler',
+                type: 'danger'
+            });
+            if (!ok) return;
+            try {
+                await App.api(`/api/clients/${id}`, 'DELETE');
+                App.notify('Client supprimé');
+                setTimeout(() => location.reload(), 500);
+            } catch (e) { App.notify(e.message, 'error'); }
+        }
+    }));
+});
+</script>
+
+<?php 
+$content = ob_get_clean();
+require_once ROOT_PATH . '/app/Views/layouts/app.php';
+?>

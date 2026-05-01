@@ -1,0 +1,22 @@
+RewriteEngine On
+
+# Ne pas réécrire les fichiers existants
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Rediriger tout vers index.php
+RewriteRule ^ index.php [QSA,L]
+
+# Protection des fichiers sensibles
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Désactiver l'affichage des erreurs en production
+# php_flag display_errors off
+# php_value error_reporting 0
+
+# Augmenter la limite d'upload
+php_value upload_max_filesize 10M
+php_value post_max_size 10M
