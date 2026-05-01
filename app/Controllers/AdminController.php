@@ -197,6 +197,7 @@ class AdminController extends Controller
                 $this->parametreModel->set($param, $data[$param]);
             }
         }
+        $this->parametreModel->set('devise_base', 'CDF');
         
         return $this->success(null, 'Paramètres mis à jour avec succès');
     }

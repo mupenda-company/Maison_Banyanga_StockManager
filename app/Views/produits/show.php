@@ -192,6 +192,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('editModal', () => ({
         isOpen: false,
         loading: false,
+        baseForm: null,
         form: {
             code: '<?= addslashes($produit['code']) ?>',
             nom: '<?= addslashes($produit['nom']) ?>',
@@ -201,8 +202,22 @@ document.addEventListener('alpine:init', () => {
             prix_vente_caisses: <?= $produit['prix_vente_caisses'] ?? 0 ?>,
             seuil_alerte: <?= $produit['seuil_alerte'] ?>
         },
+
+        init() {
+            this.baseForm = { ...this.form };
+        },
         
         open() {
+            const devise = window.DEVISE || 'CDF';
+            const baseDevise = window.BASE_DEVISE || 'CDF';
+            const base = this.baseForm || this.form;
+
+            this.form = {
+                ...base,
+                prix_achat_unitaire: App.convertMoney(parseFloat(base.prix_achat_unitaire || 0), baseDevise, devise),
+                prix_vente_unitaire: App.convertMoney(parseFloat(base.prix_vente_unitaire || 0), baseDevise, devise),
+                prix_vente_caisses: App.convertMoney(parseFloat(base.prix_vente_caisses || 0), baseDevise, devise)
+            };
             this.isOpen = true;
         },
         
@@ -213,7 +228,14 @@ document.addEventListener('alpine:init', () => {
         async save() {
             this.loading = true;
             try {
-                const result = await App.api('/api/produits/<?= $produit['id'] ?>', 'PUT', this.form);
+                const devise = window.DEVISE || 'CDF';
+                const baseDevise = window.BASE_DEVISE || 'CDF';
+                const payload = { ...this.form };
+                payload.prix_achat_unitaire = App.convertMoney(parseFloat(payload.prix_achat_unitaire || 0), devise, baseDevise);
+                payload.prix_vente_unitaire = App.convertMoney(parseFloat(payload.prix_vente_unitaire || 0), devise, baseDevise);
+                payload.prix_vente_caisses = App.convertMoney(parseFloat(payload.prix_vente_caisses || 0), devise, baseDevise);
+
+                const result = await App.api('/api/produits/<?= $produit['id'] ?>', 'PUT', payload);
                 App.notify(result.message, 'success');
                 setTimeout(() => location.reload(), 1000);
             } catch (e) {

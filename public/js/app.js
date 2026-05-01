@@ -303,7 +303,7 @@ const App = {
     },
 
     // Formater un nombre en devise
-    formatMoney(amount, currency = 'CDF') {
+    formatMoney(amount, currency = (window.DEVISE || 'CDF')) {
         if (currency === 'USD') {
             return new Intl.NumberFormat('fr-CD', {
                 style: 'decimal',
@@ -318,7 +318,7 @@ const App = {
     },
     
     // Convertir entre USD et CDF
-    convertMoney(amount, from = 'USD', to = 'CDF', taux = null) {
+    convertMoney(amount, from = (window.BASE_DEVISE || 'CDF'), to = (window.DEVISE || 'CDF'), taux = null) {
         // Si pas de taux fourni, utiliser le taux par défaut
         const rate = taux || window.TAUX_CHANGE || 2800;
         
@@ -336,14 +336,16 @@ const App = {
     },
     
     // Formater avec conversion automatique
-    formatMoneyConverted(amount, fromDevise = 'CDF', toDevise = null) {
+    formatMoneyConverted(amount, fromDevise = null, toDevise = null) {
+        const baseDevise = window.BASE_DEVISE || 'CDF';
         const targetDevise = toDevise || window.DEVISE || 'CDF';
+        const sourceDevise = fromDevise || baseDevise;
         
-        if (fromDevise === targetDevise) {
+        if (sourceDevise === targetDevise) {
             return this.formatMoney(amount, targetDevise);
         }
         
-        const converted = this.convertMoney(amount, fromDevise, targetDevise);
+        const converted = this.convertMoney(amount, sourceDevise, targetDevise);
         return this.formatMoney(converted, targetDevise);
     },
     

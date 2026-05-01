@@ -49,6 +49,7 @@ spl_autoload_register(function ($class) {
     $paths = [
         ROOT_PATH . '/app/Models/',
         ROOT_PATH . '/app/Controllers/',
+        ROOT_PATH . '/app/Controllers/Api/',
         ROOT_PATH . '/app/Core/',
     ];
     

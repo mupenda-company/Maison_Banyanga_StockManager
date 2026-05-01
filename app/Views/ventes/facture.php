@@ -42,7 +42,17 @@
         <!-- Client -->
         <div class="mb-3 text-[11px]">
             <p><strong>Client:</strong> <?= htmlspecialchars($vente['client_nom']) ?></p>
+            <?php if (!empty($vente['client_telephone'])): ?><p><strong>Numéro:</strong> <?= htmlspecialchars($vente['client_telephone']) ?></p><?php endif; ?>
             <?php if ($vente['zone_nom']): ?><p><strong>Zone:</strong> <?= htmlspecialchars($vente['zone_nom']) ?></p><?php endif; ?>
+            <?php if (!empty($ristourneInfo)): ?>
+                <p><strong>Produits cumulés (période):</strong> <?= number_format((float)($ristourneInfo['total_caisses'] ?? 0), 1, '.', ' ') ?> cs</p>
+                <p><strong>CA (période):</strong> <?= format_money_converted($ristourneInfo['ca_total'] ?? 0) ?></p>
+            <?php elseif (isset($totalCaissesClient)): ?>
+                <p><strong>Produits cumulés:</strong> <?= number_format((float)$totalCaissesClient, 1, '.', ' ') ?> cs</p>
+            <?php endif; ?>
+            <?php if (!empty($ristourneInfo)): ?>
+                <p><strong>Ristourne:</strong> <?= number_format((float)($ristourneInfo['taux_applique'] ?? 0), 2, '.', ' ') ?>% (<?= format_money_converted($ristourneInfo['montant_ristourne'] ?? 0) ?>)</p>
+            <?php endif; ?>
         </div>
         <div class="divider"></div>
         

@@ -31,6 +31,35 @@ class ClientController extends Controller
         ]);
     }
 
+    public function apiList()
+    {
+        $uri = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
+        $isMobile = strpos($uri, '/api/mobile/') !== false;
+        if (!$isMobile) {
+            $this->requireAuth();
+        }
+
+        $actifs = ($_GET['actifs'] ?? 'true');
+        $zoneId = $_GET['zone_id'] ?? null;
+
+        if (!empty($zoneId)) {
+            $clients = $this->clientModel->getByZone($zoneId);
+        } else {
+            $clients = $this->clientModel->getAllWithZone();
+        }
+
+        if ($actifs === 'false' || $actifs === '0') {
+            $clients = $this->db->fetchAll(
+                "SELECT c.*, z.nom as zone_nom
+                 FROM clients c
+                 LEFT JOIN zones z ON c.zone_id = z.id
+                 ORDER BY c.nom"
+            );
+        }
+
+        return $this->success($clients);
+    }
+
     /**
      * Enregistrer ou mettre à jour un client
      */

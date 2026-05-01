@@ -7,20 +7,43 @@ class MobileController extends Controller {
      */
     public function login() {
         $data = $this->getJsonInput();
-        $auth = new Auth();
-        $user = $auth->attempt($data['email'], $data['password']);
+        $userModel = new User();
+        $user = false;
+
+        $password = $data['password'] ?? '';
+
+        if (!empty($data['username'])) {
+            $user = $userModel->authenticate($data['username'], $password);
+        } elseif (!empty($data['email'])) {
+            $candidate = $userModel->findBy('email', $data['email']);
+            if ($candidate && ($candidate['actif'] ?? 0) && password_verify($password, $candidate['password'] ?? '')) {
+                $userModel->update($candidate['id'], ['derniere_connexion' => date('Y-m-d H:i:s')]);
+                $user = $candidate;
+            }
+        }
         
         if ($user) {
+            if (isset($user['password'])) {
+                unset($user['password']);
+            }
+
             // Récupérer la mission en cours pour ce vendeur
-            $missionModel = new Mission();
-            $mission = (new Mission())->db->fetch(
+            $mission = $this->db->fetch(
                 "SELECT * FROM missions WHERE chauffeur_id = ? AND statut = 'en_cours' LIMIT 1",
                 [$user['id']]
             );
+
+            $parametreModel = new Parametre();
             
             return $this->success([
                 'user' => $user,
-                'mission' => $mission
+                'mission' => $mission,
+                'settings' => [
+                    'devise' => $parametreModel->get('devise', 'CDF'),
+                    'devise_base' => $parametreModel->get('devise_base', 'CDF'),
+                    'taux_change' => (float) $parametreModel->get('taux_change', '2800'),
+                    'taux_tva' => (float) $parametreModel->get('taux_tva', 16)
+                ]
             ]);
         }
         return $this->error('Identifiants invalides', 401);
@@ -30,54 +53,256 @@ class MobileController extends Controller {
      * Voir le stock disponible dans le véhicule de la mission
      */
     public function getStock($missionId) {
-        $sql = "SELECT p.id, p.nom, p.code, mc.quantite_chargee, 
-                (mc.quantite_chargee - IFNULL(mc.quantite_vendue, 0)) as stock_actuel
+        $sql = "SELECT p.id, p.nom, p.code, p.bouteilles_par_caisses,
+                       p.prix_vente_unitaire, p.prix_vente_caisses,
+                       mc.quantite_chargee,
+                       (mc.quantite_chargee - IFNULL(mc.quantite_vendue, 0)) as stock_actuel
                 FROM mission_chargements mc
                 JOIN produits p ON mc.produit_id = p.id
                 WHERE mc.mission_id = ?";
-        $stock = (new Mission())->db->fetchAll($sql, [$missionId]);
+        $stock = $this->db->fetchAll($sql, [$missionId]);
         return $this->success($stock);
+    }
+
+    public function listVentes()
+    {
+        $missionId = $_GET['mission_id'] ?? null;
+        if (empty($missionId)) {
+            return $this->success([]);
+        }
+
+        $rows = $this->db->fetchAll(
+            "SELECT v.id, v.numero_facture, v.date_vente, v.total_ttc,
+                    c.nom as client_nom
+             FROM ventes v
+             JOIN clients c ON v.client_id = c.id
+             WHERE v.mission_id = :mission_id AND v.statut = 'validee'
+             ORDER BY v.date_vente DESC
+             LIMIT 100",
+            ['mission_id' => (int) $missionId]
+        );
+
+        return $this->success($rows);
     }
 
     /**
      * Enregistrer une vente depuis le mobile
      */
     public function storeVente() {
-        $data = $this->getJsonInput(); // client_id, mission_id, produits[], total
+        $data = $this->getJsonInput(); // client_id, mission_id, produits[], total, devise
+
+        if (empty($data['produits']) && !empty($data['details']) && is_array($data['details'])) {
+            $data['produits'] = $data['details'];
+        }
+
+        if (empty($data['produits']) && !empty($data['items']) && is_array($data['items'])) {
+            $data['produits'] = $data['items'];
+        }
         
         try {
             $this->db->beginTransaction();
 
-            $venteModel = new Vente();
-            $venteId = $venteModel->create([
-                'numero_facture' => 'MOB-' . date('YmdHis'),
-                'client_id' => $data['client_id'],
-                'mission_id' => $data['mission_id'],
-                'total_ttc' => $data['total'],
-                'statut' => 'validee',
-                'created_by' => $data['user_id']
+            $errors = $this->validate($data, [
+                'client_id' => 'required|numeric',
+                'mission_id' => 'required|numeric',
+                'user_id' => 'required|numeric',
+                'produits' => 'required'
             ]);
 
+            if (!empty($errors)) {
+                $this->db->rollBack();
+                return $this->error('Erreurs de validation', 422, $errors);
+            }
+
+            if (!is_array($data['produits'] ?? null) || empty($data['produits'])) {
+                $this->db->rollBack();
+                return $this->error('Liste des produits invalide', 422);
+            }
+
+            $parametreModel = new Parametre();
+            $tva = (float) $parametreModel->get('taux_tva', 16);
+
+            $fromDevise = $data['devise'] ?? get_devise();
+            $toDevise = get_base_devise();
+
+            $mission = $this->db->fetch(
+                "SELECT * FROM missions WHERE id = :id LIMIT 1",
+                ['id' => (int) $data['mission_id']]
+            );
+
+            if (!$mission) {
+                $this->db->rollBack();
+                return $this->error('Mission non trouvée', 404);
+            }
+
+            if (($mission['statut'] ?? null) !== 'en_cours') {
+                $this->db->rollBack();
+                return $this->error('Mission non en cours', 422);
+            }
+
+            $vehicule = $this->db->fetch(
+                "SELECT * FROM vehicules WHERE id = :id LIMIT 1",
+                ['id' => (int) $mission['vehicule_id']]
+            );
+
+            $emplacementVehiculeId = $vehicule['emplacement_id'] ?? null;
+
+            if (empty($emplacementVehiculeId)) {
+                $this->db->rollBack();
+                return $this->error('Emplacement véhicule introuvable', 422);
+            }
+
+            $venteModel = new Vente();
+
+            $produitModel = new Produit();
+            $stockModel = new Stock();
+            $mouvementModel = new MouvementStock();
+
+            $totalHt = 0;
+            $details = [];
+
             foreach ($data['produits'] as $item) {
-                // 1. Ajouter l'item de vente
-                $this->db->insert('vente_items', [
+                $produitId = (int) ($item['produit_id'] ?? 0);
+                $quantite = (float) ($item['quantite'] ?? 0);
+
+                if ($produitId <= 0 || $quantite <= 0) {
+                    throw new Exception('Produit ou quantité invalide');
+                }
+
+                $produit = $produitModel->find($produitId);
+                if (!$produit) {
+                    throw new Exception('Produit non trouvé');
+                }
+
+                // Verrouiller la ligne pour éviter les ventes concurrentes sur le même chargement
+                $chargement = $this->db->fetch(
+                    "SELECT quantite_chargee, IFNULL(quantite_vendue, 0) as quantite_vendue
+                     FROM mission_chargements
+                     WHERE mission_id = :m AND produit_id = :p
+                     FOR UPDATE",
+                    ['m' => (int) $data['mission_id'], 'p' => $produitId]
+                );
+
+                if (!$chargement) {
+                    throw new Exception('Chargement mission introuvable pour ce produit');
+                }
+
+                $stockActuelMission = (float) $chargement['quantite_chargee'] - (float) $chargement['quantite_vendue'];
+                if ($quantite > $stockActuelMission) {
+                    throw new Exception('Stock mission insuffisant');
+                }
+
+                $prixInput = $item['prix_unitaire'] ?? $item['prix'] ?? null;
+                if ($prixInput === null || $prixInput === '') {
+                    $prixBase = (float) ($produit['prix_vente_unitaire'] ?? 0);
+                } else {
+                    $prixBase = convert_money((float) $prixInput, $fromDevise, $toDevise);
+                }
+
+                $sousTotal = $quantite * $prixBase;
+                $totalHt += $sousTotal;
+
+                $details[] = [
+                    'produit_id' => $produitId,
+                    'quantite' => $quantite,
+                    'prix_unitaire' => $prixBase,
+                    'sous_total' => $sousTotal,
+                    'bouteilles_par_caisses' => (float) ($produit['bouteilles_par_caisses'] ?: 24)
+                ];
+            }
+
+            $totalTva = $totalHt * ($tva / 100);
+            $totalTtc = $totalHt + $totalTva;
+
+            $numeroFacture = 'MOB-' . date('YmdHis');
+
+            $venteId = $venteModel->create([
+                'numero_facture' => $numeroFacture,
+                'client_id' => (int) $data['client_id'],
+                'date_vente' => date('Y-m-d H:i:s'),
+                'mission_id' => (int) $data['mission_id'],
+                'emplacement_id' => (int) $emplacementVehiculeId,
+                'total_ht' => $totalHt,
+                'total_tva' => $totalTva,
+                'total_ttc' => $totalTtc,
+                'statut' => 'validee',
+                'notes' => $data['notes'] ?? '',
+                'created_by' => (int) $data['user_id']
+            ]);
+
+            foreach ($details as $detail) {
+                // 1. Ajouter le détail de vente (stocké en devise_base)
+                $this->db->insert('vente_details', [
                     'vente_id' => $venteId,
-                    'produit_id' => $item['produit_id'],
-                    'quantite' => $item['quantite'],
-                    'prix_unitaire' => $item['prix']
+                    'produit_id' => $detail['produit_id'],
+                    'quantite' => $detail['quantite'],
+                    'prix_unitaire' => $detail['prix_unitaire'],
+                    'sous_total' => $detail['sous_total']
                 ]);
 
-                // 2. Déduire du stock de la mission (mission_chargements)
+                // 2. Déduire du stock de la mission
                 $this->db->query(
-                    "UPDATE mission_chargements 
-                     SET quantite_vendue = IFNULL(quantite_vendue, 0) + ? 
-                     WHERE mission_id = ? AND produit_id = ?",
-                    [$item['quantite'], $data['mission_id'], $item['produit_id']]
+                    "UPDATE mission_chargements
+                     SET quantite_vendue = IFNULL(quantite_vendue, 0) + :q
+                     WHERE mission_id = :m AND produit_id = :p",
+                    [
+                        'q' => $detail['quantite'],
+                        'm' => (int) $data['mission_id'],
+                        'p' => $detail['produit_id']
+                    ]
                 );
+
+                // 3. Déduire du stock du véhicule (pleins) pour que l'inventaire reste cohérent
+                $mouvementModel->create([
+                    'produit_id' => $detail['produit_id'],
+                    'emplacement_id' => (int) $emplacementVehiculeId,
+                    'type_mouvement' => 'sortie',
+                    'quantite' => -$detail['quantite'],
+                    'reference_type' => 'vente',
+                    'reference_id' => $venteId,
+                    'motif' => 'Vente mobile N° ' . $numeroFacture . ' (Plein)',
+                    'created_by' => (int) $data['user_id']
+                ]);
+
+                $stockModel->updateOrCreate(
+                    $detail['produit_id'],
+                    (int) $emplacementVehiculeId,
+                    [
+                        'quantite_pleine' => -$detail['quantite'],
+                        'caisses_pleine' => -($detail['quantite'] / $detail['bouteilles_par_caisses'])
+                    ]
+                );
+
+                // 4. Ajouter les vides automatiquement (comme sur le web)
+                $stockModel->updateOrCreate(
+                    $detail['produit_id'],
+                    (int) $emplacementVehiculeId,
+                    [
+                        'quantite_vide' => $detail['quantite'],
+                        'caisses_vide' => ($detail['quantite'] / $detail['bouteilles_par_caisses'])
+                    ]
+                );
+
+                $mouvementModel->create([
+                    'produit_id' => $detail['produit_id'],
+                    'emplacement_id' => (int) $emplacementVehiculeId,
+                    'type_mouvement' => 'entree',
+                    'quantite' => $detail['quantite'],
+                    'reference_type' => 'vente',
+                    'reference_id' => $venteId,
+                    'motif' => 'Retour vide automatique Vente N° ' . $numeroFacture,
+                    'created_by' => (int) $data['user_id']
+                ]);
             }
 
             $this->db->commit();
-            return $this->success(['vente_id' => $venteId], 'Vente enregistrée');
+            return $this->success([
+                'vente_id' => $venteId,
+                'total_ht' => $totalHt,
+                'total_tva' => $totalTva,
+                'total_ttc' => $totalTtc,
+                'devise_base' => $toDevise
+            ], 'Vente enregistrée');
 
         } catch (Exception $e) {
             $this->db->rollBack();

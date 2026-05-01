@@ -40,9 +40,12 @@ if (!function_exists('convert_money')) {
      * @param string $to Devise cible (USD ou CDF)
      * @return float
      */
-    function convert_money($montant, $from = 'USD', $to = 'CDF')
+    function convert_money($montant, $from = null, $to = null)
     {
         static $tauxChange = null;
+
+        $from = $from ?? get_base_devise();
+        $to = $to ?? get_devise();
         
         if ($tauxChange === null) {
             $parametreModel = new Parametre();
