@@ -40,7 +40,8 @@ Application web complète pour la gestion logistique d'un dépôt de boissons Br
 
 1. **Cloner le projet**
 ```bash
-cd c:\Users\james-mat\CascadeProjects\2048
+git clone https://github.com/mupenda-company/Stock_Manage_App.git
+# assurer d'avoir git dans votre pc si non installer le pour eviter des erreur de clonnage
 ```
 
 2. **Installer les dépendances frontend**
