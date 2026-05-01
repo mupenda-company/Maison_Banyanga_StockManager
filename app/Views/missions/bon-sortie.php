@@ -24,7 +24,7 @@
                 <h1 class="text-2xl font-bold text-gray-900"><?= htmlspecialchars($params['nom_entreprise'] ?? APP_NAME) ?></h1>
             </div>
             <div class="text-right">
-                <h2 class="text-xl font-bold text-primary-600">BON DE SORTIE</h2>
+                <h2 class="text-xl font-bold text-blue-600">BON DE SORTIE</h2>
                 <p class="text-lg font-semibold mt-1"><?= htmlspecialchars($mission['numero_mission']) ?></p>
                 <p class="text-sm text-gray-600 mt-2">
                     Date: <?= date('d/m/Y H:i', strtotime($mission['date_depart'])) ?>
@@ -129,7 +129,7 @@
         
         <!-- Boutons d'action -->
         <div class="no-print mt-8 flex justify-center space-x-4">
-            <button onclick="window.print()" class="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+            <button onclick="window.print()" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                 <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
                 </svg>
@@ -140,5 +140,13 @@
             </a>
         </div>
     </div>
+
+    <script>
+        window.onload = function() {
+            setTimeout(function() {
+                window.print();
+            }, 500);
+        };
+    </script>
 </body>
 </html>
