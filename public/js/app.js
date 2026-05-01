@@ -147,7 +147,51 @@ const App = {
             throw error;
         }
             
-            return result.data !== undefined ? result.data : result;
+            if (result && typeof result === 'object' && Object.prototype.hasOwnProperty.call(result, 'data')) {
+                const data = result.data;
+
+                // Cas DELETE/retour sans data: on renvoie l'enveloppe (message disponible)
+                if (data === null || data === undefined) {
+                    return result;
+                }
+
+                // Si data est un objet/array, on injecte message/success (non-énumérable)
+                // pour permettre les deux usages:
+                // - result.code (data)
+                // - result.message (message)
+                // - result.data.password (compat)
+                if (typeof data === 'object') {
+                    try {
+                        if (!Object.prototype.hasOwnProperty.call(data, 'message')) {
+                            Object.defineProperty(data, 'message', {
+                                value: result.message,
+                                enumerable: false,
+                                configurable: true
+                            });
+                        }
+                        if (!Object.prototype.hasOwnProperty.call(data, 'success')) {
+                            Object.defineProperty(data, 'success', {
+                                value: result.success,
+                                enumerable: false,
+                                configurable: true
+                            });
+                        }
+                        if (!Object.prototype.hasOwnProperty.call(data, 'data')) {
+                            Object.defineProperty(data, 'data', {
+                                value: data,
+                                enumerable: false,
+                                configurable: true
+                            });
+                        }
+                    } catch (_) {}
+                    return data;
+                }
+
+                // Data primitive (rare): on renvoie une enveloppe simple
+                return { data, message: result.message, success: result.success };
+            }
+
+            return result;
         } catch (error) {
             throw error;
         }

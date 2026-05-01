@@ -248,7 +248,7 @@ document.addEventListener('alpine:init', () => {
                 App.notify(result.message, 'success');
                 setTimeout(() => location.reload(), 1000);
             } catch (e) {
-                App.notify(e.message, 'error');
+                App.notify(e?.message || 'Erreur', 'error');
             } finally {
                 this.loading = false;
             }
@@ -272,10 +272,10 @@ function deleteVehicule(id, immat) {
 async function confirmDelete(id) {
     try {
         const result = await App.api(`/api/vehicules/${id}`, 'DELETE');
-        App.notify(result.message, 'success');
+        App.notify(result?.message || 'Véhicule désactivé avec succès', 'success');
         setTimeout(() => location.reload(), 1000);
     } catch (e) {
-        App.notify(e.message, 'error');
+        App.notify(e?.message || 'Erreur', 'error');
     }
 }
 </script>
