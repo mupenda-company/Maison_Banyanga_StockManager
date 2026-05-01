@@ -134,22 +134,7 @@ ob_start();
 
 <script>
 async function terminerMission(id) {
-    const ok = await App.confirm({
-        title: 'Terminer la mission ?',
-        message: 'Confirmer la fin de cette mission ?',
-        confirmText: 'Terminer',
-        cancelText: 'Annuler',
-        type: 'warning'
-    });
-    if (!ok) return;
-    
-    try {
-        const result = await App.api(`/api/missions/${id}/terminer`, 'POST');
-        App.notify(result.message, 'success');
-        setTimeout(() => location.reload(), 1000);
-    } catch (e) {
-        App.notify(e.message, 'error');
-    }
+    window.location.href = '<?= url('missions') ?>/' + id + '?terminer=1';
 }
 </script>
 

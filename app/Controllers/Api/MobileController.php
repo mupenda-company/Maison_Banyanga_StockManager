@@ -29,24 +29,52 @@ class MobileController extends Controller {
 
             // Récupérer la mission en cours pour ce vendeur
             $mission = $this->db->fetch(
-                "SELECT * FROM missions WHERE chauffeur_id = ? AND statut = 'en_cours' LIMIT 1",
-                [$user['id']]
+                "SELECT m.*, 
+                        v.immatriculation as vehicule_immatriculation,
+                        v.emplacement_id as vehicule_emplacement_id,
+                        z.nom as zone_nom
+                 FROM missions m
+                 JOIN vehicules v ON m.vehicule_id = v.id
+                 LEFT JOIN zones z ON m.zone_id = z.id
+                 WHERE m.statut = 'en_cours'
+                 AND (m.chauffeur_id = :chauffeur_id OR v.agent_responsable_id = :agent_id)
+                 ORDER BY m.date_depart DESC
+                 LIMIT 1",
+                [
+                    'chauffeur_id' => (int) $user['id'],
+                    'agent_id' => (int) $user['id']
+                ]
             );
 
             $parametreModel = new Parametre();
-            
-            return $this->success([
-                'user' => $user,
-                'mission' => $mission,
-                'settings' => [
+            $personnalisation = $parametreModel->getPersonnalisation();
+
+            $settings = array_merge(
+                $personnalisation,
+                [
                     'devise' => $parametreModel->get('devise', 'CDF'),
                     'devise_base' => $parametreModel->get('devise_base', 'CDF'),
                     'taux_change' => (float) $parametreModel->get('taux_change', '2800'),
                     'taux_tva' => (float) $parametreModel->get('taux_tva', 16)
                 ]
+            );
+
+            return $this->success([
+                'user' => $user,
+                'mission' => $mission,
+                'settings' => $settings
             ]);
         }
         return $this->error('Identifiants invalides', 401);
+    }
+
+    /**
+     * Branding / personnalisation (public) pour le mobile
+     */
+    public function branding()
+    {
+        $parametreModel = new Parametre();
+        return $this->success($parametreModel->getPersonnalisation());
     }
 
     /**
@@ -62,6 +90,78 @@ class MobileController extends Controller {
                 WHERE mc.mission_id = ?";
         $stock = $this->db->fetchAll($sql, [$missionId]);
         return $this->success($stock);
+    }
+
+    /**
+     * Résumé (dashboard) de mission: caisses restantes + vides dans le véhicule
+     */
+    public function getMissionStats($missionId)
+    {
+        $missionId = (int) $missionId;
+
+        $mission = $this->db->fetch(
+            "SELECT m.*, 
+                    v.immatriculation as vehicule_immatriculation,
+                    v.emplacement_id as vehicule_emplacement_id,
+                    z.nom as zone_nom
+             FROM missions m
+             JOIN vehicules v ON m.vehicule_id = v.id
+             LEFT JOIN zones z ON m.zone_id = z.id
+             WHERE m.id = :id
+             LIMIT 1",
+            ['id' => $missionId]
+        );
+
+        if (!$mission) {
+            return $this->error('Mission non trouvée', 404);
+        }
+
+        $emplacementId = (int) ($mission['vehicule_emplacement_id'] ?? 0);
+        if ($emplacementId <= 0) {
+            return $this->error('Emplacement véhicule introuvable', 422);
+        }
+
+        $stockTotals = $this->db->fetch(
+            "SELECT 
+                    COALESCE(SUM(caisses_pleine), 0) as caisses_pleine,
+                    COALESCE(SUM(caisses_vide), 0) as caisses_vide,
+                    COALESCE(SUM(quantite_pleine), 0) as bouteilles_pleine,
+                    COALESCE(SUM(quantite_vide), 0) as bouteilles_vide
+             FROM stocks
+             WHERE emplacement_id = :emplacement_id",
+            ['emplacement_id' => $emplacementId]
+        );
+
+        $chargementTotals = $this->db->fetch(
+            "SELECT
+                    COALESCE(SUM(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24)), 0) as caisses_chargees,
+                    COALESCE(SUM((mc.quantite_chargee - IFNULL(mc.quantite_vendue, 0)) / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24)), 0) as caisses_restantes
+             FROM mission_chargements mc
+             JOIN produits p ON mc.produit_id = p.id
+             WHERE mc.mission_id = :mission_id",
+            ['mission_id' => $missionId]
+        );
+
+        return $this->success([
+            'mission' => [
+                'id' => (int) ($mission['id'] ?? 0),
+                'numero_mission' => $mission['numero_mission'] ?? null,
+                'statut' => $mission['statut'] ?? null,
+                'date_depart' => $mission['date_depart'] ?? null,
+                'vehicule_immatriculation' => $mission['vehicule_immatriculation'] ?? null,
+                'zone_nom' => $mission['zone_nom'] ?? null,
+            ],
+            'chargement' => [
+                'caisses_chargees' => (float) ($chargementTotals['caisses_chargees'] ?? 0),
+                'caisses_restantes' => (float) ($chargementTotals['caisses_restantes'] ?? 0),
+            ],
+            'stock' => [
+                'caisses_pleine' => (float) ($stockTotals['caisses_pleine'] ?? 0),
+                'caisses_vide' => (float) ($stockTotals['caisses_vide'] ?? 0),
+                'bouteilles_pleine' => (float) ($stockTotals['bouteilles_pleine'] ?? 0),
+                'bouteilles_vide' => (float) ($stockTotals['bouteilles_vide'] ?? 0),
+            ]
+        ]);
     }
 
     public function listVentes()
@@ -83,6 +183,45 @@ class MobileController extends Controller {
         );
 
         return $this->success($rows);
+    }
+
+    /**
+     * Données facture (ticket) d'une vente pour le mobile
+     */
+    public function getVenteFacture($id)
+    {
+        $venteId = (int) $id;
+        if ($venteId <= 0) {
+            return $this->error('Vente invalide', 422);
+        }
+
+        $vente = (new Vente())->getWithDetails($venteId);
+        if (!$vente) {
+            return $this->error('Vente non trouvée', 404);
+        }
+
+        $parametreModel = new Parametre();
+        $params = $parametreModel->getPersonnalisation();
+
+        $totalCaissesClient = (float) $this->db->fetchColumn(
+            "SELECT COALESCE(SUM(vd.quantite / p.bouteilles_par_caisses), 0)
+             FROM vente_details vd
+             JOIN ventes v ON vd.vente_id = v.id
+             JOIN produits p ON vd.produit_id = p.id
+             WHERE v.client_id = :client_id AND v.statut = 'validee'",
+            ['client_id' => (int) ($vente['client_id'] ?? 0)]
+        );
+
+        $mois = (int) date('m', strtotime($vente['date_vente'] ?? date('Y-m-d')));
+        $annee = (int) date('Y', strtotime($vente['date_vente'] ?? date('Y-m-d')));
+        $ristourneInfo = (new Ristourne())->calculerRistourne((int) $vente['client_id'], $mois, $annee);
+
+        return $this->success([
+            'vente' => $vente,
+            'params' => $params,
+            'totalCaissesClient' => $totalCaissesClient,
+            'ristourneInfo' => $ristourneInfo
+        ]);
     }
 
     /**
@@ -298,6 +437,7 @@ class MobileController extends Controller {
             $this->db->commit();
             return $this->success([
                 'vente_id' => $venteId,
+                'numero_facture' => $numeroFacture,
                 'total_ht' => $totalHt,
                 'total_tva' => $totalTva,
                 'total_ttc' => $totalTtc,

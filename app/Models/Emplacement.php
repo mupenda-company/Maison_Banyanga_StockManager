@@ -51,7 +51,13 @@ class Emplacement extends Model
                     COALESCE(SUM(s.caisses_vide), 0) as total_caisses_vide
              FROM {$this->table} e
              LEFT JOIN stocks s ON e.id = s.emplacement_id
-             WHERE e.actif = 1
+             LEFT JOIN (
+                 SELECT emplacement_id
+                 FROM vehicules
+                 WHERE actif = 1
+                 GROUP BY emplacement_id
+             ) v ON v.emplacement_id = e.id
+             WHERE e.actif = 1 AND (e.type != 'mobile' OR v.emplacement_id IS NOT NULL)
              GROUP BY e.id
              ORDER BY e.type, e.nom"
         );

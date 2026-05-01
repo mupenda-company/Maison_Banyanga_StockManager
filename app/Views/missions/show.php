@@ -369,6 +369,14 @@ ob_start();
 function terminerMission() {
     window.dispatchEvent(new CustomEvent('open-modal-terminer'));
 }
+
+<?php if (isset($_GET['terminer']) && (string)$_GET['terminer'] === '1' && ($mission['statut'] ?? null) === 'en_cours'): ?>
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        try { terminerMission(); } catch (_) {}
+    }, 50);
+});
+<?php endif; ?>
 </script>
 
 <?php 

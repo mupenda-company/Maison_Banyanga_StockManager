@@ -177,6 +177,10 @@ class MissionController extends Controller
         
         $data = $this->getJsonInput();
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
+
+        if (empty($data) || (!isset($data['retours']) && !isset($data['vides_retournes']) && !isset($data['montant_encaisse']))) {
+            return $this->error('Veuillez enregistrer les retours (pleins/vides) et le montant encaissé avant de clôturer la mission', 422);
+        }
         
         // Préparer les retours de produits pleins (invendus)
         $retours = [];

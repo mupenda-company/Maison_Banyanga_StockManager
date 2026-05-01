@@ -69,7 +69,6 @@
                     <span><?= number_format($caisses, 1, '.', ' ') ?> cs x <?= format_money_converted($prixCaisse) ?></span>
                     <span class="font-bold"><?= format_money_converted($detail['sous_total']) ?></span>
                 </div>
-                <p class="text-[9px] text-gray-500 italic"><?= '(' . number_format($detail['quantite']) . ' btl)' ?></p>
             </div>
             <?php endforeach; ?>
         </div>

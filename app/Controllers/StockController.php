@@ -142,7 +142,7 @@ class StockController extends Controller
         }
 
         $produits = $this->produitModel->getActive();
-        $emplacements = $this->emplacementModel->all('type, nom');
+        $emplacements = $this->emplacementModel->getWithStock();
         $categories = $this->produitModel->getCategories();
         
         // Totaux globaux (non paginés pour le résumé)
@@ -296,7 +296,7 @@ class StockController extends Controller
         }
 
         $produits = $this->produitModel->getActive();
-        $emplacements = $this->emplacementModel->all('type, nom');
+        $emplacements = $this->emplacementModel->getWithStock();
         
         $pagination = [
             'current_page' => $page,

@@ -5,14 +5,28 @@
 
 require_once __DIR__ . '/../config/config.php';
 
-// Parser l'URL en tenant compte du chemin de base
-$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-// Supprimer le chemin de base de l'URI
+$requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
 if (defined('BASE_PATH') && BASE_PATH !== '') {
-    $uri = preg_replace('#^' . preg_quote(BASE_PATH) . '#', '', $uri);
+    $requestPath = preg_replace('#^' . preg_quote(BASE_PATH) . '#', '', $requestPath);
 }
-$uri = str_replace('/index.php', '', $uri);
-$uri = rtrim($uri, '/') ?: '/';
+$requestPath = str_replace('/index.php', '', $requestPath);
+$requestPath = rtrim($requestPath, '/') ?: '/';
+
+if (strpos($requestPath, '/api/mobile/') === 0) {
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Accept, Authorization, X-Requested-With');
+    header('Access-Control-Max-Age: 86400');
+
+    if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+        http_response_code(204);
+        exit;
+    }
+}
+
+// Parser l'URL en tenant compte du chemin de base
+$uri = $requestPath;
+// Supprimer le chemin de base de l'URI
 
 // Routes de l'application
 $routes = [
@@ -99,8 +113,11 @@ $routes = [
 
     // API Mobile
     'POST::/api/mobile/login' => ['MobileController', 'login'],
+    'GET::/api/mobile/branding' => ['MobileController', 'branding'],
     'GET::/api/mobile/mission/(\d+)/stock' => ['MobileController', 'getStock'],
+    'GET::/api/mobile/mission/(\d+)/stats' => ['MobileController', 'getMissionStats'],
     'POST::/api/mobile/vente' => ['MobileController', 'storeVente'],
+    'GET::/api/mobile/vente/(\d+)/facture' => ['MobileController', 'getVenteFacture'],
     'GET::/api/mobile/clients' => ['ClientController', 'apiList'],
     'GET::/api/mobile/ventes' => ['MobileController', 'listVentes'],
     

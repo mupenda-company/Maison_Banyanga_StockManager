@@ -6,7 +6,7 @@
 class Mission extends Model
 {
     protected $table = 'missions';
-    protected $fillable = ['numero_mission', 'vehicule_id', 'chauffeur_id', 'date_depart', 'date_retour', 'zone_id', 'notes', 'statut', 'created_by'];
+    protected $fillable = ['numero_mission', 'vehicule_id', 'chauffeur_id', 'date_depart', 'date_retour', 'zone_id', 'notes', 'statut', 'montant_encaisse', 'created_by'];
     
     /**
      * Générer un numéro de mission unique

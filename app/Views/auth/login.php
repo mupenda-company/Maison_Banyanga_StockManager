@@ -5,15 +5,47 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Connexion - <?= APP_NAME ?></title>
     <link href="<?= asset('css/app.css') ?>" rel="stylesheet">
+    <style>
+        :root {
+            --color-primary-50: 239 246 255;
+            --color-primary-100: 219 234 254;
+            --color-primary-200: 191 219 254;
+            --color-primary-300: 147 197 253;
+            --color-primary-400: 96 165 250;
+            --color-primary-500: 59 130 246;
+            --color-primary-600: 37 99 235;
+            --color-primary-700: 29 78 216;
+            --color-primary-800: 30 64 175;
+            --color-primary-900: 30 58 138;
+        }
+    </style>
     <script>
         window.BASE_URL = '<?= APP_URL ?>';
         <?php 
         $parametreModel = new Parametre();
         $logo = $parametreModel->get('logo');
         $nomEntreprise = $parametreModel->get('nom_entreprise', APP_NAME);
+        $couleurPrimaire = $parametreModel->get('couleur_primaire', '#3B82F6');
         ?>
         window.LOGO_URL = '<?= $logo ? asset('uploads/' . $logo) : '' ?>';
         window.NOM_ENTREPRISE = '<?= htmlspecialchars($nomEntreprise) ?>';
+        window.COULEUR_PRIMAIRE = '<?= htmlspecialchars($couleurPrimaire) ?>';
+    </script>
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.store('theme', {
+                dark: localStorage.getItem('theme') === 'dark' ||
+                    (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches),
+                toggle() {
+                    this.dark = !this.dark;
+                    localStorage.setItem('theme', this.dark ? 'dark' : 'light');
+                    document.documentElement.classList.toggle('dark', this.dark);
+                },
+                init() {
+                    document.documentElement.classList.toggle('dark', this.dark);
+                }
+            });
+        });
     </script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="<?= asset('js/app.js') ?>" defer></script>

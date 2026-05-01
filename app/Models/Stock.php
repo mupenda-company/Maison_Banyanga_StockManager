@@ -32,7 +32,7 @@ class Stock extends Model
      */
     public function getAllPaginated($page = 1, $perPage = 20, $filters = [])
     {
-        $where = "p.actif = 1 AND e.actif = 1";
+        $where = "p.actif = 1 AND e.actif = 1 AND (e.type != 'mobile' OR v.emplacement_id IS NOT NULL)";
         $params = [];
         
         if (!empty($filters['produit_id'])) {
@@ -58,6 +58,12 @@ class Stock extends Model
         $countSql = "SELECT COUNT(*) FROM {$this->table} s 
                      JOIN produits p ON s.produit_id = p.id 
                      JOIN emplacements e ON s.emplacement_id = e.id 
+                     LEFT JOIN (
+                         SELECT emplacement_id, MAX(immatriculation) as immatriculation
+                         FROM vehicules
+                         WHERE actif = 1
+                         GROUP BY emplacement_id
+                     ) v ON v.emplacement_id = e.id
                      WHERE {$where}";
         $total = (int) $this->db->fetchColumn($countSql, $params);
         
@@ -67,7 +73,12 @@ class Stock extends Model
                 FROM {$this->table} s
                 JOIN produits p ON s.produit_id = p.id
                 JOIN emplacements e ON s.emplacement_id = e.id
-                LEFT JOIN vehicules v ON e.id = v.emplacement_id
+                LEFT JOIN (
+                    SELECT emplacement_id, MAX(immatriculation) as immatriculation
+                    FROM vehicules
+                    WHERE actif = 1
+                    GROUP BY emplacement_id
+                ) v ON v.emplacement_id = e.id
                 WHERE {$where}
                 ORDER BY e.type, e.nom, p.nom
                 LIMIT {$perPage} OFFSET {$offset}";
@@ -206,7 +217,7 @@ class Stock extends Model
      */
     public function getInventairePaginated($page = 1, $perPage = 5, $filters = [])
     {
-        $where = "p.actif = 1 AND e.actif = 1";
+        $where = "p.actif = 1 AND e.actif = 1 AND (e.type != 'mobile' OR v.emplacement_id IS NOT NULL)";
         $params = [];
         
         if (!empty($filters['emplacement_id'])) {
@@ -224,6 +235,12 @@ class Stock extends Model
         $countSql = "SELECT COUNT(*) FROM produits p 
                      CROSS JOIN emplacements e 
                      LEFT JOIN {$this->table} s ON p.id = s.produit_id AND e.id = s.emplacement_id 
+                     LEFT JOIN (
+                         SELECT emplacement_id, MAX(immatriculation) as immatriculation, MAX(agent_responsable_id) as agent_responsable_id
+                         FROM vehicules
+                         WHERE actif = 1
+                         GROUP BY emplacement_id
+                     ) v ON v.emplacement_id = e.id
                      WHERE {$where}";
         $total = (int) $this->db->fetchColumn($countSql, $params);
         
@@ -241,7 +258,12 @@ class Stock extends Model
                 FROM produits p
                 CROSS JOIN emplacements e
                 LEFT JOIN {$this->table} s ON p.id = s.produit_id AND e.id = s.emplacement_id
-                LEFT JOIN vehicules v ON e.id = v.emplacement_id
+                LEFT JOIN (
+                    SELECT emplacement_id, MAX(immatriculation) as immatriculation, MAX(agent_responsable_id) as agent_responsable_id
+                    FROM vehicules
+                    WHERE actif = 1
+                    GROUP BY emplacement_id
+                ) v ON v.emplacement_id = e.id
                 LEFT JOIN users u ON v.agent_responsable_id = u.id
                 WHERE {$where}
                 ORDER BY p.nom, e.type, e.nom
@@ -263,7 +285,7 @@ class Stock extends Model
      */
     public function getInventaireTotaux($filters = [])
     {
-        $where = "p.actif = 1 AND e.actif = 1";
+        $where = "p.actif = 1 AND e.actif = 1 AND (e.type != 'mobile' OR v.emplacement_id IS NOT NULL)";
         $params = [];
         
         if (!empty($filters['emplacement_id'])) {
@@ -286,6 +308,12 @@ class Stock extends Model
                 FROM produits p
                 CROSS JOIN emplacements e
                 LEFT JOIN {$this->table} s ON p.id = s.produit_id AND e.id = s.emplacement_id
+                LEFT JOIN (
+                    SELECT emplacement_id
+                    FROM vehicules
+                    WHERE actif = 1
+                    GROUP BY emplacement_id
+                ) v ON v.emplacement_id = e.id
                 WHERE {$where}";
         
         $row = $this->db->fetch($sql, $params);
