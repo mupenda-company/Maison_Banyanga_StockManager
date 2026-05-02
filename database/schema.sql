@@ -192,6 +192,7 @@ CREATE TABLE IF NOT EXISTS `missions` (
     `date_retour` DATETIME NULL,
     `zone_id` INT UNSIGNED,
     `notes` TEXT,
+    `montant_encaisse` DECIMAL(15,2) DEFAULT 0,
     `statut` ENUM('en_cours', 'terminee', 'annulee') NOT NULL DEFAULT 'en_cours',
     `created_by` INT UNSIGNED,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -352,7 +353,7 @@ CREATE TABLE IF NOT EXISTS `alertes` (
 -- Structure de la table `retours_emballages`
 -- --------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS retours_emballages (
+CREATE TABLE IF NOT EXISTS `retours_emballages` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `client_id` INT UNSIGNED NOT NULL,
     `produit_id` INT UNSIGNED NOT NULL,
@@ -380,7 +381,7 @@ CREATE TABLE IF NOT EXISTS `ristourne_paliers` (
     `montant_par_caisse` DECIMAL(15,2) NOT NULL,
     `type_produit` VARCHAR(50) DEFAULT 'tous',
     `actif` TINYINT(1) DEFAULT 1,
-    `created_at` TIMESTAMP DEFAULT CURRENT_DATE
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `ristournes` (
@@ -410,7 +411,7 @@ INSERT INTO `ristourne_paliers` (`quantite_min`, `quantite_max`, `montant_par_ca
 
 -- Utilisateur admin par défaut
 INSERT INTO `users` (`username`, `email`, `password`, `nom`, `prenom`, `role`) VALUES
-('admin', 'admin@bralima.cd', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Administrateur', 'Système', 'admin');
+('admin', 'admin@bralima.cd', '$2y$10$P6GArcijgFX6rQVQQTxxg.TusYWUJObGMjjfuMtJOB1B.dHskS2JC', 'Administrateur', 'Système', 'admin');
 
 -- Paramètres par défaut
 INSERT INTO `parametres` (`cle`, `valeur`, `type`) VALUES
@@ -421,11 +422,12 @@ INSERT INTO `parametres` (`cle`, `valeur`, `type`) VALUES
 ('telephone', '', 'text'),
 ('email_contact', '', 'text'),
 ('devise', 'CDF', 'text'),
+('devise_base', 'CDF', 'text'),
 ('taux_tva', '16', 'number');
 
 -- Emplacement principal par défaut (Entrepôt)
 INSERT INTO `emplacements` (`code`, `nom`, `type`, `capacite`) VALUES
-('ENT-001', 'Entrepôt Principal', 'fixe', 10000);
+('ENT-001', 'Entrepôt Principal', 'fixe', 1000000);
 
 -- Paliers de ristourne par défaut
 INSERT INTO `paliers_ristourne` (`nom`, `ca_min`, `ca_max`, `taux_ristourne`) VALUES

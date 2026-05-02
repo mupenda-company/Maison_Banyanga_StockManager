@@ -220,7 +220,7 @@ class Mission extends Model
                     $mouvementModel->create([
                         'produit_id' => $produitId,
                         'emplacement_id' => $emplacementPrincipalId,
-                        'type_mouvement' => 'entree_vide',
+                        'type_mouvement' => 'entree',
                         'quantite' => 0,
                         'caisses_vide' => $nbCaissesVides,
                         'reference_type' => 'mission',
@@ -232,12 +232,25 @@ class Mission extends Model
             }
             
             // 3. Clôturer la mission
-            $this->update($id, [
+            $updateData = [
                 'statut' => 'terminee',
                 'date_retour' => date('Y-m-d H:i:s'),
-                'montant_encaisse' => $montant_encaisse,
                 'notes' => ($mission['notes'] ?? '') . "\nMission terminée. Montant encaissé: " . $montant_encaisse
-            ]);
+            ];
+
+            $hasMontantEncaisseColumn = (bool) $this->db->fetchColumn(
+                "SELECT COUNT(*)
+                 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'missions'
+                   AND COLUMN_NAME = 'montant_encaisse'"
+            );
+
+            if ($hasMontantEncaisseColumn) {
+                $updateData['montant_encaisse'] = $montant_encaisse;
+            }
+
+            $this->update($id, $updateData);
             
             $this->db->commit();
             return ['success' => true];

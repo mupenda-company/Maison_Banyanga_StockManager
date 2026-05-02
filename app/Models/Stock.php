@@ -58,12 +58,7 @@ class Stock extends Model
         $countSql = "SELECT COUNT(*) FROM {$this->table} s 
                      JOIN produits p ON s.produit_id = p.id 
                      JOIN emplacements e ON s.emplacement_id = e.id 
-                     LEFT JOIN (
-                         SELECT emplacement_id, MAX(immatriculation) as immatriculation
-                         FROM vehicules
-                         WHERE actif = 1
-                         GROUP BY emplacement_id
-                     ) v ON v.emplacement_id = e.id
+                     LEFT JOIN vehicules v ON v.emplacement_id = e.id AND v.actif = 1
                      WHERE {$where}";
         $total = (int) $this->db->fetchColumn($countSql, $params);
         
@@ -73,12 +68,7 @@ class Stock extends Model
                 FROM {$this->table} s
                 JOIN produits p ON s.produit_id = p.id
                 JOIN emplacements e ON s.emplacement_id = e.id
-                LEFT JOIN (
-                    SELECT emplacement_id, MAX(immatriculation) as immatriculation
-                    FROM vehicules
-                    WHERE actif = 1
-                    GROUP BY emplacement_id
-                ) v ON v.emplacement_id = e.id
+                LEFT JOIN vehicules v ON v.emplacement_id = e.id AND v.actif = 1
                 WHERE {$where}
                 ORDER BY e.type, e.nom, p.nom
                 LIMIT {$perPage} OFFSET {$offset}";
@@ -107,6 +97,7 @@ class Stock extends Model
                     COALESCE(SUM(s.caisses_vide), 0) as total_caisses_vide
              FROM produits p
              LEFT JOIN {$this->table} s ON p.id = s.produit_id
+             LEFT JOIN emplacements e ON s.emplacement_id = e.id
              WHERE p.actif = 1
              GROUP BY p.id
              ORDER BY p.nom"
@@ -233,14 +224,9 @@ class Stock extends Model
         $offset = ($page - 1) * $perPage;
         
         $countSql = "SELECT COUNT(*) FROM produits p 
-                     CROSS JOIN emplacements e 
+                     JOIN emplacements e ON e.actif = 1
                      LEFT JOIN {$this->table} s ON p.id = s.produit_id AND e.id = s.emplacement_id 
-                     LEFT JOIN (
-                         SELECT emplacement_id, MAX(immatriculation) as immatriculation, MAX(agent_responsable_id) as agent_responsable_id
-                         FROM vehicules
-                         WHERE actif = 1
-                         GROUP BY emplacement_id
-                     ) v ON v.emplacement_id = e.id
+                     LEFT JOIN vehicules v ON v.emplacement_id = e.id AND v.actif = 1
                      WHERE {$where}";
         $total = (int) $this->db->fetchColumn($countSql, $params);
         
@@ -256,14 +242,9 @@ class Stock extends Model
                     COALESCE(s.caisses_pleine, 0) as caisses_pleine,
                     COALESCE(s.caisses_vide, 0) as caisses_vide
                 FROM produits p
-                CROSS JOIN emplacements e
+                JOIN emplacements e ON e.actif = 1
                 LEFT JOIN {$this->table} s ON p.id = s.produit_id AND e.id = s.emplacement_id
-                LEFT JOIN (
-                    SELECT emplacement_id, MAX(immatriculation) as immatriculation, MAX(agent_responsable_id) as agent_responsable_id
-                    FROM vehicules
-                    WHERE actif = 1
-                    GROUP BY emplacement_id
-                ) v ON v.emplacement_id = e.id
+                LEFT JOIN vehicules v ON v.emplacement_id = e.id AND v.actif = 1
                 LEFT JOIN users u ON v.agent_responsable_id = u.id
                 WHERE {$where}
                 ORDER BY p.nom, e.type, e.nom
@@ -306,14 +287,9 @@ class Stock extends Model
                     COALESCE(SUM(s.quantite_vide), 0) as total_btl_vide,
                     SUM(COALESCE(s.caisses_pleine, 0) * (COALESCE(p.prix_vente_caisses, 0))) as valeur_stock
                 FROM produits p
-                CROSS JOIN emplacements e
+                JOIN emplacements e ON e.actif = 1
                 LEFT JOIN {$this->table} s ON p.id = s.produit_id AND e.id = s.emplacement_id
-                LEFT JOIN (
-                    SELECT emplacement_id
-                    FROM vehicules
-                    WHERE actif = 1
-                    GROUP BY emplacement_id
-                ) v ON v.emplacement_id = e.id
+                LEFT JOIN vehicules v ON v.emplacement_id = e.id AND v.actif = 1
                 WHERE {$where}";
         
         $row = $this->db->fetch($sql, $params);

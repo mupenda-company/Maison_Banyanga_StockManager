@@ -319,7 +319,7 @@ ob_start();
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <template x-for="c in chargements" :key="c.produit_id">
+                                        <template x-for="(c, index) in chargements" :key="index + '-' + c.produit_id">
                                             <tr>
                                                 <td x-text="c.produit_nom"></td>
                                                 <td x-text="c.quantite_chargee + ' btl'"></td>

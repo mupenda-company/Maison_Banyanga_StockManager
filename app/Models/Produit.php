@@ -35,6 +35,7 @@ class Produit extends Model
                     COALESCE(SUM(s.caisses_vide), 0) as stock_caisses_vide
              FROM {$this->table} p
              LEFT JOIN stocks s ON p.id = s.produit_id
+             LEFT JOIN emplacements e ON s.emplacement_id = e.id
              WHERE p.actif = 1
              GROUP BY p.id
              ORDER BY p.nom"

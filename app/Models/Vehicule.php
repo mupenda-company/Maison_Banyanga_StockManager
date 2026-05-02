@@ -59,7 +59,7 @@ class Vehicule extends Model
              FROM {$this->table} v
              LEFT JOIN users u ON v.agent_responsable_id = u.id
              LEFT JOIN emplacements e ON v.emplacement_id = e.id
-             WHERE v.id = :id",
+             WHERE v.id = :id AND v.actif = 1",
             ['id' => $id]
         );
         
