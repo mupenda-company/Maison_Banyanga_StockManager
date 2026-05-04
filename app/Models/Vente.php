@@ -291,14 +291,32 @@ class Vente extends Model
             $where .= " AND emplacement_id = :emplacement_id";
             $params['emplacement_id'] = $emplacementId;
         }
-        
+
+        $caissesWhere = "v2.date_vente BETWEEN :caisses_date_debut AND :caisses_date_fin AND v2.statut = 'validee'";
+        if ($emplacementId) {
+            $caissesWhere .= " AND v2.emplacement_id = :caisses_emplacement_id";
+        }
+
+        $params['caisses_date_debut'] = $dateDebut;
+        $params['caisses_date_fin'] = $dateFin;
+        if ($emplacementId) {
+            $params['caisses_emplacement_id'] = $emplacementId;
+        }
+
         return $this->db->fetch(
             "SELECT 
                 COUNT(*) as nb_ventes,
                 SUM(total_ht) as total_ht,
                 SUM(total_tva) as total_tva,
                 SUM(total_ttc) as total_ttc,
-                AVG(total_ttc) as moyenne_vente
+                AVG(total_ttc) as moyenne_vente,
+                (
+                    SELECT COALESCE(SUM(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24)), 0)
+                    FROM vente_details vd
+                    JOIN ventes v2 ON vd.vente_id = v2.id
+                    JOIN produits p ON vd.produit_id = p.id
+                    WHERE {$caissesWhere}
+                ) as caisses_vendues
              FROM {$this->table}
              WHERE {$where}",
             $params

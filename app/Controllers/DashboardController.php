@@ -40,6 +40,31 @@ class DashboardController extends Controller
         // Statistiques du mois
         $firstDayMonth = date('Y-m-01');
         $statsMonth = $this->venteModel->getStats($firstDayMonth . ' 00:00:00', date('Y-m-d H:i:s'));
+
+        // Résumé clients du mois
+        $clientsCountMonth = (int) $this->db->fetchColumn(
+            "SELECT COUNT(DISTINCT client_id)
+             FROM ventes
+             WHERE date_vente BETWEEN :date_debut AND :date_fin AND statut = 'validee'",
+            [
+                'date_debut' => $firstDayMonth . ' 00:00:00',
+                'date_fin' => date('Y-m-d H:i:s')
+            ]
+        );
+
+        $lastClient = $this->db->fetch(
+            "SELECT c.nom, c.telephone, c.adresse, z.nom as zone_nom
+             FROM ventes v
+             JOIN clients c ON v.client_id = c.id
+             LEFT JOIN zones z ON c.zone_id = z.id
+             WHERE v.date_vente BETWEEN :date_debut AND :date_fin AND v.statut = 'validee'
+             ORDER BY v.date_vente DESC, v.id DESC
+             LIMIT 1",
+            [
+                'date_debut' => $firstDayMonth . ' 00:00:00',
+                'date_fin' => date('Y-m-d H:i:s')
+            ]
+        );
         
         // Produits en alerte
         $produitsAlerte = array_slice($this->produitModel->getAlertProducts(), 0, 5);
@@ -70,7 +95,14 @@ class DashboardController extends Controller
             'missionsEnCours' => $missionsEnCours,
             'derniersMouvements' => $derniersMouvements,
             'ventesParProduit' => $ventesParProduit,
-            'pertesStats' => $pertesStats
+            'pertesStats' => $pertesStats,
+            'clientsStats' => [
+                'clients_count' => $clientsCountMonth,
+                'last_client' => $lastClient['nom'] ?? 'Aucun client',
+                'last_phone' => $lastClient['telephone'] ?? '',
+                'last_address' => $lastClient['adresse'] ?? '',
+                'last_zone' => $lastClient['zone_nom'] ?? 'N/A'
+            ]
         ]);
     }
     

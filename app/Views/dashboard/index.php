@@ -23,6 +23,9 @@ ob_start();
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
             <?= $statsToday['nb_ventes'] ?? 0 ?> vente(s)
         </p>
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+            <?= number_format((float) ($statsToday['caisses_vendues'] ?? 0), 1, '.', ' ') ?> caisse(s) vendue(s)
+        </p>
     </div>
     
     <!-- Ventes du mois -->
@@ -42,6 +45,9 @@ ob_start();
         </div>
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
             <?= $statsMonth['nb_ventes'] ?? 0 ?> vente(s)
+        </p>
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+            <?= number_format((float) ($statsMonth['caisses_vendues'] ?? 0), 1, '.', ' ') ?> caisse(s) vendue(s)
         </p>
     </div>
     
@@ -83,6 +89,42 @@ ob_start();
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
             Produits sous le seuil
         </p>
+    </div>
+</div>
+
+<div class="card mb-8">
+    <div class="card-header flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Clients du mois</h2>
+        <a href="<?= url('clients') ?>" class="text-sm text-primary-600 hover:text-primary-700">Voir les clients</a>
+    </div>
+    <div class="card-body">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="stat-card">
+                <p class="stat-label">Clients servis</p>
+                <p class="stat-value text-primary-600 dark:text-primary-400">
+                    <?= $clientsStats['clients_count'] ?? 0 ?>
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">Clients distincts sur le mois</p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-label">Dernier client</p>
+                <p class="font-semibold text-gray-900 dark:text-white truncate" title="<?= htmlspecialchars($clientsStats['last_client'] ?? 'Aucun client') ?>">
+                    <?= htmlspecialchars($clientsStats['last_client'] ?? 'Aucun client') ?>
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2 truncate">
+                    <?= htmlspecialchars($clientsStats['last_zone'] ?? 'N/A') ?>
+                </p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-label">Contact</p>
+                <p class="font-semibold text-gray-900 dark:text-white truncate" title="<?= htmlspecialchars($clientsStats['last_phone'] ?? '') ?>">
+                    <?= htmlspecialchars($clientsStats['last_phone'] ?: 'Non renseigné') ?>
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2 truncate" title="<?= htmlspecialchars($clientsStats['last_address'] ?? '') ?>">
+                    <?= htmlspecialchars($clientsStats['last_address'] ?: 'Adresse non renseignée') ?>
+                </p>
+            </div>
+        </div>
     </div>
 </div>
 
