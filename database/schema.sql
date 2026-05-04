@@ -410,8 +410,8 @@ INSERT INTO `ristourne_paliers` (`quantite_min`, `quantite_max`, `montant_par_ca
 -- --------------------------------------------------------
 
 -- Utilisateur admin par défaut
-INSERT INTO `users` (`username`, `email`, `password`, `nom`, `prenom`, `role`) VALUES
-('admin', 'admin@bralima.cd', '$2y$10$P6GArcijgFX6rQVQQTxxg.TusYWUJObGMjjfuMtJOB1B.dHskS2JC', 'Administrateur', 'Système', 'admin');
+INSERT INTO `users` (`username`, `telephone`, `password`, `nom`, `prenom`, `role`) VALUES
+('admin', '0927161930', '$2y$10$P6GArcijgFX6rQVQQTxxg.TusYWUJObGMjjfuMtJOB1B.dHskS2JC', 'Administrateur', 'Système', 'admin');
 
 -- Paramètres par défaut
 INSERT INTO `parametres` (`cle`, `valeur`, `type`) VALUES
