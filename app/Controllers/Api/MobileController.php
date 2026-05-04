@@ -142,6 +142,30 @@ class MobileController extends Controller {
             ['mission_id' => $missionId]
         );
 
+        $clientsCount = (int) $this->db->fetchColumn(
+            "SELECT COUNT(DISTINCT client_id)
+             FROM ventes
+             WHERE mission_id = :mission_id AND statut = 'validee'",
+            ['mission_id' => $missionId]
+        );
+
+        $caissesChargees = round((float) ($chargementTotals['caisses_chargees'] ?? 0), 0);
+        $caissesRestantes = round((float) ($chargementTotals['caisses_restantes'] ?? 0), 0);
+        $caissesPleines = round((float) ($stockTotals['caisses_pleine'] ?? 0), 0);
+        $caissesVides = round((float) ($stockTotals['caisses_vide'] ?? 0), 0);
+
+        $stockCoherent = abs($caissesRestantes - $caissesPleines) < 0.0001;
+
+        $dernierClient = $this->db->fetch(
+            "SELECT c.nom, c.telephone, c.adresse
+             FROM ventes v
+             JOIN clients c ON v.client_id = c.id
+             WHERE v.mission_id = :mission_id AND v.statut = 'validee'
+             ORDER BY v.date_vente DESC, v.id DESC
+             LIMIT 1",
+            ['mission_id' => $missionId]
+        );
+
         return $this->success([
             'mission' => [
                 'id' => (int) ($mission['id'] ?? 0),
@@ -152,12 +176,19 @@ class MobileController extends Controller {
                 'zone_nom' => $mission['zone_nom'] ?? null,
             ],
             'chargement' => [
-                'caisses_chargees' => (float) ($chargementTotals['caisses_chargees'] ?? 0),
-                'caisses_restantes' => (float) ($chargementTotals['caisses_restantes'] ?? 0),
+                'caisses_chargees' => $caissesChargees,
+                'caisses_restantes' => $caissesRestantes,
+                'stock_coherent' => $stockCoherent,
+            ],
+            'clients' => [
+                'clients_count' => $clientsCount,
+                'dernier_client_nom' => $dernierClient['nom'] ?? null,
+                'dernier_client_telephone' => $dernierClient['telephone'] ?? null,
+                'dernier_client_adresse' => $dernierClient['adresse'] ?? null,
             ],
             'stock' => [
-                'caisses_pleine' => (float) ($stockTotals['caisses_pleine'] ?? 0),
-                'caisses_vide' => (float) ($stockTotals['caisses_vide'] ?? 0),
+                'caisses_pleine' => $caissesPleines,
+                'caisses_vide' => $caissesVides,
                 'bouteilles_pleine' => (float) ($stockTotals['bouteilles_pleine'] ?? 0),
                 'bouteilles_vide' => (float) ($stockTotals['bouteilles_vide'] ?? 0),
             ]
@@ -173,10 +204,15 @@ class MobileController extends Controller {
 
         $rows = $this->db->fetchAll(
             "SELECT v.id, v.numero_facture, v.date_vente, v.total_ttc,
-                    c.nom as client_nom
+                    c.nom as client_nom,
+                    c.telephone as client_telephone,
+                    COALESCE(SUM(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24)), 0) as caisses_vendues
              FROM ventes v
              JOIN clients c ON v.client_id = c.id
+             LEFT JOIN vente_details vd ON vd.vente_id = v.id
+             LEFT JOIN produits p ON vd.produit_id = p.id
              WHERE v.mission_id = :mission_id AND v.statut = 'validee'
+             GROUP BY v.id, v.numero_facture, v.date_vente, v.total_ttc, c.nom, c.telephone
              ORDER BY v.date_vente DESC
              LIMIT 100",
             ['mission_id' => (int) $missionId]

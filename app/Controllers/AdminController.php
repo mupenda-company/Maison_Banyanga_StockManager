@@ -59,7 +59,7 @@ class AdminController extends Controller
         
         $errors = $this->validate($data, [
             'username' => 'required|unique:users,username',
-            'email' => 'required|email|unique:users,email',
+            'telephone' => 'required|unique:users,telephone',
             'password' => 'required|min:6',
             'nom' => 'required',
             'prenom' => 'required',
@@ -72,7 +72,7 @@ class AdminController extends Controller
         
         $userData = [
             'username' => trim($data['username']),
-            'email' => trim($data['email']),
+            'telephone' => trim($data['telephone']),
             'password' => $data['password'],
             'nom' => trim($data['nom']),
             'prenom' => trim($data['prenom']),
@@ -112,15 +112,15 @@ class AdminController extends Controller
             }
         }
         
-        // Vérifier email unique
-        if (isset($data['email']) && $data['email'] !== $user['email']) {
-            if ($this->userModel->emailExists($data['email'], $id)) {
-                return $this->error('Cet email existe déjà', 422);
+        // Vérifier téléphone unique
+        if (isset($data['telephone']) && $data['telephone'] !== $user['telephone']) {
+            if ($this->userModel->telephoneExists($data['telephone'], $id)) {
+                return $this->error('Ce numéro de téléphone existe déjà', 422);
             }
         }
         
         $updateData = array_intersect_key($data, array_flip([
-            'username', 'email', 'nom', 'prenom', 'role', 'actif'
+            'username', 'telephone', 'nom', 'prenom', 'role', 'actif'
         ]));
         
         // Mettre à jour le mot de passe si fourni

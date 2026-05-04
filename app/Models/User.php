@@ -6,7 +6,7 @@
 class User extends Model
 {
     protected $table = 'users';
-    protected $fillable = ['username', 'email', 'password', 'nom', 'prenom', 'role', 'actif', 'derniere_connexion'];
+    protected $fillable = ['username', 'telephone', 'password', 'nom', 'prenom', 'role', 'actif', 'derniere_connexion'];
     
     /**
      * Authentifier un utilisateur
@@ -84,12 +84,12 @@ class User extends Model
     }
     
     /**
-     * Vérifier si un email existe
+     * Vérifier si un numéro de téléphone existe
      */
-    public function emailExists($email, $excludeId = null)
+    public function telephoneExists($telephone, $excludeId = null)
     {
-        $sql = "SELECT COUNT(*) FROM {$this->table} WHERE email = :email";
-        $params = ['email' => $email];
+        $sql = "SELECT COUNT(*) FROM {$this->table} WHERE telephone = :telephone";
+        $params = ['telephone' => $telephone];
         
         if ($excludeId) {
             $sql .= " AND id != :excludeId";

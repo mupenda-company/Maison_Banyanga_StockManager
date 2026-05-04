@@ -13,7 +13,7 @@ ob_start();
                 x-data="{
                     prenom: '<?= htmlspecialchars($_SESSION['user_prenom'] ?? '') ?>',
                     nom: '<?= htmlspecialchars($_SESSION['user_nom'] ?? '') ?>',
-                    email: '<?= htmlspecialchars($_SESSION['user_email'] ?? '') ?>',
+                    telephone: '<?= htmlspecialchars($_SESSION['user_telephone'] ?? '') ?>',
                     username: '<?= htmlspecialchars($_SESSION['user_username'] ?? '') ?>',
                     loading: false
                 }"
@@ -23,14 +23,14 @@ ob_start();
                         await App.api('/api/auth/profile', 'POST', {
                             prenom: prenom,
                             nom: nom,
-                            email: email
+                            telephone: telephone
                         });
                         
                         // Mettre à jour la session localement
                         <?php 
                         $_SESSION['user_prenom'] = $user['prenom'] ?? $_SESSION['user_prenom'];
                         $_SESSION['user_nom'] = $user['nom'] ?? $_SESSION['user_nom'];
-                        $_SESSION['user_email'] = $user['email'] ?? $_SESSION['user_email'];
+                        $_SESSION['user_telephone'] = $user['telephone'] ?? $_SESSION['user_telephone'];
                         ?>
                         
                         App.notify('Profil mis à jour avec succès');
@@ -60,8 +60,8 @@ ob_start();
                 </div>
                 
                 <div class="mt-4">
-                    <label class="label">Email</label>
-                    <input type="email" x-model="email" class="input">
+                    <label class="label">Téléphone</label>
+                    <input type="tel" x-model="telephone" class="input">
                 </div>
                 
                 <div class="flex justify-end mt-6">
