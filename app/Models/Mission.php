@@ -114,6 +114,12 @@ class Mission extends Model
             foreach ($chargements as $chargement) {
                 $chargement['mission_id'] = $missionId;
                 $this->db->insert('mission_chargements', $chargement);
+
+                $produit = (new Produit())->find($chargement['produit_id']);
+                $bouteillesParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+                if ($bouteillesParCaisse <= 0) {
+                    $bouteillesParCaisse = 24;
+                }
                 
                 // Transférer du stock principal vers le véhicule
                 $stockModel->updateOrCreate(
@@ -121,7 +127,7 @@ class Mission extends Model
                     $emplacementPrincipalId,
                     [
                         'quantite_pleine' => -$chargement['quantite_chargee'],
-                        'caisses_pleine' => -intval($chargement['quantite_chargee'] / 24) // Approximation
+                        'caisses_pleine' => -intval($chargement['quantite_chargee'] / $bouteillesParCaisse)
                     ]
                 );
                 
@@ -130,7 +136,7 @@ class Mission extends Model
                     $emplacementVehicule,
                     [
                         'quantite_pleine' => $chargement['quantite_chargee'],
-                        'caisses_pleine' => intval($chargement['quantite_chargee'] / 24)
+                        'caisses_pleine' => intval($chargement['quantite_chargee'] / $bouteillesParCaisse)
                     ]
                 );
                 

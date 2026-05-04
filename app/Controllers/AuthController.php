@@ -49,7 +49,7 @@ class AuthController extends Controller
             $_SESSION['user_nom'] = $user['nom'];
             $_SESSION['user_prenom'] = $user['prenom'];
             $_SESSION['user_role'] = $user['role'];
-            $_SESSION['user_email'] = $user['email'];
+            $_SESSION['user_telephone'] = $user['telephone'];
             
             return $this->success([
                 'redirect' => url('dashboard')
@@ -130,27 +130,27 @@ class AuthController extends Controller
         $errors = $this->validate($data, [
             'nom' => 'required',
             'prenom' => 'required',
-            'email' => 'required|email'
+            'telephone' => 'required'
         ]);
         
         if (!empty($errors)) {
             return $this->error('Erreurs de validation', 422, $errors);
         }
         
-        // Vérifier si l'email existe déjà
-        if ($this->userModel->emailExists($data['email'], $_SESSION['user_id'])) {
-            return $this->error('Cet email est déjà utilisé', 422);
+        // Vérifier si le téléphone existe déjà
+        if ($this->userModel->telephoneExists($data['telephone'], $_SESSION['user_id'])) {
+            return $this->error('Ce numéro de téléphone est déjà utilisé', 422);
         }
-        
+
         $this->userModel->update($_SESSION['user_id'], [
             'nom' => $data['nom'],
             'prenom' => $data['prenom'],
-            'email' => $data['email']
+            'telephone' => $data['telephone']
         ]);
-        
+
         $_SESSION['user_nom'] = $data['nom'];
         $_SESSION['user_prenom'] = $data['prenom'];
-        $_SESSION['user_email'] = $data['email'];
+        $_SESSION['user_telephone'] = $data['telephone'];
         
         return $this->success(null, 'Profil mis à jour avec succès');
     }

@@ -149,6 +149,13 @@ class MobileController extends Controller {
             ['mission_id' => $missionId]
         );
 
+        $caissesChargees = round((float) ($chargementTotals['caisses_chargees'] ?? 0), 0);
+        $caissesRestantes = round((float) ($chargementTotals['caisses_restantes'] ?? 0), 0);
+        $caissesPleines = round((float) ($stockTotals['caisses_pleine'] ?? 0), 0);
+        $caissesVides = round((float) ($stockTotals['caisses_vide'] ?? 0), 0);
+
+        $stockCoherent = abs($caissesRestantes - $caissesPleines) < 0.0001;
+
         $dernierClient = $this->db->fetch(
             "SELECT c.nom, c.telephone, c.adresse
              FROM ventes v
@@ -169,8 +176,9 @@ class MobileController extends Controller {
                 'zone_nom' => $mission['zone_nom'] ?? null,
             ],
             'chargement' => [
-                'caisses_chargees' => (float) ($chargementTotals['caisses_chargees'] ?? 0),
-                'caisses_restantes' => (float) ($chargementTotals['caisses_restantes'] ?? 0),
+                'caisses_chargees' => $caissesChargees,
+                'caisses_restantes' => $caissesRestantes,
+                'stock_coherent' => $stockCoherent,
             ],
             'clients' => [
                 'clients_count' => $clientsCount,
@@ -179,8 +187,8 @@ class MobileController extends Controller {
                 'dernier_client_adresse' => $dernierClient['adresse'] ?? null,
             ],
             'stock' => [
-                'caisses_pleine' => (float) ($stockTotals['caisses_pleine'] ?? 0),
-                'caisses_vide' => (float) ($stockTotals['caisses_vide'] ?? 0),
+                'caisses_pleine' => $caissesPleines,
+                'caisses_vide' => $caissesVides,
                 'bouteilles_pleine' => (float) ($stockTotals['bouteilles_pleine'] ?? 0),
                 'bouteilles_vide' => (float) ($stockTotals['bouteilles_vide'] ?? 0),
             ]

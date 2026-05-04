@@ -20,7 +20,7 @@ ob_start();
                 <thead>
                     <tr>
                         <th>Utilisateur</th>
-                        <th>Email</th>
+                        <th>Téléphone</th>
                         <th>Rôle</th>
                         <th>Statut</th>
                         <th>Dernière connexion</th>
@@ -48,7 +48,7 @@ ob_start();
                                     </div>
                                 </div>
                             </td>
-                            <td x-text="user.email"></td>
+                            <td x-text="user.telephone"></td>
                             <td>
                                 <span class="badge" 
                                       :class="user.role === 'admin' ? 'badge-danger' : (user.role === 'magasinier' ? 'badge-warning' : 'badge-info')"
@@ -125,8 +125,8 @@ ob_start();
                                 <input type="text" x-model="form.username" class="input" required>
                             </div>
                             <div class="mt-4">
-                                <label class="label">Email *</label>
-                                <input type="email" x-model="form.email" class="input" required>
+                                <label class="label">Téléphone *</label>
+                                <input type="tel" x-model="form.telephone" class="input" required>
                             </div>
                             <div class="mt-4">
                                 <label class="label">Mot de passe <span x-show="editMode">(laisser vide pour ne pas modifier)</span><span x-show="!editMode">*</span></label>
@@ -170,13 +170,13 @@ document.addEventListener('alpine:init', () => {
         editId: null,
         loading: false,
         form: {
-            username: '', email: '', password: '', nom: '', prenom: '', role: 'vendeur', actif: 1
+            username: '', telephone: '', password: '', nom: '', prenom: '', role: 'vendeur', actif: 1
         },
         
         openModal() {
             this.editMode = false;
             this.editId = null;
-            this.form = { username: '', email: '', password: '', nom: '', prenom: '', role: 'vendeur', actif: 1 };
+            this.form = { username: '', telephone: '', password: '', nom: '', prenom: '', role: 'vendeur', actif: 1 };
             this.modalOpen = true;
         },
         

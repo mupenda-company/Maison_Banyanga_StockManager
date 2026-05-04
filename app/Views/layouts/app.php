@@ -465,7 +465,7 @@
                                 <div class="py-1">
                                     <div class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
                                         <p class="text-sm font-medium text-gray-900 dark:text-white"><?= htmlspecialchars(($_SESSION['user_nom'] ?? '') . ' ' . ($_SESSION['user_prenom'] ?? '')) ?></p>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400"><?= htmlspecialchars($_SESSION['user_email'] ?? '') ?></p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400"><?= htmlspecialchars($_SESSION['user_telephone'] ?? '') ?></p>
                                         <span class="badge badge-info mt-1"><?= ucfirst($_SESSION['user_role'] ?? 'user') ?></span>
                                     </div>
                                     <a href="<?= url('profile') ?>" class="dropdown-item">
