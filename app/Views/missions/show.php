@@ -192,21 +192,21 @@ ob_start();
             <div class="card-body">
                 <div class="space-y-4">
                     <div>
-                        <p class="text-sm text-gray-500">Vendu</p>
+                        <p class="text-sm text-gray-500">Caisses vendues</p>
                         <p class="text-xl font-bold text-green-600">
-                            <?= $mission['ventes']['quantite'] ?? 0 ?> bouteilles
+                            <?= $mission['caisses_vendues_total'] ?? 0 ?> caisses
                         </p>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-500">Chiffre d'affaires</p>
+                        <p class="text-sm text-gray-500">Caisses vides retournées</p>
                         <p class="text-xl font-bold text-primary-600">
-                            <?= format_money_converted($mission['ventes']['total'] ?? 0) ?>
+                            <?= $mission['retours_vides_total'] ?? 0 ?> caisses
                         </p>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-500">Retours vides</p>
+                        <p class="text-sm text-gray-500">Montant à donner</p>
                         <p class="text-xl font-bold text-gray-400">
-                            <?= $mission['ventes']['retours'] ?? 0 ?> bouteilles
+                            <?= format_money_converted($mission['montant_attendu'] ?? 0) ?>
                         </p>
                     </div>
                 </div>
@@ -235,6 +235,11 @@ ob_start();
             retours: {},
             vides_retournes: {},
             montant_encaisse: 0,
+            missionSummary: {
+                caissesVendues: <?= (int) ($mission['caisses_vendues_total'] ?? 0) ?>,
+                retoursVides: <?= (int) ($mission['retours_vides_total'] ?? 0) ?>,
+                montantAttendu: <?= json_encode((float) ($mission['montant_attendu'] ?? 0)) ?>
+            },
             chargements: <?= htmlspecialchars(json_encode($mission['chargements'] ?? []), ENT_QUOTES, 'UTF-8') ?>,
             
             initData() {
@@ -244,20 +249,15 @@ ob_start();
                         this.vides_retournes[c.produit_id] = 0;
                     });
                 }
+                this.montant_encaisse = this.getTotalAttendu();
             },
             
             getTotalAttendu() {
-                let total = 0;
-                if (!this.chargements) return 0;
-                this.chargements.forEach(c => {
-                    const vendus = c.quantite_chargee - (this.retours[c.produit_id] || 0);
-                    if (vendus > 0) {
-                        const btlPerCs = parseInt(c.bouteilles_par_caisses) || 24;
-                        const prixCaisse = parseFloat(c.prix_vente_caisses) || (parseFloat(c.prix_vente_unitaire) * btlPerCs);
-                        total += (vendus / btlPerCs) * prixCaisse;
-                    }
-                });
-                return total;
+                return parseFloat(this.missionSummary.montantAttendu || 0);
+            },
+
+            getTotalVidesRetournees() {
+                return Object.values(this.vides_retournes).reduce((total, value) => total + (parseInt(value, 10) || 0), 0);
             },
 
             async submit() {
@@ -316,6 +316,7 @@ ob_start();
                                         <tr>
                                             <th>Produit</th>
                                             <th>Chargé</th>
+                                            <th>Vendu</th>
                                             <th>Retour Pleins (btl)</th>
                                             <th>Retour Vides (caisses)</th>
                                         </tr>
@@ -325,6 +326,7 @@ ob_start();
                                             <tr>
                                                 <td x-text="c.produit_nom"></td>
                                                 <td x-text="c.quantite_chargee + ' btl'"></td>
+                                                <td x-text="(c.caisses_vendues || 0) + ' cs'"></td>
                                                 <td>
                                                     <input type="number" x-model.number="retours[c.produit_id]" class="input py-1 w-24" :max="c.quantite_chargee" min="0">
                                                 </td>
@@ -340,11 +342,16 @@ ob_start();
                             <!-- Section Financière -->
                             <div class="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label class="label">Montant encaissé par l'agent (<span x-text="window.DEVISE"></span>)</label>
+                                    <label class="label">Montant à donner à l'agent (<span x-text="window.DEVISE"></span>)</label>
                                     <input type="number" x-model.number="montant_encaisse" class="input text-xl font-bold text-green-600" step="0.01" required>
+                                    <p class="text-xs text-gray-500 mt-2">Montant calculé automatiquement à partir des caisses vendues.</p>
                                 </div>
                                 <div class="text-right">
-                                    <p class="text-sm text-gray-500 uppercase">Total attendu (Ventes)</p>
+                                    <p class="text-sm text-gray-500 uppercase">Caisses vendues</p>
+                                    <p class="text-2xl font-bold text-primary-600" x-text="missionSummary.caissesVendues + ' cs'"></p>
+                                    <p class="text-sm text-gray-500 uppercase mt-4">Caisses vides retournées</p>
+                                    <p class="text-2xl font-bold text-orange-500" x-text="getTotalVidesRetournees() + ' cs'"></p>
+                                    <p class="text-sm text-gray-500 uppercase mt-4">Montant attendu</p>
                                     <p class="text-2xl font-bold text-primary-600" x-text="App.formatMoneyConverted(getTotalAttendu(), window.BASE_DEVISE, window.DEVISE)"></p>
                                     <p class="text-xs mt-1" :class="montant_encaisse >= App.convertMoney(getTotalAttendu(), window.BASE_DEVISE, window.DEVISE) ? 'text-green-500' : 'text-red-500'">
                                         Ecart: <span x-text="App.formatMoney(montant_encaisse - App.convertMoney(getTotalAttendu(), window.BASE_DEVISE, window.DEVISE), window.DEVISE)"></span>

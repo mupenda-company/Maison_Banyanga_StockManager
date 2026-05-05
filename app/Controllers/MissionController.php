@@ -184,9 +184,14 @@ class MissionController extends Controller
         
         $data = $this->getJsonInput();
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
+        $mission = $this->missionModel->getWithDetails($id);
 
         if (empty($data) || (!isset($data['retours']) && !isset($data['vides_retournes']) && !isset($data['montant_encaisse']))) {
             return $this->error('Veuillez enregistrer les retours (pleins/vides) et le montant encaissé avant de clôturer la mission', 422);
+        }
+
+        if (!$mission) {
+            return $this->error('Mission non trouvée', 404);
         }
         
         // Préparer les retours de produits pleins (invendus)
@@ -205,7 +210,11 @@ class MissionController extends Controller
             }
         }
 
+        $montant_attendu = (float) ($mission['montant_attendu'] ?? 0);
         $montant_encaisse = isset($data['montant_encaisse']) ? floatval($data['montant_encaisse']) : 0;
+        if ($montant_encaisse <= 0 && $montant_attendu > 0) {
+            $montant_encaisse = $montant_attendu;
+        }
         
         $result = $this->missionModel->terminer(
             $id, 
