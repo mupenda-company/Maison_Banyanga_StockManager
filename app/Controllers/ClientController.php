@@ -22,12 +22,21 @@ class ClientController extends Controller
     {
         $this->requireAuth();
         
-        $clients = $this->clientModel->getAllWithZone();
+        $search = trim((string) ($_GET['q'] ?? ''));
+        $zoneId = $_GET['zone_id'] ?? null;
+
+        if ($search !== '' || !empty($zoneId)) {
+            $clients = $this->clientModel->searchWithZone($search, $zoneId);
+        } else {
+            $clients = $this->clientModel->getAllWithZone();
+        }
         $zones = $this->zoneModel->all();
         
         $this->view('clients/index', [
             'clients' => $clients,
-            'zones' => $zones
+            'zones' => $zones,
+            'search' => $search,
+            'selectedZoneId' => $zoneId
         ]);
     }
 
@@ -41,20 +50,24 @@ class ClientController extends Controller
 
         $actifs = ($_GET['actifs'] ?? 'true');
         $zoneId = $_GET['zone_id'] ?? null;
+        $search = trim((string) ($_GET['q'] ?? ''));
+        $includeInactive = $actifs === 'false' || $actifs === '0';
 
-        if (!empty($zoneId)) {
-            $clients = $this->clientModel->getByZone($zoneId);
-        } else {
-            $clients = $this->clientModel->getAllWithZone();
-        }
-
-        if ($actifs === 'false' || $actifs === '0') {
+        if ($search !== '') {
+            $clients = $this->clientModel->searchWithZone($search, $zoneId, $includeInactive);
+        } elseif (!empty($zoneId)) {
+            $clients = $includeInactive
+                ? $this->clientModel->searchWithZone('', $zoneId, true)
+                : $this->clientModel->getByZone($zoneId);
+        } elseif ($includeInactive) {
             $clients = $this->db->fetchAll(
                 "SELECT c.*, z.nom as zone_nom
                  FROM clients c
                  LEFT JOIN zones z ON c.zone_id = z.id
                  ORDER BY c.nom"
             );
+        } else {
+            $clients = $this->clientModel->getAllWithZone();
         }
 
         return $this->success($clients);

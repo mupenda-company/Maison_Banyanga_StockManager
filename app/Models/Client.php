@@ -50,6 +50,40 @@ class Client extends Model
             ['zone_id' => $zoneId]
         );
     }
+
+    /**
+     * Rechercher des clients par terme et zone.
+     */
+    public function searchWithZone($term, $zoneId = null, $includeInactive = false)
+    {
+        $where = $includeInactive ? '1=1' : 'c.actif = 1';
+        $params = [];
+
+        if ($zoneId !== null && $zoneId !== '') {
+            $where .= ' AND c.zone_id = :zone_id';
+            $params['zone_id'] = $zoneId;
+        }
+
+        $term = trim((string) $term);
+        if ($term !== '') {
+            $where .= " AND (c.nom LIKE :term_nom OR c.telephone LIKE :term_telephone OR c.email LIKE :term_email OR c.adresse LIKE :term_adresse OR z.nom LIKE :term_zone)";
+            $likeTerm = '%' . $term . '%';
+            $params['term_nom'] = $likeTerm;
+            $params['term_telephone'] = $likeTerm;
+            $params['term_email'] = $likeTerm;
+            $params['term_adresse'] = $likeTerm;
+            $params['term_zone'] = $likeTerm;
+        }
+
+        return $this->db->fetchAll(
+            "SELECT c.*, z.nom as zone_nom
+             FROM {$this->table} c
+             LEFT JOIN zones z ON c.zone_id = z.id
+             WHERE {$where}
+             ORDER BY c.nom",
+            $params
+        );
+    }
     
     /**
      * Calculer le CA d'un client pour une période

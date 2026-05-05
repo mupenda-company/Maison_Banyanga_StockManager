@@ -7,22 +7,30 @@ ob_start();
     <div class="card">
         <div class="card-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Liste des clients</h2>
-            <div class="flex items-center space-x-3">
-                <select class="input w-auto" onchange="window.location.href='?zone_id='+this.value">
+            <form method="get" class="flex flex-col sm:flex-row sm:items-center gap-3">
+                <input
+                    type="search"
+                    name="q"
+                    value="<?= htmlspecialchars($search ?? '') ?>"
+                    placeholder="Rechercher un client..."
+                    class="input w-full sm:w-64"
+                >
+                <select name="zone_id" class="input w-auto">
                     <option value="">Toutes les zones</option>
                     <?php foreach ($zones as $zone): ?>
-                    <option value="<?= $zone['id'] ?>" <?= ($_GET['zone_id'] ?? '') == $zone['id'] ? 'selected' : '' ?>>
+                    <option value="<?= $zone['id'] ?>" <?= ($selectedZoneId ?? '') == $zone['id'] ? 'selected' : '' ?>>
                         <?= htmlspecialchars($zone['nom']) ?>
                     </option>
                     <?php endforeach; ?>
                 </select>
-                <button @click="openModal()" class="btn btn-primary">
+                <button type="submit" class="btn btn-secondary">Rechercher</button>
+                <button type="button" @click="openModal()" class="btn btn-primary">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
                     Nouveau client
                 </button>
-            </div>
+            </form>
         </div>
         <div class="card-body p-0">
             <div class="table-container">

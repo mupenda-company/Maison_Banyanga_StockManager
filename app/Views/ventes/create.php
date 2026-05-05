@@ -17,9 +17,10 @@ ob_start();
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div>
                         <label class="label">Client *</label>
+                        <input type="search" x-model="clientSearch" class="input mb-2" placeholder="Rechercher un client...">
                         <select x-model="client_id" class="input" required>
                             <option value="">Sélectionner un client</option>
-                            <template x-for="c in clients" :key="c.id">
+                            <template x-for="c in filteredClients()" :key="c.id">
                                 <option :value="c.id" x-text="c.nom + (c.zone_nom ? ' (' + c.zone_nom + ')' : '')"></option>
                             </template>
                         </select>
@@ -160,6 +161,7 @@ ob_start();
 document.addEventListener('alpine:init', () => {
     Alpine.data('venteForm', () => ({
         client_id: '',
+        clientSearch: '',
         emplacement_id: '<?= $emplacements[0]['id'] ?? '' ?>',
         notes: '',
         lignes: [{ produit_id: '', caisses: 0, prix_caisse: 0 }],
@@ -176,6 +178,30 @@ document.addEventListener('alpine:init', () => {
             this.$watch('lignes', () => {
                 this.calculateTotals();
             }, { deep: true });
+        },
+
+        filteredClients() {
+            const term = (this.clientSearch || '').trim().toLowerCase();
+            const allClients = Array.isArray(this.clients) ? this.clients : [];
+
+            if (!term) {
+                return allClients;
+            }
+
+            const filtered = allClients.filter((client) => {
+                const haystack = [client.nom, client.telephone, client.zone_nom, client.email, client.adresse]
+                    .filter(Boolean)
+                    .join(' ')
+                    .toLowerCase();
+                return haystack.includes(term);
+            });
+
+            const selected = allClients.find((client) => client.id == this.client_id);
+            if (selected && !filtered.some((client) => client.id == selected.id)) {
+                filtered.unshift(selected);
+            }
+
+            return filtered;
         },
 
         onProduitChange(ligne) {
