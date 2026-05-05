@@ -192,8 +192,8 @@ class VenteController extends Controller
         
         $params = $this->parametreModel->getPersonnalisation();
 
-        $totalCaissesClient = (float) $this->db->fetchColumn(
-            "SELECT COALESCE(SUM(vd.quantite / p.bouteilles_par_caisses), 0)
+        $totalCaissesClient = (int) $this->db->fetchColumn(
+            "SELECT COALESCE(SUM(ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)), 0)
              FROM vente_details vd
              JOIN ventes v ON vd.vente_id = v.id
              JOIN produits p ON vd.produit_id = p.id

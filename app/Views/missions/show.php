@@ -114,7 +114,7 @@ ob_start();
                                     <div class="font-medium"><?= htmlspecialchars($item['produit_nom']) ?></div>
                                     <div class="text-xs text-gray-500"><?= htmlspecialchars($item['produit_code']) ?></div>
                                 </td>
-                                <td class="text-right"><?= $item['quantite_chargee'] ?></td>
+                                <td class="text-right"><?= number_format((int) $item['quantite_chargee'], 0, '.', ' ') ?></td>
                                 <td class="text-right"><?= format_money_converted($prixUnitaire) ?></td>
                                 <td class="text-right font-medium"><?= format_money_converted($item['sous_total'] ?? 0) ?></td>
                             </tr>

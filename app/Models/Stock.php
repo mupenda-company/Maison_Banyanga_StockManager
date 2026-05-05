@@ -93,8 +93,8 @@ class Stock extends Model
             "SELECT p.id, p.code, p.nom, p.seuil_alerte,
                     COALESCE(SUM(s.quantite_pleine), 0) as total_plein,
                     COALESCE(SUM(s.quantite_vide), 0) as total_vide,
-                    COALESCE(SUM(s.caisses_pleine), 0) as total_caisses_pleine,
-                    COALESCE(SUM(s.caisses_vide), 0) as total_caisses_vide
+                    CAST(COALESCE(SUM(s.caisses_pleine), 0) AS SIGNED) as total_caisses_pleine,
+                    CAST(COALESCE(SUM(s.caisses_vide), 0) AS SIGNED) as total_caisses_vide
              FROM produits p
              LEFT JOIN {$this->table} s ON p.id = s.produit_id
              LEFT JOIN emplacements e ON s.emplacement_id = e.id
@@ -297,8 +297,8 @@ class Stock extends Model
         return [
             'pleines' => (int)$row['total_btl_pleine'],
             'vides' => (int)$row['total_btl_vide'],
-            'caisses_pleine' => (float)$row['total_caisses_pleine'],
-            'caisses_vide' => (float)$row['total_caisses_vide'],
+            'caisses_pleine' => (int) round($row['total_caisses_pleine']),
+            'caisses_vide' => (int) round($row['total_caisses_vide']),
             'valeur' => (float)$row['valeur_stock'],
             'nb_produits' => (int)$row['nb_produits']
         ];

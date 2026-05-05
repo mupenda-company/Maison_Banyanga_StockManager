@@ -78,13 +78,13 @@ ob_start();
                                             </select>
                                         </td>
                                         <td class="px-4 py-2 text-sm">
-                                            <span x-text="ligne.produit_id ? ((produits.find(p => p.id == ligne.produit_id)?.stock_plein || 0) / (produits.find(p => p.id == ligne.produit_id)?.bouteilles_par_caisses || 24)).toFixed(1) : '0.0'"></span>
+                                            <span x-text="ligne.produit_id ? Math.round((produits.find(p => p.id == ligne.produit_id)?.stock_plein || 0) / (produits.find(p => p.id == ligne.produit_id)?.bouteilles_par_caisses || 24)) : '0'"></span>
                                         </td>
                                         <td class="px-4 py-2">
                                             <input type="number" x-model.number="ligne.prix_caisse" class="input w-32" step="0.01" min="0" @input="calculateTotals()">
                                         </td>
                                         <td class="px-4 py-2">
-                                            <input type="number" x-model.number="ligne.caisses" class="input w-24" min="0.01" step="0.01" required @input="calculateTotals()">
+                                            <input type="number" x-model.number="ligne.caisses" class="input w-24" min="1" step="1" required @input="ligne.caisses = Math.round(ligne.caisses || 0); calculateTotals()">
                                         </td>
                                         <td class="px-4 py-2 text-sm font-medium">
                                             <span x-text="App.formatMoney((ligne.caisses * (ligne.prix_caisse || 0)), (window.DEVISE || 'CDF'))"></span>

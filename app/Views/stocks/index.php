@@ -48,14 +48,14 @@ ob_start();
 <!-- Résumé par emplacement -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     <?php foreach ($emplacements as $emp): 
-        $caisses = (float)($emp['total_caisses_pleine'] ?? 0);
+        $caisses = (int) round($emp['total_caisses_pleine'] ?? 0);
     ?>
     <div class="stat-card">
         <div class="flex items-center justify-between">
             <div>
                 <p class="stat-label"><?= htmlspecialchars($emp['nom']) ?></p>
                 <p class="stat-value text-2xl font-bold text-gray-900 dark:text-white">
-                    <?= number_format($caisses, 2, '.', ' ') ?> <span class="text-sm font-normal text-gray-500">cs</span>
+                    <?= number_format($caisses, 0, '.', ' ') ?> <span class="text-sm font-normal text-gray-500">cs</span>
                 </p>
             </div>
             <div class="w-12 h-12 rounded-full flex items-center justify-center
@@ -156,10 +156,10 @@ ob_start();
                                 </span>
                             </td>
                             <td class="px-4 py-3 text-right">
-                                <div class="font-bold text-green-600 truncate"><?= number_format($stock['caisses_pleine'], 2, '.', ' ') ?> <span class="text-[10px] font-normal">cs</span></div>
+                                <div class="font-bold text-green-600 truncate"><?= number_format((int) round($stock['caisses_pleine']), 0, '.', ' ') ?> <span class="text-[10px] font-normal">cs</span></div>
                             </td>
                             <td class="px-4 py-3 text-right">
-                                <div class="font-bold text-gray-600 dark:text-gray-400 truncate"><?= number_format($stock['caisses_vide'], 2, '.', ' ') ?> <span class="text-[10px] font-normal">cs</span></div>
+                                <div class="font-bold text-gray-600 dark:text-gray-400 truncate"><?= number_format((int) round($stock['caisses_vide']), 0, '.', ' ') ?> <span class="text-[10px] font-normal">cs</span></div>
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex justify-center">

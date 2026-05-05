@@ -25,9 +25,16 @@ class Ristourne extends Model
      */
     public function calculerRistourne($clientId, $mois, $annee)
     {
+        $client = $this->db->fetch(
+            "SELECT taux_ristourne, nom, prenom
+             FROM clients
+             WHERE id = :client_id",
+            ['client_id' => $clientId]
+        );
+
         // 1. Calculer le total de caisses livrées (ventes validées)
-        $sql = "SELECT SUM(vd.quantite / p.bouteilles_par_caisses) as total_caisses,
-                       SUM(vd.sous_total) as total_ca
+        $sql = "SELECT COALESCE(SUM(ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)), 0) as total_caisses,
+                       COALESCE(SUM(vd.sous_total), 0) as total_ca
                 FROM vente_details vd
                 JOIN ventes v ON vd.vente_id = v.id
                 JOIN produits p ON vd.produit_id = p.id
@@ -42,28 +49,15 @@ class Ristourne extends Model
             'annee' => $annee
         ]);
 
-        $totalCaisses = (float)($result['total_caisses'] ?? 0);
+        $totalCaisses = (int)($result['total_caisses'] ?? 0);
         $totalCA = (float)($result['total_ca'] ?? 0);
         
         if ($totalCA <= 0) return null;
 
-        // 2. Trouver le palier correspondant (basé sur le CA total)
-        $palierSql = "SELECT * 
-                      FROM paliers_ristourne 
-                      WHERE actif = 1 
-                      AND :ca >= ca_min 
-                      AND (:ca2 < ca_max OR ca_max IS NULL)
-                      ORDER BY ca_min DESC LIMIT 1";
-        
-        $palier = $this->db->fetch($palierSql, [
-            'ca' => $totalCA,
-            'ca2' => $totalCA
-        ]);
-
-        if (!$palier) return null;
-
-        $tauxRistourne = (float)$palier['taux_ristourne'];
+        $tauxRistourne = (float) ($client['taux_ristourne'] ?? 5);
         $montantRistourne = ($totalCA * $tauxRistourne) / 100;
+
+        $palierNom = abs($tauxRistourne - 5.0) < 0.0001 ? 'Standard' : 'Spécial';
 
         return [
             'client_id' => $clientId,
@@ -71,7 +65,8 @@ class Ristourne extends Model
             'periode_fin' => date('Y-m-t', strtotime("$annee-$mois-01")),
             'total_caisses' => $totalCaisses,
             'ca_total' => $totalCA,
-            'palier_id' => $palier['id'],
+            'palier_id' => null,
+            'palier_nom' => $palierNom,
             'taux_applique' => $tauxRistourne,
             'montant_ristourne' => $montantRistourne
         ];

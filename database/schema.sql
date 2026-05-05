@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS `clients` (
     `adresse` TEXT,
     `zone_id` INT UNSIGNED,
     `email` VARCHAR(100),
+    `taux_ristourne` DECIMAL(5,2) NOT NULL DEFAULT 5.00 COMMENT 'Taux de ristourne client',
     `notes` TEXT,
     `actif` TINYINT(1) NOT NULL DEFAULT 1,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,

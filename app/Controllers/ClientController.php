@@ -83,7 +83,10 @@ class ClientController extends Controller
                 'nom' => $data['nom'],
                 'telephone' => $data['telephone'] ?? null,
                 'adresse' => $data['adresse'] ?? null,
-                'zone_id' => $data['zone_id']
+                'zone_id' => $data['zone_id'],
+                'taux_ristourne' => isset($data['taux_ristourne']) && $data['taux_ristourne'] !== ''
+                    ? (float) $data['taux_ristourne']
+                    : 5
             ]);
             return $this->success(null, 'Client mis à jour avec succès');
         } else {
@@ -91,7 +94,10 @@ class ClientController extends Controller
                 'nom' => $data['nom'],
                 'telephone' => $data['telephone'] ?? null,
                 'adresse' => $data['adresse'] ?? null,
-                'zone_id' => $data['zone_id']
+                'zone_id' => $data['zone_id'],
+                'taux_ristourne' => isset($data['taux_ristourne']) && $data['taux_ristourne'] !== ''
+                    ? (float) $data['taux_ristourne']
+                    : 5
             ]);
             return $this->success(null, 'Client créé avec succès');
         }
@@ -103,6 +109,9 @@ class ClientController extends Controller
     public function show($id)
     {
         $this->requireAuth();
+
+        $dateDebut = $_GET['date_debut'] ?? null;
+        $dateFin = $_GET['date_fin'] ?? null;
         
         $client = $this->clientModel->find($id);
         if (!$client) {
@@ -114,17 +123,23 @@ class ClientController extends Controller
         
         // Récupérer l'historique des ventes (achats pour le client)
         $venteModel = new Vente();
-        $ventesData = $venteModel->getAllWithClient(1, 100, ['client_id' => $id]);
+        $ventesData = $venteModel->getAllWithClient(1, 100, [
+            'client_id' => $id,
+            'date_debut' => $dateDebut,
+            'date_fin' => $dateFin
+        ]);
+
+        $kpis = $this->clientModel->getKpis($id, $dateDebut, $dateFin);
         
         // Récupérer la dernière ristourne active (en attente)
         $ristourneModel = new Ristourne();
         $ristournes = $ristourneModel->getAllWithDetails(['client_id' => $id]);
         $ristourneActive = null;
         foreach ($ristournes as $r) {
-            if ($r['statut'] === 'calcule') {
+            if ($r['statut'] === 'calculee') {
                 // Adapter le format pour la vue qui attend 'montant_accumule'
                 $ristourneActive = $r;
-                $ristourneActive['montant_accumule'] = $r['montant_total'];
+                $ristourneActive['montant_accumule'] = $r['montant_ristourne'] ?? 0;
                 break;
             }
         }
@@ -144,6 +159,11 @@ class ClientController extends Controller
         $this->view('clients/show', [
             'client' => $client,
             'achats' => $ventesData['data'] ?? [],
+            'kpis' => $kpis,
+            'filters' => [
+                'date_debut' => $dateDebut,
+                'date_fin' => $dateFin,
+            ],
             'ristourne' => $ristourneActive,
             'dettes' => $dettes
         ]);
