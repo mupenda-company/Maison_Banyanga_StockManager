@@ -43,6 +43,16 @@ class Mission extends Model
                  WHERE v.id = :id",
                 ['id' => $mission['vehicule_id']]
             );
+
+            $mission['created_by_user'] = $this->db->fetch(
+                "SELECT u.nom, u.prenom
+                 FROM users u
+                 WHERE u.id = :id",
+                ['id' => $mission['created_by']]
+            );
+
+            $createdByNom = trim((($mission['created_by_user']['prenom'] ?? '') . ' ' . ($mission['created_by_user']['nom'] ?? '')));
+            $mission['created_by_nom'] = $createdByNom !== '' ? $createdByNom : 'Système';
             
             // Garantir que l'immatriculation est disponible au niveau racine pour la vue
             $mission['immatriculation'] = $mission['vehicule']['immatriculation'] ?? 'N/A';
@@ -62,15 +72,41 @@ class Mission extends Model
                  WHERE mc.mission_id = :id",
                 ['id' => $id]
             );
+
+            $mission['clients'] = $this->db->fetchAll(
+                "SELECT c.id, c.nom, c.telephone, c.adresse,
+                        COALESCE(SUM(ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)), 0) as quantite_caisses,
+                        COALESCE(SUM(v.total_ttc), 0) as montant
+                 FROM ventes v
+                 JOIN clients c ON v.client_id = c.id
+                 LEFT JOIN vente_details vd ON vd.vente_id = v.id
+                 LEFT JOIN produits p ON vd.produit_id = p.id
+                 WHERE v.mission_id = :id AND v.statut = 'validee'
+                 GROUP BY c.id, c.nom, c.telephone, c.adresse
+                 ORDER BY MAX(v.date_vente) DESC",
+                ['id' => $id]
+            );
             
             // Calculer le total du chargement
             $total = 0;
+            $totalCaisses = 0;
             foreach ($mission['chargements'] as &$item) {
+                $btlParCaisse = (int) ($item['bouteilles_par_caisses'] ?? 24);
+                if ($btlParCaisse <= 0) {
+                    $btlParCaisse = 24;
+                }
+
                 $prixCaisse = $item['prix_vente_caisses'] ?: ($item['prix_vente_unitaire'] * $item['bouteilles_par_caisses']);
-                $item['sous_total'] = ($item['quantite_chargee'] / $item['bouteilles_par_caisses']) * $prixCaisse;
+                $item['quantite_caisses'] = intdiv((int) $item['quantite_chargee'], $btlParCaisse);
+                $item['sous_total'] = ($item['quantite_chargee'] / $btlParCaisse) * $prixCaisse;
                 $total += $item['sous_total'];
+                $totalCaisses += $item['quantite_caisses'];
             }
             $mission['total_chargement'] = $total;
+            $mission['total_caisses'] = $totalCaisses;
+            $mission['total_bouteilles'] = array_sum(array_map(static function ($item) {
+                return (int) ($item['quantite_chargee'] ?? 0);
+            }, $mission['chargements']));
         }
         
         return $mission;

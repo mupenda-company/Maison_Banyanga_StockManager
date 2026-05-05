@@ -91,7 +91,7 @@ ob_start();
                         <td><?= htmlspecialchars($mission['agent_nom'] ?? 'N/A') ?></td>
                         <td><?= htmlspecialchars($mission['zone_nom'] ?? 'N/A') ?></td>
                         <td>
-                            <div class="font-medium"><?= $mission['total_bouteilles'] ?? 0 ?> bouteilles</div>
+                            <div class="font-medium"><?= number_format((int) ($mission['total_caisses'] ?? 0), 0, '.', ' ') ?> caisses</div>
                             <div class="text-xs text-gray-500"><?= $mission['nb_clients'] ?? 0 ?> client(s)</div>
                         </td>
                         <td>

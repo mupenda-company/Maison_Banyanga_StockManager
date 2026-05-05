@@ -36,7 +36,14 @@ class MissionController extends Controller
         $page = (int) ($_GET['page'] ?? 1);
         
         $missions = $this->db->fetchAll(
-            "SELECT m.*, v.immatriculation, u.nom as agent_nom, u.prenom as agent_prenom, z.nom as zone_nom
+            "SELECT m.*, v.immatriculation, u.nom as agent_nom, u.prenom as agent_prenom, z.nom as zone_nom,
+                    COALESCE((SELECT SUM(ROUND(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0))
+                              FROM mission_chargements mc
+                              JOIN produits p ON mc.produit_id = p.id
+                              WHERE mc.mission_id = m.id), 0) as total_caisses,
+                    COALESCE((SELECT COUNT(DISTINCT v2.client_id)
+                              FROM ventes v2
+                              WHERE v2.mission_id = m.id AND v2.statut = 'validee'), 0) as nb_clients
              FROM missions m
              JOIN vehicules v ON m.vehicule_id = v.id
              LEFT JOIN users u ON v.agent_responsable_id = u.id

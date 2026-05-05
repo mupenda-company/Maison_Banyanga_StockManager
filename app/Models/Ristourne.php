@@ -26,7 +26,7 @@ class Ristourne extends Model
     public function calculerRistourne($clientId, $mois, $annee)
     {
         $client = $this->db->fetch(
-            "SELECT taux_ristourne, nom, prenom
+            "SELECT taux_ristourne, nom
              FROM clients
              WHERE id = :client_id",
             ['client_id' => $clientId]

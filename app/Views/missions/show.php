@@ -97,8 +97,8 @@ ob_start();
                         <thead>
                             <tr>
                                 <th>Produit</th>
-                                <th class="text-right">Quantité</th>
-                                <th class="text-right">Prix unitaire</th>
+                                <th class="text-right">Caisses</th>
+                                <th class="text-right">Prix caisse</th>
                                 <th class="text-right">Sous-total</th>
                             </tr>
                         </thead>
@@ -106,23 +106,25 @@ ob_start();
                             <?php foreach ($mission['chargements'] as $item): ?>
                             <?php
                                 $btlParCaisse = (int)($item['bouteilles_par_caisses'] ?? 24);
+                                if ($btlParCaisse <= 0) {
+                                    $btlParCaisse = 24;
+                                }
                                 $prixCaisse = $item['prix_vente_caisses'] ?: ($item['prix_vente_unitaire'] * $btlParCaisse);
-                                $prixUnitaire = $btlParCaisse > 0 ? ($prixCaisse / $btlParCaisse) : 0;
                             ?>
                             <tr>
                                 <td>
                                     <div class="font-medium"><?= htmlspecialchars($item['produit_nom']) ?></div>
                                     <div class="text-xs text-gray-500"><?= htmlspecialchars($item['produit_code']) ?></div>
                                 </td>
-                                <td class="text-right"><?= number_format((int) $item['quantite_chargee'], 0, '.', ' ') ?></td>
-                                <td class="text-right"><?= format_money_converted($prixUnitaire) ?></td>
+                                <td class="text-right"><?= number_format((int) ($item['quantite_caisses'] ?? 0), 0, '.', ' ') ?> cs</td>
+                                <td class="text-right"><?= format_money_converted($prixCaisse) ?></td>
                                 <td class="text-right font-medium"><?= format_money_converted($item['sous_total'] ?? 0) ?></td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
                         <tfoot class="bg-gray-50 dark:bg-gray-700/50">
                             <tr>
-                                <td colspan="3" class="text-right font-bold">Total</td>
+                                <td colspan="3" class="text-right font-bold">Total caisses</td>
                                 <td class="text-right font-bold text-primary-600">
                                     <?= format_money_converted($mission['total_chargement'] ?? 0) ?>
                                 </td>
@@ -134,14 +136,14 @@ ob_start();
             </div>
         </div>
         
-        <!-- Clients à livrer -->
+        <!-- Clients servis -->
         <div class="card">
             <div class="card-header">
-                <h3 class="font-semibold">Clients à livrer</h3>
+                <h3 class="font-semibold">Clients servis</h3>
             </div>
             <div class="card-body p-0">
                 <?php if (empty($mission['clients'])): ?>
-                <div class="p-6 text-center text-gray-500">Aucun client assigné</div>
+                <div class="p-6 text-center text-gray-500">Aucune vente enregistrée</div>
                 <?php else: ?>
                 <div class="divide-y divide-gray-200 dark:divide-gray-700">
                     <?php foreach ($mission['clients'] as $client): ?>
@@ -156,7 +158,7 @@ ob_start();
                                 </p>
                             </div>
                             <div class="text-right">
-                                <p class="font-medium"><?= $client['quantite'] ?> bouteilles</p>
+                                <p class="font-medium"><?= number_format((int) round(($client['quantite'] ?? 0) / max((int) ($client['bouteilles_par_caisses'] ?? 24), 1)), 0, '.', ' ') ?> caisses</p>
                                 <p class="text-sm text-gray-500"><?= format_money_converted($client['montant'] ?? 0) ?></p>
                             </div>
                         </div>
@@ -173,11 +175,11 @@ ob_start();
         <!-- Résumé -->
         <div class="card">
             <div class="card-body text-center">
-                <p class="text-sm text-gray-500 dark:text-gray-400">Total bouteilles</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Total caisses</p>
                 <p class="text-3xl font-bold text-primary-600">
-                    <?= $mission['total_bouteilles'] ?? 0 ?>
+                    <?= $mission['total_caisses'] ?? 0 ?>
                 </p>
-                <p class="text-sm text-gray-500 mt-2"><?= count($mission['clients'] ?? []) ?> client(s)</p>
+                <p class="text-sm text-gray-500 mt-2"><?= count($mission['clients'] ?? []) ?> client(s) servis</p>
             </div>
         </div>
         
@@ -216,7 +218,7 @@ ob_start();
         <div class="card">
             <div class="card-body">
                 <p class="text-sm text-gray-500 dark:text-gray-400">Créé par</p>
-                <p class="font-medium"><?= htmlspecialchars($mission['created_by_nom'] ?? 'N/A') ?></p>
+                <p class="font-medium"><?= htmlspecialchars($mission['created_by_nom'] ?? 'Système') ?></p>
                 <p class="text-sm text-gray-500">
                     <?= date('d/m/Y H:i', strtotime($mission['created_at'])) ?>
                 </p>
