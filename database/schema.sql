@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS `produits` (
     `nom` VARCHAR(150) NOT NULL,
     `description` TEXT,
     `categorie` VARCHAR(50),
-    `unite_base` VARCHAR(20) NOT NULL DEFAULT 'bouteille',
+    `unite_base` VARCHAR(20) NOT NULL DEFAULT 'caisse',
     `bouteilles_par_caisses` INT NOT NULL DEFAULT 24,
     `prix_achat_unitaire` DECIMAL(12,2) NOT NULL DEFAULT 0,
     `prix_vente_unitaire` DECIMAL(12,2) NOT NULL DEFAULT 0,
@@ -83,6 +83,10 @@ CREATE TABLE IF NOT EXISTS `produits` (
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- INSERT INTO `produits` (`code`,`nom`,`description`,`categorie`,`unite_base`,`bouteilles_par_caisses`,`prix_achat_unitaire`,`prix_vente_unitaire`,`prix_vente_caisses`,`seuil_alerte`,`actif`)
+-- VALUES 
+-- ('PRD-0001', 'PRIMUS 72CL', 'Description du produit 1', 'Avec Alcol', 'caisse', 12, 10.00, 15.00, 360.00, 10, 1),
+-- ('P002', 'Produit 2', 'Description du produit 2', 'Categorie 2', 'caisse', 24, 20.00, 25.00, 600.00, 10, 1);
 -- --------------------------------------------------------
 -- Structure de la table `emplacements`
 -- --------------------------------------------------------
