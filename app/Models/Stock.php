@@ -169,6 +169,59 @@ class Stock extends Model
     }
     
     /**
+     * Définir un stock initial absolu
+     */
+    public function setInitialStock($produitId, $emplacementId, $data)
+    {
+        $produit = (new Produit())->find($produitId);
+        $btlParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+        if ($btlParCaisse <= 0) {
+            $btlParCaisse = 24;
+        }
+
+        $caissesPleines = (int) ($data['caisses_pleine'] ?? 0);
+        $caissesVides = (int) ($data['caisses_vide'] ?? 0);
+        $quantitePleine = isset($data['quantite_pleine'])
+            ? (int) $data['quantite_pleine']
+            : ($caissesPleines * $btlParCaisse);
+        $quantiteVide = isset($data['quantite_vide'])
+            ? (int) $data['quantite_vide']
+            : ($caissesVides * $btlParCaisse);
+
+        $existing = $this->getStock($produitId, $emplacementId);
+        if ($existing) {
+            $this->db->query(
+                "UPDATE {$this->table} SET
+                    quantite_pleine = :quantite_pleine,
+                    quantite_vide = :quantite_vide,
+                    caisses_pleine = :caisses_pleine,
+                    caisses_vide = :caisses_vide,
+                    updated_at = NOW()
+                 WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id",
+                [
+                    'produit_id' => $produitId,
+                    'emplacement_id' => $emplacementId,
+                    'quantite_pleine' => $quantitePleine,
+                    'quantite_vide' => $quantiteVide,
+                    'caisses_pleine' => $caissesPleines,
+                    'caisses_vide' => $caissesVides
+                ]
+            );
+
+            return $existing['id'];
+        }
+
+        return $this->create([
+            'produit_id' => $produitId,
+            'emplacement_id' => $emplacementId,
+            'quantite_pleine' => $quantitePleine,
+            'quantite_vide' => $quantiteVide,
+            'caisses_pleine' => $caissesPleines,
+            'caisses_vide' => $caissesVides
+        ]);
+    }
+    
+    /**
      * Déduire du stock vide
      */
     public function deduireVide($produitId, $emplacementId, $quantiteCaisses)

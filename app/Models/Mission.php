@@ -6,7 +6,7 @@
 class Mission extends Model
 {
     protected $table = 'missions';
-    protected $fillable = ['numero_mission', 'vehicule_id', 'chauffeur_id', 'date_depart', 'date_retour', 'zone_id', 'notes', 'statut', 'montant_encaisse', 'created_by'];
+    protected $fillable = ['numero_mission', 'vehicule_id', 'chauffeur_id', 'date_depart', 'date_retour', 'zone_id', 'notes', 'statut', 'montant_encaisse', 'caisses_vides_retournees', 'created_by'];
     
     /**
      * Générer un numéro de mission unique
@@ -134,7 +134,8 @@ class Mission extends Model
 
             $mission['montant_attendu'] = (float) ($mission['ventes']['total'] ?? 0);
             $mission['caisses_vendues_total'] = (int) ($mission['ventes']['caisses_vendues'] ?? 0);
-            $mission['retours_vides_total'] = 0;
+            $mission['caisses_vides_retournees'] = (int) ($mission['caisses_vides_retournees'] ?? 0);
+            $mission['retours_vides_total'] = $mission['caisses_vides_retournees'];
             
             // Calculer le total du chargement
             $total = 0;
@@ -147,9 +148,9 @@ class Mission extends Model
 
                 $prixCaisse = $item['prix_vente_caisses'] ?: ($item['prix_vente_unitaire'] * $item['bouteilles_par_caisses']);
                 $item['quantite_caisses'] = (int) ($item['quantite_caisses'] ?? intdiv((int) $item['quantite_chargee'], $btlParCaisse));
-                $item['caisses_vendues'] = (int) round(((int) ($item['quantite_vendue'] ?? 0)) / $btlParCaisse, 0);
+                $item['caisses_vendues'] = (int) intdiv((int) ($item['quantite_vendue'] ?? 0), $btlParCaisse);
                 $item['montant_vendu'] = $item['caisses_vendues'] * $prixCaisse;
-                $item['sous_total'] = ($item['quantite_chargee'] / $btlParCaisse) * $prixCaisse;
+                $item['sous_total'] = $item['quantite_caisses'] * $prixCaisse;
                 $total += $item['sous_total'];
                 $totalCaisses += $item['quantite_caisses'];
             }
@@ -311,8 +312,10 @@ class Mission extends Model
             }
 
             // 2. Gérer les VIDES retournés
+            $totalVidesRetournes = 0;
             foreach ($vides_retournes as $produitId => $nbCaissesVides) {
                 if ($nbCaissesVides > 0) {
+                    $totalVidesRetournes += (int) $nbCaissesVides;
                     // Les vides retournés vont à l'entrepôt principal
                     $stockModel->updateOrCreate($produitId, $emplacementPrincipalId, [
                         'caisses_vide' => $nbCaissesVides
@@ -349,6 +352,18 @@ class Mission extends Model
 
             if ($hasMontantEncaisseColumn) {
                 $updateData['montant_encaisse'] = $montant_encaisse;
+            }
+
+            $hasVidesRetournesColumn = (bool) $this->db->fetchColumn(
+                "SELECT COUNT(*)
+                 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'missions'
+                   AND COLUMN_NAME = 'caisses_vides_retournees'"
+            );
+
+            if ($hasVidesRetournesColumn) {
+                $updateData['caisses_vides_retournees'] = $totalVidesRetournes;
             }
 
             $this->update($id, $updateData);

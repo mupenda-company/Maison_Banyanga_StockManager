@@ -57,11 +57,13 @@ $routes = [
     // Stocks
     'GET::/stocks' => ['StockController', 'index'],
     'GET::/stocks/inventaire' => ['StockController', 'inventaire'],
+    'GET::/stocks/inventaire-initial' => ['StockController', 'inventaireInitial'],
     'GET::/stocks/mouvements' => ['StockController', 'mouvements'],
     'GET::/api/stocks' => ['StockController', 'apiGlobal'],
     'GET::/api/stocks/emplacement/(\d+)' => ['StockController', 'apiEmplacement'],
     'POST::/api/stocks/transfert' => ['StockController', 'transfert'],
     'POST::/api/stocks/ajustement' => ['StockController', 'ajustement'],
+    'POST::/api/stocks/inventaire-initial' => ['StockController', 'enregistrerInventaireInitial'],
     
     // Approvisionnements
     'GET::/approvisionnements' => ['ApprovisionnementController', 'index'],
