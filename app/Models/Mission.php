@@ -132,6 +132,24 @@ class Mission extends Model
                 [$id, $id, $id]
             ) ?: ['quantite_bouteilles' => 0, 'caisses_vendues' => 0, 'total' => 0];
 
+            $mission['ventes_par_produit'] = $this->db->fetchAll(
+                "SELECT vd.produit_id,
+                        p.nom as produit_nom,
+                        p.code as produit_code,
+                        p.bouteilles_par_caisses,
+                        COALESCE(SUM(COALESCE(vd.quantite_caisses, ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0))), 0) as caisses_vendues,
+                        COALESCE(SUM(vd.quantite), 0) as bouteilles_vendues,
+                        COALESCE(SUM(vd.sous_total), 0) as montant
+                 FROM ventes v
+                 JOIN vente_details vd ON vd.vente_id = v.id
+                 LEFT JOIN produits p ON vd.produit_id = p.id
+                 WHERE v.mission_id = ?
+                   AND v.statut = 'validee'
+                 GROUP BY vd.produit_id, p.nom, p.code, p.bouteilles_par_caisses
+                 ORDER BY p.nom ASC",
+                [$id]
+            );
+
             $mission['montant_attendu'] = (float) ($mission['ventes']['total'] ?? 0);
             $mission['caisses_vendues_total'] = (int) ($mission['ventes']['caisses_vendues'] ?? 0);
             $mission['caisses_vides_retournees'] = (int) ($mission['caisses_vides_retournees'] ?? 0);
@@ -271,14 +289,11 @@ class Mission extends Model
             
             $mission = $this->getWithDetails($id);
             if (!$mission) throw new Exception("Mission non trouvée");
-
-            $vehicule = (new Vehicule())->find($mission['vehicule_id']);
-            $emplacementVehicule = $vehicule['emplacement_id'];
             
             $stockModel = new Stock();
             $mouvementModel = new MouvementStock();
             
-            // 1. Gérer les INVENDUS (Produits pleins qui reviennent à l'entrepôt)
+            // 1. Gérer les INVENDUS (Produits pleins conservés dans le véhicule pour transfert manuel)
             foreach ($invendus as $produitId => $quantiteInvendue) {
                 // Mettre à jour le chargement avec ce qui revient
                 $this->db->query(
@@ -286,29 +301,6 @@ class Mission extends Model
                      WHERE mission_id = ? AND produit_id = ?",
                     [$quantiteInvendue, $id, $produitId]
                 );
-                
-                if ($quantiteInvendue > 0) {
-                    // Transférer du véhicule vers l'entrepôt principal
-                    $stockModel->updateOrCreate($produitId, $emplacementVehicule, [
-                        'quantite_pleine' => -$quantiteInvendue
-                    ]);
-                    
-                    $stockModel->updateOrCreate($produitId, $emplacementPrincipalId, [
-                        'quantite_pleine' => $quantiteInvendue
-                    ]);
-
-                    // Mouvement de stock pour la réintégration
-                    $mouvementModel->create([
-                        'produit_id' => $produitId,
-                        'emplacement_id' => $emplacementPrincipalId,
-                        'type_mouvement' => 'entree',
-                        'quantite' => $quantiteInvendue,
-                        'reference_type' => 'mission',
-                        'reference_id' => $id,
-                        'motif' => 'Réintégration invendus mission ' . $mission['numero_mission'],
-                        'created_by' => $_SESSION['user_id']
-                    ]);
-                }
             }
 
             // 2. Gérer les VIDES retournés

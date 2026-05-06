@@ -74,7 +74,10 @@ class MobileController extends Controller {
     public function branding()
     {
         $parametreModel = new Parametre();
-        return $this->success($parametreModel->getPersonnalisation());
+        $params = $parametreModel->getPersonnalisation();
+        $params['logo_url'] = !empty($params['logo']) ? asset('uploads/' . $params['logo']) : '';
+
+        return $this->success($params);
     }
 
     /**
@@ -88,7 +91,9 @@ class MobileController extends Controller {
                        IFNULL(mc.quantite_vendue, 0) as quantite_vendue,
                        (IFNULL(mc.quantite_caisses, FLOOR(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))) -
                         FLOOR(IFNULL(mc.quantite_vendue, 0) / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))) as stock_actuel_caisses,
-                       (mc.quantite_chargee - IFNULL(mc.quantite_vendue, 0)) as stock_actuel_bouteilles
+                       (mc.quantite_chargee - IFNULL(mc.quantite_vendue, 0)) as stock_actuel_bouteilles,
+                       (IFNULL(mc.quantite_caisses, FLOOR(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))) -
+                        FLOOR(IFNULL(mc.quantite_vendue, 0) / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))) as stock_actuel
                 FROM mission_chargements mc
                 JOIN produits p ON mc.produit_id = p.id
                 WHERE mc.mission_id = ?";
@@ -245,6 +250,7 @@ class MobileController extends Controller {
 
         $parametreModel = new Parametre();
         $params = $parametreModel->getPersonnalisation();
+        $params['logo_url'] = !empty($params['logo']) ? asset('uploads/' . $params['logo']) : '';
 
         $totalCaissesClient = (float) $this->db->fetchColumn(
             "SELECT COALESCE(SUM(vd.quantite / p.bouteilles_par_caisses), 0)
@@ -382,21 +388,26 @@ class MobileController extends Controller {
                     throw new Exception('Quantité de caisses invalide');
                 }
 
-                $prixInput = $item['prix_unitaire'] ?? $item['prix'] ?? null;
-                if ($prixInput === null || $prixInput === '') {
-                    $prixBase = (float) ($produit['prix_vente_unitaire'] ?? 0);
+                $prixCaisseInput = $item['prix_caisse'] ?? $item['prix'] ?? null;
+                if ($prixCaisseInput === null || $prixCaisseInput === '') {
+                    $prixCaisseBase = (float) ($produit['prix_vente_caisses'] ?? 0);
+                    if ($prixCaisseBase <= 0) {
+                        $prixCaisseBase = (float) (($produit['prix_vente_unitaire'] ?? 0) * ($produit['bouteilles_par_caisses'] ?: 24));
+                    }
                 } else {
-                    $prixBase = convert_money((float) $prixInput, $fromDevise, $toDevise);
+                    $prixCaisseBase = convert_money((float) $prixCaisseInput, $fromDevise, $toDevise);
                 }
 
-                $sousTotal = $quantite * $prixBase;
+                $prixUnitaireBase = $prixCaisseBase / ($produit['bouteilles_par_caisses'] ?: 24);
+                $sousTotal = $quantiteCaisses * $prixCaisseBase;
                 $totalHt += $sousTotal;
 
                 $details[] = [
                     'produit_id' => $produitId,
                     'quantite_caisses' => $quantiteCaisses,
                     'quantite' => $quantiteCaisses * (int) ($produit['bouteilles_par_caisses'] ?: 24),
-                    'prix_unitaire' => $prixBase,
+                    'prix_unitaire' => $prixUnitaireBase,
+                    'prix_caisse' => $prixCaisseBase,
                     'sous_total' => $sousTotal,
                     'bouteilles_par_caisses' => (float) ($produit['bouteilles_par_caisses'] ?: 24)
                 ];
