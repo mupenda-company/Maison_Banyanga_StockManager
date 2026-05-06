@@ -83,10 +83,6 @@ CREATE TABLE IF NOT EXISTS `produits` (
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- INSERT INTO `produits` (`code`,`nom`,`description`,`categorie`,`unite_base`,`bouteilles_par_caisses`,`prix_achat_unitaire`,`prix_vente_unitaire`,`prix_vente_caisses`,`seuil_alerte`,`actif`)
--- VALUES 
--- ('PRD-0001', 'PRIMUS 72CL', 'Description du produit 1', 'Avec Alcol', 'caisse', 12, 10.00, 15.00, 360.00, 10, 1),
--- ('P002', 'Produit 2', 'Description du produit 2', 'Categorie 2', 'caisse', 24, 20.00, 25.00, 600.00, 10, 1);
 -- --------------------------------------------------------
 -- Structure de la table `emplacements`
 -- --------------------------------------------------------
@@ -450,6 +446,20 @@ INSERT INTO `parametres` (`cle`, `valeur`, `type`) VALUES
 -- Emplacement principal par défaut (Entrepôt)
 INSERT INTO `emplacements` (`code`, `nom`, `type`, `capacite`) VALUES
 ('ENT-001', 'Entrepôt Principal', 'fixe', 1000000);
+
+-- Produit par defauf pour m'evite de tous les ecrire hahha
+INSERT INTO `produits` (`id`, `code`, `nom`, `description`, `categorie`, `unite_base`, `caisses_par_caisses`, `prix_achat_unitaire`, `prix_vente_unitaire`, `prix_vente_caisses`, `seuil_alerte`, `actif`) VALUES
+(1, 'PRD-0001', 'PRIMUS 72CL', '', 'Alcolisé', 'caisse', 12, 3023.67, 3250.00, 39000.00, 10, 1),
+(2, 'PRD-0002', 'PRIMUS 50CL', '', 'Alcolisé', 'caisse', 20, 2336.70, 2500.00, 50000.00, 10, 1),
+(3, 'PRD-0003', 'TURBO KING 72CL', '', 'Alcolisé', 'caisse', 12, 3182.00, 3416.67, 41000.00, 10, 1),
+(4, 'PRD-0004', 'TURBO KING 50CL', '', 'Alcolisé', 'caisse', 20, 2431.70, 2600.00, 52000.00, 10, 1),
+(5, 'PRD-0005', 'SUPER BOOCKB 65CL', '', 'Alcolisé', 'caisse', 12, 3166.67, 3416.67, 41000.00, 10, 1),
+(6, 'PRD-0006', 'MUTZIG BL 33CL', '', 'Alcolisé', 'caisse', 24, 1868.08, 2000.00, 48000.00, 10, 1),
+(7, 'PRD-0007', 'MUTZIG BL 72CL', '', 'Alcolisé', 'caisse', 12, 3250.00, 3416.67, 41000.00, 10, 1),
+(8, 'PRD-0008', 'CLASS 50CL', '', 'Alcolisé', 'caisse', 20, 2336.70, 2500.00, 50000.00, 10, 1),
+(9, 'PRD-0009', 'CLASS 33CL', '', 'Alcolisé', 'caisse', 24, 1947.25, 2083.33, 50000.00, 10, 1),
+(10, 'PRD-0010', 'ENERGY MALT 33CL', '', 'Alcolisé', 'caisse', 24, 1551.42, 1666.67, 40000.00, 10, 1),
+(11, 'PRD-0011', 'LEGEND 33CL', '', 'Alcolisé', 'caisse', 24, 2026.42, 2166.67, 52000.00, 10, 1);
 
 -- Paliers de ristourne par défaut
 INSERT INTO `paliers_ristourne` (`nom`, `ca_min`, `ca_max`, `taux_ristourne`) VALUES
