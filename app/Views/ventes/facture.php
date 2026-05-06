@@ -28,12 +28,24 @@
     </style>
 </head>
 <body class="bg-white">
+    <?php
+        $companyLogo = !empty($params['logo']) ? asset('uploads/' . $params['logo']) : '';
+        $companyContact = $params['contact'] ?? ($params['telephone'] ?? '');
+    ?>
     <div class="max-w-[100mm] mx-auto">
         <!-- En-tête -->
         <div class="ticket-header">
-            <h1 class="text-lg font-bold uppercase"><?= htmlspecialchars($params['nom_entreprise']) ?></h1>
-            <p class="text-[10px]"><?= htmlspecialchars($params['adresse'] ?? '') ?></p>
-            <p class="text-[10px]">Tél: <?= htmlspecialchars($params['telephone'] ?? '') ?></p>
+            <?php if ($companyLogo): ?>
+            <img src="<?= $companyLogo ?>" alt="Logo" class="h-14 mx-auto mb-2 object-contain">
+            <?php endif; ?>
+            <h1 class="text-lg font-bold uppercase"><?= htmlspecialchars($params['nom_entreprise'] ?? APP_NAME) ?></h1>
+            <?php if (!empty($params['adresse'])): ?><p class="text-[10px]"><?= htmlspecialchars($params['adresse']) ?></p><?php endif; ?>
+            <?php if (!empty($companyContact)): ?><p class="text-[10px]">Contact: <?= htmlspecialchars($companyContact) ?></p><?php endif; ?>
+            <?php if (!empty($params['email_contact'])): ?><p class="text-[10px]">Email: <?= htmlspecialchars($params['email_contact']) ?></p><?php endif; ?>
+            <?php if (!empty($params['rccm'])): ?><p class="text-[10px]">RCCM: <?= htmlspecialchars($params['rccm']) ?></p><?php endif; ?>
+            <?php if (!empty($params['id_nat'])): ?><p class="text-[10px]">ID NAT: <?= htmlspecialchars($params['id_nat']) ?></p><?php endif; ?>
+            <?php if (!empty($params['nif'])): ?><p class="text-[10px]">NIF: <?= htmlspecialchars($params['nif']) ?></p><?php endif; ?>
+            <?php if (!empty($params['numero_compte'])): ?><p class="text-[10px]">N° compte: <?= htmlspecialchars($params['numero_compte']) ?></p><?php endif; ?>
             <div class="divider"></div>
             <p class="font-bold">FACTURE: <?= htmlspecialchars($vente['numero_facture']) ?></p>
             <p class="text-[10px]"><?= date('d/m/Y H:i', strtotime($vente['date_vente'])) ?></p>

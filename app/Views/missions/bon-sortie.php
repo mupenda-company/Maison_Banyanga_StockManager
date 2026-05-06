@@ -14,14 +14,25 @@
 </head>
 <body class="bg-white text-gray-900 p-8">
     <?php $vehicule = $mission['vehicule'] ?? []; ?>
+    <?php
+        $companyLogo = !empty($params['logo']) ? asset('uploads/' . $params['logo']) : '';
+        $companyContact = $params['contact'] ?? ($params['telephone'] ?? '');
+    ?>
     <div class="max-w-3xl mx-auto">
         <!-- En-tête -->
         <div class="flex justify-between items-start mb-8 border-b pb-6">
             <div>
-                <?php if (!empty($params['logo'])): ?>
-                <img src="<?= asset('uploads/' . $params['logo']) ?>" alt="Logo" class="h-16 mb-2">
+                <?php if ($companyLogo): ?>
+                <img src="<?= $companyLogo ?>" alt="Logo" class="h-16 mb-2 object-contain">
                 <?php endif; ?>
                 <h1 class="text-2xl font-bold text-gray-900"><?= htmlspecialchars($params['nom_entreprise'] ?? APP_NAME) ?></h1>
+                <?php if (!empty($params['adresse'])): ?><p class="text-sm text-gray-600"><?= htmlspecialchars($params['adresse']) ?></p><?php endif; ?>
+                <?php if (!empty($companyContact)): ?><p class="text-sm text-gray-600">Contact: <?= htmlspecialchars($companyContact) ?></p><?php endif; ?>
+                <?php if (!empty($params['email_contact'])): ?><p class="text-sm text-gray-600">Email: <?= htmlspecialchars($params['email_contact']) ?></p><?php endif; ?>
+                <?php if (!empty($params['rccm'])): ?><p class="text-sm text-gray-600">RCCM: <?= htmlspecialchars($params['rccm']) ?></p><?php endif; ?>
+                <?php if (!empty($params['id_nat'])): ?><p class="text-sm text-gray-600">ID NAT: <?= htmlspecialchars($params['id_nat']) ?></p><?php endif; ?>
+                <?php if (!empty($params['nif'])): ?><p class="text-sm text-gray-600">NIF: <?= htmlspecialchars($params['nif']) ?></p><?php endif; ?>
+                <?php if (!empty($params['numero_compte'])): ?><p class="text-sm text-gray-600">N° compte: <?= htmlspecialchars($params['numero_compte']) ?></p><?php endif; ?>
             </div>
             <div class="text-right">
                 <h2 class="text-xl font-bold text-blue-600">BON DE SORTIE</h2>

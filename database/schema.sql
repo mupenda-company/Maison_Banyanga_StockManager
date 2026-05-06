@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS `produits` (
     `nom` VARCHAR(150) NOT NULL,
     `description` TEXT,
     `categorie` VARCHAR(50),
-    `unite_base` VARCHAR(20) NOT NULL DEFAULT 'bouteille',
+    `unite_base` VARCHAR(20) NOT NULL DEFAULT 'caisse',
     `bouteilles_par_caisses` INT NOT NULL DEFAULT 24,
     `prix_achat_unitaire` DECIMAL(12,2) NOT NULL DEFAULT 0,
     `prix_vente_unitaire` DECIMAL(12,2) NOT NULL DEFAULT 0,
@@ -83,6 +83,10 @@ CREATE TABLE IF NOT EXISTS `produits` (
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- INSERT INTO `produits` (`code`,`nom`,`description`,`categorie`,`unite_base`,`bouteilles_par_caisses`,`prix_achat_unitaire`,`prix_vente_unitaire`,`prix_vente_caisses`,`seuil_alerte`,`actif`)
+-- VALUES 
+-- ('PRD-0001', 'PRIMUS 72CL', 'Description du produit 1', 'Avec Alcol', 'caisse', 12, 10.00, 15.00, 360.00, 10, 1),
+-- ('P002', 'Produit 2', 'Description du produit 2', 'Categorie 2', 'caisse', 24, 20.00, 25.00, 600.00, 10, 1);
 -- --------------------------------------------------------
 -- Structure de la table `emplacements`
 -- --------------------------------------------------------
@@ -164,12 +168,8 @@ CREATE TABLE IF NOT EXISTS `approvisionnement_details` (
     FOREIGN KEY (`produit_id`) REFERENCES `produits`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-<<<<<<< HEAD
 ALTER TABLE `approvisionnement_details`
     ADD COLUMN `prix_caisse` DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER `quantite_bouteilles`;
-
-=======
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
 -- --------------------------------------------------------
 -- Structure de la table `dettes_emballages`
 -- --------------------------------------------------------
@@ -200,10 +200,7 @@ CREATE TABLE IF NOT EXISTS `missions` (
     `zone_id` INT UNSIGNED,
     `notes` TEXT,
     `montant_encaisse` DECIMAL(15,2) DEFAULT 0,
-<<<<<<< HEAD
     `caisses_vides_retournees` INT NOT NULL DEFAULT 0,
-=======
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
     `statut` ENUM('en_cours', 'terminee', 'annulee') NOT NULL DEFAULT 'en_cours',
     `created_by` INT UNSIGNED,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -221,10 +218,7 @@ CREATE TABLE IF NOT EXISTS `mission_chargements` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `mission_id` INT UNSIGNED NOT NULL,
     `produit_id` INT UNSIGNED NOT NULL,
-<<<<<<< HEAD
     `quantite_caisses` INT NOT NULL DEFAULT 0 COMMENT 'Quantité en caisses',
-=======
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
     `quantite_chargee` INT NOT NULL COMMENT 'Quantité en bouteilles',
     `quantite_retournee` INT DEFAULT 0 COMMENT 'Quantité retournée à la fin de mission',
     `quantite_vendue` INT DEFAULT 0 COMMENT 'Quantité vendue pendant la mission',
@@ -232,12 +226,8 @@ CREATE TABLE IF NOT EXISTS `mission_chargements` (
     FOREIGN KEY (`produit_id`) REFERENCES `produits`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-<<<<<<< HEAD
 ALTER TABLE `mission_chargements`
     ADD COLUMN `prix_caisse` DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER `quantite_caisses`;
-
-=======
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
 -- --------------------------------------------------------
 -- Structure de la table `ventes`
 -- --------------------------------------------------------
@@ -269,10 +259,7 @@ CREATE TABLE IF NOT EXISTS `vente_details` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `vente_id` INT UNSIGNED NOT NULL,
     `produit_id` INT UNSIGNED NOT NULL,
-<<<<<<< HEAD
     `quantite_caisses` INT NOT NULL DEFAULT 0 COMMENT 'Quantité en caisses',
-=======
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
     `quantite` INT NOT NULL COMMENT 'Quantité en bouteilles',
     `prix_unitaire` DECIMAL(12,2) NOT NULL,
     `sous_total` DECIMAL(12,2) NOT NULL,
@@ -280,12 +267,8 @@ CREATE TABLE IF NOT EXISTS `vente_details` (
     FOREIGN KEY (`produit_id`) REFERENCES `produits`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-<<<<<<< HEAD
 ALTER TABLE `vente_details`
     ADD COLUMN `prix_caisse` DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER `quantite_caisses`;
-
-=======
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
 -- --------------------------------------------------------
 -- Structure de la table `pertes`
 -- --------------------------------------------------------
@@ -388,10 +371,6 @@ CREATE TABLE IF NOT EXISTS `retours_emballages` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `client_id` INT UNSIGNED NOT NULL,
     `produit_id` INT UNSIGNED NOT NULL,
-<<<<<<< HEAD
-    `quantite_caisses` INT NOT NULL DEFAULT 0,
-=======
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
     `quantite` INT NOT NULL,
     `date_retour` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `emplacement_id` INT UNSIGNED NOT NULL,
@@ -402,13 +381,9 @@ CREATE TABLE IF NOT EXISTS `retours_emballages` (
     FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE CASCADE
 )ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-<<<<<<< HEAD
 ALTER TABLE `dettes_emballages`
     ADD COLUMN `quantite_dette_bouteilles` INT NOT NULL DEFAULT 0 AFTER `quantite_dette_caisses`,
     ADD COLUMN `quantite_remboursee_bouteilles` INT NOT NULL DEFAULT 0 AFTER `quantite_remboursee`;
-
-=======
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
 
 ALTER TABLE pertes ADD COLUMN type_stock ENUM('plein', 'vide') NOT NULL DEFAULT 'plein' AFTER emplacement_id;
 
@@ -460,12 +435,17 @@ INSERT INTO `parametres` (`cle`, `valeur`, `type`) VALUES
 ('nom_entreprise', 'Bralima', 'text'),
 ('logo', '', 'text'),
 ('couleur_primaire', '#3B82F6', 'text'),
-('adresse', 'Kinshasa, RD Congo', 'text'),
+('adresse', 'Goma, RD Congo', 'text'),
 ('telephone', '', 'text'),
 ('email_contact', '', 'text'),
+('contact', '+243998681273', 'text'),
+('rccm', 'CD/GOM/RCCM/15-B-0278', 'text'),
+('id_nat', '5-93-N466812 Z', 'text'),
+('nif', '1504690Q', 'text'),
+('numero_compte', '100250288942 BK', 'text'),
 ('devise', 'CDF', 'text'),
 ('devise_base', 'CDF', 'text'),
-('taux_tva', '16', 'number');
+('taux_tva', '0', 'number');
 
 -- Emplacement principal par défaut (Entrepôt)
 INSERT INTO `emplacements` (`code`, `nom`, `type`, `capacite`) VALUES

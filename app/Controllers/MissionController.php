@@ -37,11 +37,7 @@ class MissionController extends Controller
         
         $missions = $this->db->fetchAll(
             "SELECT m.*, v.immatriculation, u.nom as agent_nom, u.prenom as agent_prenom, z.nom as zone_nom,
-<<<<<<< HEAD
                     COALESCE((SELECT SUM(COALESCE(mc.quantite_caisses, FLOOR(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))))
-=======
-                    COALESCE((SELECT SUM(ROUND(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0))
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                               FROM mission_chargements mc
                               JOIN produits p ON mc.produit_id = p.id
                               WHERE mc.mission_id = m.id), 0) as total_caisses,
@@ -246,9 +242,33 @@ class MissionController extends Controller
         $this->requireAuth();
         
         $mission = $this->missionModel->getWithDetails($id);
+        if (!$mission) {
+            return $this->error('Mission non trouvée', 404);
+        }
+
         $params = (new Parametre())->getPersonnalisation();
         
         $this->view('missions/bon-sortie', [
+            'mission' => $mission,
+            'params' => $params
+        ]);
+    }
+
+    /**
+     * Imprimer la facture de fin de mission
+     */
+    public function facture($id)
+    {
+        $this->requireAuth();
+
+        $mission = $this->missionModel->getWithDetails($id);
+        if (!$mission) {
+            return $this->error('Mission non trouvée', 404);
+        }
+
+        $params = (new Parametre())->getPersonnalisation();
+
+        $this->view('missions/facture', [
             'mission' => $mission,
             'params' => $params
         ]);
