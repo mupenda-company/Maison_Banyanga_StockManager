@@ -60,7 +60,6 @@ class StockController extends Controller
     }
 
     /**
-<<<<<<< HEAD
      * Inventaire initial du stock
      */
     public function inventaireInitial()

@@ -116,6 +116,7 @@ $routes = [
     'POST::/api/missions' => ['MissionController', 'store'],
     'POST::/api/missions/(\d+)/terminer' => ['MissionController', 'terminer'],
     'GET::/missions/(\d+)/print' => ['MissionController', 'print'],
+    'GET::/missions/(\d+)/facture' => ['MissionController', 'facture'],
 
     // API Mobile
     'POST::/api/mobile/login' => ['MobileController', 'login'],

@@ -431,17 +431,17 @@ INSERT INTO `parametres` (`cle`, `valeur`, `type`) VALUES
 ('nom_entreprise', 'Bralima', 'text'),
 ('logo', '', 'text'),
 ('couleur_primaire', '#3B82F6', 'text'),
-('adresse', 'Kinshasa, RD Congo', 'text'),
+('adresse', 'Goma, RD Congo', 'text'),
 ('telephone', '', 'text'),
 ('email_contact', '', 'text'),
-('contact', '+24398681273', 'text'),
+('contact', '+243998681273', 'text'),
 ('rccm', 'CD/GOM/RCCM/15-B-0278', 'text'),
 ('id_nat', '5-93-N466812 Z', 'text'),
 ('nif', '1504690Q', 'text'),
 ('numero_compte', '100250288942 BK', 'text'),
 ('devise', 'CDF', 'text'),
 ('devise_base', 'CDF', 'text'),
-('taux_tva', '16', 'number');
+('taux_tva', '0', 'number');
 
 -- Emplacement principal par défaut (Entrepôt)
 INSERT INTO `emplacements` (`code`, `nom`, `type`, `capacite`) VALUES
