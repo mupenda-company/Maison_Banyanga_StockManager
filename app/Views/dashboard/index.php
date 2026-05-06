@@ -24,7 +24,7 @@ ob_start();
             <?= $statsToday['nb_ventes'] ?? 0 ?> vente(s)
         </p>
         <p class="text-xs text-gray-500 dark:text-gray-400">
-            <?= number_format((float) ($statsToday['caisses_vendues'] ?? 0), 1, '.', ' ') ?> caisse(s) vendue(s)
+            <?= number_format((int) round($statsToday['caisses_vendues'] ?? 0), 0, '.', ' ') ?> caisse(s) vendue(s)
         </p>
     </div>
     
@@ -47,7 +47,7 @@ ob_start();
             <?= $statsMonth['nb_ventes'] ?? 0 ?> vente(s)
         </p>
         <p class="text-xs text-gray-500 dark:text-gray-400">
-            <?= number_format((float) ($statsMonth['caisses_vendues'] ?? 0), 1, '.', ' ') ?> caisse(s) vendue(s)
+            <?= number_format((int) round($statsMonth['caisses_vendues'] ?? 0), 0, '.', ' ') ?> caisse(s) vendue(s)
         </p>
     </div>
     

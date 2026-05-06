@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS `clients` (
     `adresse` TEXT,
     `zone_id` INT UNSIGNED,
     `email` VARCHAR(100),
+    `taux_ristourne` DECIMAL(5,2) NOT NULL DEFAULT 5.00 COMMENT 'Taux de ristourne client',
     `notes` TEXT,
     `actif` TINYINT(1) NOT NULL DEFAULT 1,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -163,6 +164,9 @@ CREATE TABLE IF NOT EXISTS `approvisionnement_details` (
     FOREIGN KEY (`produit_id`) REFERENCES `produits`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+ALTER TABLE `approvisionnement_details`
+    ADD COLUMN `prix_caisse` DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER `quantite_bouteilles`;
+
 -- --------------------------------------------------------
 -- Structure de la table `dettes_emballages`
 -- --------------------------------------------------------
@@ -210,12 +214,16 @@ CREATE TABLE IF NOT EXISTS `mission_chargements` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `mission_id` INT UNSIGNED NOT NULL,
     `produit_id` INT UNSIGNED NOT NULL,
+    `quantite_caisses` INT NOT NULL DEFAULT 0 COMMENT 'Quantité en caisses',
     `quantite_chargee` INT NOT NULL COMMENT 'Quantité en bouteilles',
     `quantite_retournee` INT DEFAULT 0 COMMENT 'Quantité retournée à la fin de mission',
     `quantite_vendue` INT DEFAULT 0 COMMENT 'Quantité vendue pendant la mission',
     FOREIGN KEY (`mission_id`) REFERENCES `missions`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`produit_id`) REFERENCES `produits`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE `mission_chargements`
+    ADD COLUMN `prix_caisse` DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER `quantite_caisses`;
 
 -- --------------------------------------------------------
 -- Structure de la table `ventes`
@@ -248,12 +256,16 @@ CREATE TABLE IF NOT EXISTS `vente_details` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `vente_id` INT UNSIGNED NOT NULL,
     `produit_id` INT UNSIGNED NOT NULL,
+    `quantite_caisses` INT NOT NULL DEFAULT 0 COMMENT 'Quantité en caisses',
     `quantite` INT NOT NULL COMMENT 'Quantité en bouteilles',
     `prix_unitaire` DECIMAL(12,2) NOT NULL,
     `sous_total` DECIMAL(12,2) NOT NULL,
     FOREIGN KEY (`vente_id`) REFERENCES `ventes`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`produit_id`) REFERENCES `produits`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE `vente_details`
+    ADD COLUMN `prix_caisse` DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER `quantite_caisses`;
 
 -- --------------------------------------------------------
 -- Structure de la table `pertes`
@@ -357,6 +369,7 @@ CREATE TABLE IF NOT EXISTS `retours_emballages` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `client_id` INT UNSIGNED NOT NULL,
     `produit_id` INT UNSIGNED NOT NULL,
+    `quantite_caisses` INT NOT NULL DEFAULT 0,
     `quantite` INT NOT NULL,
     `date_retour` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `emplacement_id` INT UNSIGNED NOT NULL,
@@ -366,6 +379,10 @@ CREATE TABLE IF NOT EXISTS `retours_emballages` (
     FOREIGN KEY (`emplacement_id`) REFERENCES `emplacements`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE CASCADE
 )ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE `dettes_emballages`
+    ADD COLUMN `quantite_dette_bouteilles` INT NOT NULL DEFAULT 0 AFTER `quantite_dette_caisses`,
+    ADD COLUMN `quantite_remboursee_bouteilles` INT NOT NULL DEFAULT 0 AFTER `quantite_remboursee`;
 
 
 ALTER TABLE pertes ADD COLUMN type_stock ENUM('plein', 'vide') NOT NULL DEFAULT 'plein' AFTER emplacement_id;

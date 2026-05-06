@@ -45,10 +45,10 @@
             <?php if (!empty($vente['client_telephone'])): ?><p><strong>Numéro:</strong> <?= htmlspecialchars($vente['client_telephone']) ?></p><?php endif; ?>
             <?php if ($vente['zone_nom']): ?><p><strong>Zone:</strong> <?= htmlspecialchars($vente['zone_nom']) ?></p><?php endif; ?>
             <?php if (!empty($ristourneInfo)): ?>
-                <p><strong>Produits cumulés (période):</strong> <?= number_format((float)($ristourneInfo['total_caisses'] ?? 0), 1, '.', ' ') ?> cs</p>
+                <p><strong>Produits cumulés (période):</strong> <?= number_format((int)($ristourneInfo['total_caisses'] ?? 0), 0, '.', ' ') ?> cs</p>
                 <p><strong>CA (période):</strong> <?= format_money_converted($ristourneInfo['ca_total'] ?? 0) ?></p>
             <?php elseif (isset($totalCaissesClient)): ?>
-                <p><strong>Produits cumulés:</strong> <?= number_format((float)$totalCaissesClient, 1, '.', ' ') ?> cs</p>
+                <p><strong>Produits cumulés:</strong> <?= number_format((int)$totalCaissesClient, 0, '.', ' ') ?> cs</p>
             <?php endif; ?>
             <?php if (!empty($ristourneInfo)): ?>
                 <p><strong>Ristourne:</strong> <?= number_format((float)($ristourneInfo['taux_applique'] ?? 0), 2, '.', ' ') ?>% (<?= format_money_converted($ristourneInfo['montant_ristourne'] ?? 0) ?>)</p>
@@ -60,13 +60,13 @@
         <div class="mb-3">
             <?php foreach ($vente['details'] as $detail): 
                 $btlParCaisse = (int)($detail['bouteilles_par_caisses'] ?? 24);
-                $caisses = $detail['quantite'] / $btlParCaisse;
+                $caisses = intdiv((int)$detail['quantite'], $btlParCaisse);
                 $prixCaisse = $detail['prix_unitaire'] * $btlParCaisse;
             ?>
             <div class="mb-2">
                 <p class="font-bold"><?= htmlspecialchars($detail['produit_nom']) ?></p>
                 <div class="ticket-row text-[11px]">
-                    <span><?= number_format($caisses, 1, '.', ' ') ?> cs x <?= format_money_converted($prixCaisse) ?></span>
+                    <span><?= number_format($caisses, 0, '.', ' ') ?> cs x <?= format_money_converted($prixCaisse) ?></span>
                     <span class="font-bold"><?= format_money_converted($detail['sous_total']) ?></span>
                 </div>
             </div>

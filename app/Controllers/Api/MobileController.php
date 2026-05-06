@@ -206,7 +206,7 @@ class MobileController extends Controller {
             "SELECT v.id, v.numero_facture, v.date_vente, v.total_ttc,
                     c.nom as client_nom,
                     c.telephone as client_telephone,
-                    COALESCE(SUM(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24)), 0) as caisses_vendues
+                    COALESCE(SUM(ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)), 0) as caisses_vendues
              FROM ventes v
              JOIN clients c ON v.client_id = c.id
              LEFT JOIN vente_details vd ON vd.vente_id = v.id
@@ -444,7 +444,7 @@ class MobileController extends Controller {
                     (int) $emplacementVehiculeId,
                     [
                         'quantite_pleine' => -$detail['quantite'],
-                        'caisses_pleine' => -($detail['quantite'] / $detail['bouteilles_par_caisses'])
+                        'caisses_pleine' => -intdiv((int) $detail['quantite'], (int) $detail['bouteilles_par_caisses'])
                     ]
                 );
 
@@ -454,7 +454,7 @@ class MobileController extends Controller {
                     (int) $emplacementVehiculeId,
                     [
                         'quantite_vide' => $detail['quantite'],
-                        'caisses_vide' => ($detail['quantite'] / $detail['bouteilles_par_caisses'])
+                        'caisses_vide' => intdiv((int) $detail['quantite'], (int) $detail['bouteilles_par_caisses'])
                     ]
                 );
 

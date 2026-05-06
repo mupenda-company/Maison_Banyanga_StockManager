@@ -98,4 +98,20 @@ class DetteEmballage extends Model
              WHERE statut = 'en_cours'"
         );
     }
+
+    /**
+     * Statistiques globales des dettes d'emballages
+     */
+    public function getStatsGlobales()
+    {
+        return $this->db->fetch(
+            "SELECT 
+                COUNT(*) as nb_dettes,
+                COALESCE(SUM(quantite_dette_caisses), 0) as caisses_dettes,
+                COALESCE(SUM(quantite_remboursee), 0) as caisses_remboursees,
+                COALESCE(SUM(quantite_dette_caisses - quantite_remboursee), 0) as caisses_restantes,
+                SUM(CASE WHEN statut = 'solde' THEN 1 ELSE 0 END) as nb_soldees
+             FROM {$this->table}"
+        );
+    }
 }

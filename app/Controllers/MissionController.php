@@ -36,7 +36,14 @@ class MissionController extends Controller
         $page = (int) ($_GET['page'] ?? 1);
         
         $missions = $this->db->fetchAll(
-            "SELECT m.*, v.immatriculation, u.nom as agent_nom, u.prenom as agent_prenom, z.nom as zone_nom
+            "SELECT m.*, v.immatriculation, u.nom as agent_nom, u.prenom as agent_prenom, z.nom as zone_nom,
+                    COALESCE((SELECT SUM(ROUND(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0))
+                              FROM mission_chargements mc
+                              JOIN produits p ON mc.produit_id = p.id
+                              WHERE mc.mission_id = m.id), 0) as total_caisses,
+                    COALESCE((SELECT COUNT(DISTINCT v2.client_id)
+                              FROM ventes v2
+                              WHERE v2.mission_id = m.id AND v2.statut = 'validee'), 0) as nb_clients
              FROM missions m
              JOIN vehicules v ON m.vehicule_id = v.id
              LEFT JOIN users u ON v.agent_responsable_id = u.id
@@ -177,9 +184,14 @@ class MissionController extends Controller
         
         $data = $this->getJsonInput();
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
+        $mission = $this->missionModel->getWithDetails($id);
 
         if (empty($data) || (!isset($data['retours']) && !isset($data['vides_retournes']) && !isset($data['montant_encaisse']))) {
             return $this->error('Veuillez enregistrer les retours (pleins/vides) et le montant encaissé avant de clôturer la mission', 422);
+        }
+
+        if (!$mission) {
+            return $this->error('Mission non trouvée', 404);
         }
         
         // Préparer les retours de produits pleins (invendus)
@@ -198,7 +210,11 @@ class MissionController extends Controller
             }
         }
 
+        $montant_attendu = (float) ($mission['montant_attendu'] ?? 0);
         $montant_encaisse = isset($data['montant_encaisse']) ? floatval($data['montant_encaisse']) : 0;
+        if ($montant_encaisse <= 0 && $montant_attendu > 0) {
+            $montant_encaisse = $montant_attendu;
+        }
         
         $result = $this->missionModel->terminer(
             $id, 

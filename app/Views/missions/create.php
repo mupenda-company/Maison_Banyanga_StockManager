@@ -127,7 +127,7 @@ ob_start();
                                         <td class="px-4 py-2 text-sm">
                                             <template x-if="selectedProduit">
                                                 <div class="flex flex-col">
-                                                    <span class="font-bold text-primary-600" x-text="parseFloat(selectedProduit.stock_caisses_pleine).toFixed(1) + ' cs'"></span>
+                                                    <span class="font-bold text-primary-600" x-text="Math.round(parseFloat(selectedProduit.stock_caisses_pleine || 0)) + ' cs'"></span>
                                                     <span class="text-xs text-gray-400" x-text="'(' + selectedProduit.stock_plein + ' btl)'"></span>
                                                 </div>
                                             </template>
@@ -138,12 +138,12 @@ ob_start();
                                         <td class="px-4 py-2">
                                             <div class="flex items-center space-x-2">
                                                 <input type="number" x-model.number="chargement.quantite_caisses" 
-                                                       @input="if(selectedProduit) chargement.quantite = chargement.quantite_caisses * selectedProduit.bouteilles_par_caisses"
-                                                       class="input w-24" min="0.1" step="0.1" placeholder="Caisses">
+                                                       @input="if(selectedProduit) chargement.quantite = Math.round(chargement.quantite_caisses) * selectedProduit.bouteilles_par_caisses; chargement.quantite_caisses = Math.round(chargement.quantite_caisses || 0)"
+                                                       class="input w-24" min="1" step="1" placeholder="Caisses">
                                                 <span class="text-xs text-gray-500">=</span>
                                                 <input type="number" x-model.number="chargement.quantite" 
-                                                       @input="if(selectedProduit) chargement.quantite_caisses = (chargement.quantite / selectedProduit.bouteilles_par_caisses).toFixed(2)"
-                                                       class="input w-24" min="1" placeholder="Btl">
+                                                       @input="if(selectedProduit) { chargement.quantite = Math.round(chargement.quantite || 0); chargement.quantite_caisses = Math.round(chargement.quantite / selectedProduit.bouteilles_par_caisses) }"
+                                                       class="input w-24" min="1" step="1" placeholder="Btl">
                                             </div>
                                         </td>
                                         <td class="px-4 py-2">

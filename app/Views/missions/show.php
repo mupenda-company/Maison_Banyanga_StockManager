@@ -97,8 +97,8 @@ ob_start();
                         <thead>
                             <tr>
                                 <th>Produit</th>
-                                <th class="text-right">Quantité</th>
-                                <th class="text-right">Prix unitaire</th>
+                                <th class="text-right">Caisses</th>
+                                <th class="text-right">Prix caisse</th>
                                 <th class="text-right">Sous-total</th>
                             </tr>
                         </thead>
@@ -106,23 +106,25 @@ ob_start();
                             <?php foreach ($mission['chargements'] as $item): ?>
                             <?php
                                 $btlParCaisse = (int)($item['bouteilles_par_caisses'] ?? 24);
+                                if ($btlParCaisse <= 0) {
+                                    $btlParCaisse = 24;
+                                }
                                 $prixCaisse = $item['prix_vente_caisses'] ?: ($item['prix_vente_unitaire'] * $btlParCaisse);
-                                $prixUnitaire = $btlParCaisse > 0 ? ($prixCaisse / $btlParCaisse) : 0;
                             ?>
                             <tr>
                                 <td>
                                     <div class="font-medium"><?= htmlspecialchars($item['produit_nom']) ?></div>
                                     <div class="text-xs text-gray-500"><?= htmlspecialchars($item['produit_code']) ?></div>
                                 </td>
-                                <td class="text-right"><?= $item['quantite_chargee'] ?></td>
-                                <td class="text-right"><?= format_money_converted($prixUnitaire) ?></td>
+                                <td class="text-right"><?= number_format((int) ($item['quantite_caisses'] ?? 0), 0, '.', ' ') ?> cs</td>
+                                <td class="text-right"><?= format_money_converted($prixCaisse) ?></td>
                                 <td class="text-right font-medium"><?= format_money_converted($item['sous_total'] ?? 0) ?></td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
                         <tfoot class="bg-gray-50 dark:bg-gray-700/50">
                             <tr>
-                                <td colspan="3" class="text-right font-bold">Total</td>
+                                <td colspan="3" class="text-right font-bold">Total caisses</td>
                                 <td class="text-right font-bold text-primary-600">
                                     <?= format_money_converted($mission['total_chargement'] ?? 0) ?>
                                 </td>
@@ -134,14 +136,14 @@ ob_start();
             </div>
         </div>
         
-        <!-- Clients à livrer -->
+        <!-- Clients servis -->
         <div class="card">
             <div class="card-header">
-                <h3 class="font-semibold">Clients à livrer</h3>
+                <h3 class="font-semibold">Clients servis</h3>
             </div>
             <div class="card-body p-0">
                 <?php if (empty($mission['clients'])): ?>
-                <div class="p-6 text-center text-gray-500">Aucun client assigné</div>
+                <div class="p-6 text-center text-gray-500">Aucune vente enregistrée</div>
                 <?php else: ?>
                 <div class="divide-y divide-gray-200 dark:divide-gray-700">
                     <?php foreach ($mission['clients'] as $client): ?>
@@ -156,7 +158,7 @@ ob_start();
                                 </p>
                             </div>
                             <div class="text-right">
-                                <p class="font-medium"><?= $client['quantite'] ?> bouteilles</p>
+                                <p class="font-medium"><?= number_format((int) round(($client['quantite'] ?? 0) / max((int) ($client['bouteilles_par_caisses'] ?? 24), 1)), 0, '.', ' ') ?> caisses</p>
                                 <p class="text-sm text-gray-500"><?= format_money_converted($client['montant'] ?? 0) ?></p>
                             </div>
                         </div>
@@ -173,11 +175,11 @@ ob_start();
         <!-- Résumé -->
         <div class="card">
             <div class="card-body text-center">
-                <p class="text-sm text-gray-500 dark:text-gray-400">Total bouteilles</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Total caisses</p>
                 <p class="text-3xl font-bold text-primary-600">
-                    <?= $mission['total_bouteilles'] ?? 0 ?>
+                    <?= $mission['total_caisses'] ?? 0 ?>
                 </p>
-                <p class="text-sm text-gray-500 mt-2"><?= count($mission['clients'] ?? []) ?> client(s)</p>
+                <p class="text-sm text-gray-500 mt-2"><?= count($mission['clients'] ?? []) ?> client(s) servis</p>
             </div>
         </div>
         
@@ -190,21 +192,21 @@ ob_start();
             <div class="card-body">
                 <div class="space-y-4">
                     <div>
-                        <p class="text-sm text-gray-500">Vendu</p>
+                        <p class="text-sm text-gray-500">Caisses vendues</p>
                         <p class="text-xl font-bold text-green-600">
-                            <?= $mission['ventes']['quantite'] ?? 0 ?> bouteilles
+                            <?= $mission['caisses_vendues_total'] ?? 0 ?> caisses
                         </p>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-500">Chiffre d'affaires</p>
+                        <p class="text-sm text-gray-500">Caisses vides retournées</p>
                         <p class="text-xl font-bold text-primary-600">
-                            <?= format_money_converted($mission['ventes']['total'] ?? 0) ?>
+                            <?= $mission['retours_vides_total'] ?? 0 ?> caisses
                         </p>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-500">Retours vides</p>
+                        <p class="text-sm text-gray-500">Montant à donner</p>
                         <p class="text-xl font-bold text-gray-400">
-                            <?= $mission['ventes']['retours'] ?? 0 ?> bouteilles
+                            <?= format_money_converted($mission['montant_attendu'] ?? 0) ?>
                         </p>
                     </div>
                 </div>
@@ -216,7 +218,7 @@ ob_start();
         <div class="card">
             <div class="card-body">
                 <p class="text-sm text-gray-500 dark:text-gray-400">Créé par</p>
-                <p class="font-medium"><?= htmlspecialchars($mission['created_by_nom'] ?? 'N/A') ?></p>
+                <p class="font-medium"><?= htmlspecialchars($mission['created_by_nom'] ?? 'Système') ?></p>
                 <p class="text-sm text-gray-500">
                     <?= date('d/m/Y H:i', strtotime($mission['created_at'])) ?>
                 </p>
@@ -233,6 +235,11 @@ ob_start();
             retours: {},
             vides_retournes: {},
             montant_encaisse: 0,
+            missionSummary: {
+                caissesVendues: <?= (int) ($mission['caisses_vendues_total'] ?? 0) ?>,
+                retoursVides: <?= (int) ($mission['retours_vides_total'] ?? 0) ?>,
+                montantAttendu: <?= json_encode((float) ($mission['montant_attendu'] ?? 0)) ?>
+            },
             chargements: <?= htmlspecialchars(json_encode($mission['chargements'] ?? []), ENT_QUOTES, 'UTF-8') ?>,
             
             initData() {
@@ -242,20 +249,15 @@ ob_start();
                         this.vides_retournes[c.produit_id] = 0;
                     });
                 }
+                this.montant_encaisse = this.getTotalAttendu();
             },
             
             getTotalAttendu() {
-                let total = 0;
-                if (!this.chargements) return 0;
-                this.chargements.forEach(c => {
-                    const vendus = c.quantite_chargee - (this.retours[c.produit_id] || 0);
-                    if (vendus > 0) {
-                        const btlPerCs = parseInt(c.bouteilles_par_caisses) || 24;
-                        const prixCaisse = parseFloat(c.prix_vente_caisses) || (parseFloat(c.prix_vente_unitaire) * btlPerCs);
-                        total += (vendus / btlPerCs) * prixCaisse;
-                    }
-                });
-                return total;
+                return parseFloat(this.missionSummary.montantAttendu || 0);
+            },
+
+            getTotalVidesRetournees() {
+                return Object.values(this.vides_retournes).reduce((total, value) => total + (parseInt(value, 10) || 0), 0);
             },
 
             async submit() {
@@ -314,6 +316,7 @@ ob_start();
                                         <tr>
                                             <th>Produit</th>
                                             <th>Chargé</th>
+                                            <th>Vendu</th>
                                             <th>Retour Pleins (btl)</th>
                                             <th>Retour Vides (caisses)</th>
                                         </tr>
@@ -323,6 +326,7 @@ ob_start();
                                             <tr>
                                                 <td x-text="c.produit_nom"></td>
                                                 <td x-text="c.quantite_chargee + ' btl'"></td>
+                                                <td x-text="(c.caisses_vendues || 0) + ' cs'"></td>
                                                 <td>
                                                     <input type="number" x-model.number="retours[c.produit_id]" class="input py-1 w-24" :max="c.quantite_chargee" min="0">
                                                 </td>
@@ -338,11 +342,16 @@ ob_start();
                             <!-- Section Financière -->
                             <div class="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label class="label">Montant encaissé par l'agent (<span x-text="window.DEVISE"></span>)</label>
+                                    <label class="label">Montant à donner à l'agent (<span x-text="window.DEVISE"></span>)</label>
                                     <input type="number" x-model.number="montant_encaisse" class="input text-xl font-bold text-green-600" step="0.01" required>
+                                    <p class="text-xs text-gray-500 mt-2">Montant calculé automatiquement à partir des caisses vendues.</p>
                                 </div>
                                 <div class="text-right">
-                                    <p class="text-sm text-gray-500 uppercase">Total attendu (Ventes)</p>
+                                    <p class="text-sm text-gray-500 uppercase">Caisses vendues</p>
+                                    <p class="text-2xl font-bold text-primary-600" x-text="missionSummary.caissesVendues + ' cs'"></p>
+                                    <p class="text-sm text-gray-500 uppercase mt-4">Caisses vides retournées</p>
+                                    <p class="text-2xl font-bold text-orange-500" x-text="getTotalVidesRetournees() + ' cs'"></p>
+                                    <p class="text-sm text-gray-500 uppercase mt-4">Montant attendu</p>
                                     <p class="text-2xl font-bold text-primary-600" x-text="App.formatMoneyConverted(getTotalAttendu(), window.BASE_DEVISE, window.DEVISE)"></p>
                                     <p class="text-xs mt-1" :class="montant_encaisse >= App.convertMoney(getTotalAttendu(), window.BASE_DEVISE, window.DEVISE) ? 'text-green-500' : 'text-red-500'">
                                         Ecart: <span x-text="App.formatMoney(montant_encaisse - App.convertMoney(getTotalAttendu(), window.BASE_DEVISE, window.DEVISE), window.DEVISE)"></span>

@@ -87,7 +87,9 @@ class Vente extends Model
         
         if (!empty($filters['date_fin'])) {
             $where .= " AND v.date_vente <= :date_fin";
-            $params['date_fin'] = $filters['date_fin'];
+            $params['date_fin'] = str_contains((string) $filters['date_fin'], ':')
+                ? $filters['date_fin']
+                : ($filters['date_fin'] . ' 23:59:59');
         }
         
         if (!empty($filters['emplacement_id'])) {
@@ -161,7 +163,7 @@ class Vente extends Model
                     $data['emplacement_id'],
                     [
                         'quantite_pleine' => -$detail['quantite'],
-                        'caisses_pleine' => -($detail['quantite'] / $btlParCaisse)
+                        'caisses_pleine' => -intdiv((int) $detail['quantite'], $btlParCaisse)
                     ]
                 );
                 
@@ -171,7 +173,7 @@ class Vente extends Model
                     $data['emplacement_id'],
                     [
                         'quantite_vide' => $detail['quantite'],
-                        'caisses_vide' => ($detail['quantite'] / $btlParCaisse)
+                        'caisses_vide' => intdiv((int) $detail['quantite'], $btlParCaisse)
                     ]
                 );
                 
@@ -258,11 +260,19 @@ class Vente extends Model
             // Reverser le stock
             $stockModel = new Stock();
             foreach ($vente['details'] as $detail) {
+                $btlParCaisse = (int) ($detail['bouteilles_par_caisses'] ?? 24);
+                if ($btlParCaisse <= 0) {
+                    $btlParCaisse = 24;
+                }
+
                 $stockModel->updateOrCreate(
                     $detail['produit_id'],
                     $vente['emplacement_id'],
                     [
-                        'quantite_pleine' => $detail['quantite']
+                        'quantite_pleine' => $detail['quantite'],
+                        'caisses_pleine' => intdiv((int) $detail['quantite'], $btlParCaisse),
+                        'quantite_vide' => -$detail['quantite'],
+                        'caisses_vide' => -intdiv((int) $detail['quantite'], $btlParCaisse)
                     ]
                 );
             }
@@ -311,7 +321,7 @@ class Vente extends Model
                 SUM(total_ttc) as total_ttc,
                 AVG(total_ttc) as moyenne_vente,
                 (
-                    SELECT COALESCE(SUM(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24)), 0)
+                    SELECT COALESCE(SUM(ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)), 0)
                     FROM vente_details vd
                     JOIN ventes v2 ON vd.vente_id = v2.id
                     JOIN produits p ON vd.produit_id = p.id
@@ -331,6 +341,7 @@ class Vente extends Model
         return $this->db->fetchAll(
             "SELECT p.id, p.code, p.nom,
                     SUM(vd.quantite) as quantite_vendue,
+                    SUM(ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)) as total_caisses,
                     SUM(vd.sous_total) as total_vente
              FROM vente_details vd
              JOIN ventes v ON vd.vente_id = v.id

@@ -16,6 +16,23 @@ ob_start();
         </a>
     </div>
 
+    <form method="GET" class="card">
+        <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div>
+                <label class="label">Date début</label>
+                <input type="date" name="date_debut" class="input" value="<?= htmlspecialchars($filters['date_debut'] ?? '') ?>">
+            </div>
+            <div>
+                <label class="label">Date fin</label>
+                <input type="date" name="date_fin" class="input" value="<?= htmlspecialchars($filters['date_fin'] ?? '') ?>">
+            </div>
+            <div class="flex gap-3">
+                <button type="submit" class="btn btn-primary">Filtrer</button>
+                <a href="<?= url('clients/' . $client['id']) ?>" class="btn btn-secondary">Réinitialiser</a>
+            </div>
+        </div>
+    </form>
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Infos client -->
         <div class="lg:col-span-2 space-y-6">
@@ -44,6 +61,25 @@ ob_start();
                             <p class="font-medium"><?= htmlspecialchars($client['adresse'] ?? 'N/A') ?></p>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                <div class="stat-card">
+                    <p class="stat-label">Caisses achetées</p>
+                    <p class="stat-value"><?= number_format((int)($kpis['caisses_achetees'] ?? 0), 0, '.', ' ') ?></p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-label">Chiffre d'affaires</p>
+                    <p class="stat-value"><?= format_money_converted($kpis['ca_total'] ?? 0) ?></p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-label">Caisses retournées</p>
+                    <p class="stat-value"><?= number_format((int)($kpis['caisses_retournees'] ?? 0), 0, '.', ' ') ?></p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-label">Ristourne</p>
+                    <p class="stat-value"><?= number_format((float)($kpis['taux_ristourne'] ?? 5), 2, '.', ' ') ?>%</p>
                 </div>
             </div>
             
@@ -91,12 +127,9 @@ ob_start();
         <div class="space-y-6">
             <div class="card">
                 <div class="card-body text-center">
-                    <p class="text-sm text-gray-500">Total des achats</p>
+                    <p class="text-sm text-gray-500">Montant ristourne estimé</p>
                     <p class="text-3xl font-bold text-primary-600">
-                        <?php 
-                        $total = array_sum(array_column(array_filter($achats, fn($a) => $a['statut'] === 'validee'), 'total_ttc'));
-                        echo format_money_converted($total);
-                        ?>
+                        <?= format_money_converted($kpis['montant_ristourne'] ?? 0) ?>
                     </p>
                 </div>
             </div>
@@ -111,7 +144,7 @@ ob_start();
                         <button @click="payerRistourne(<?= $ristourne['id'] ?>)" class="btn btn-primary w-full" :disabled="loading">Payer</button>
                     </div>
                     <?php else: ?>
-                    <p class="text-gray-500 text-center">Aucune ristourne active</p>
+                    <p class="text-gray-500 text-center">Taux client: <?= number_format((float)($kpis['taux_ristourne'] ?? 5), 2, '.', ' ') ?>%</p>
                     <?php endif; ?>
                 </div>
             </div>
@@ -137,6 +170,10 @@ ob_start();
                         <div>
                             <label class="label">Adresse</label>
                             <textarea x-model="form.adresse" class="input" rows="2"></textarea>
+                        </div>
+                        <div>
+                            <label class="label">Taux ristourne (%)</label>
+                            <input type="number" x-model.number="form.taux_ristourne" class="input" step="0.01" min="0">
                         </div>
                         <div>
                             <label class="label">Zone</label>
@@ -171,7 +208,8 @@ document.addEventListener('alpine:init', () => {
             nom: '<?= addslashes($client['nom']) ?>',
             telephone: '<?= addslashes($client['telephone'] ?? '') ?>',
             adresse: '<?= addslashes($client['adresse'] ?? '') ?>',
-            zone_id: '<?= $client['zone_id'] ?>'
+            zone_id: '<?= $client['zone_id'] ?>',
+            taux_ristourne: '<?= addslashes($client['taux_ristourne'] ?? 5) ?>'
         },
         openEdit() { this.isModalOpen = true; },
         closeEdit() { this.isModalOpen = false; },

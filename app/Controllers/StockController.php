@@ -86,9 +86,9 @@ class StockController extends Controller
                 $s['produit_code'],
                 $s['emplacement_nom'],
                 ucfirst($s['emplacement_type']),
-                $s['caisses_pleine'],
+                (int) round($s['caisses_pleine']),
                 $s['quantite_pleine'],
-                $s['caisses_vide'],
+                (int) round($s['caisses_vide']),
                 $statut
             ]);
         }

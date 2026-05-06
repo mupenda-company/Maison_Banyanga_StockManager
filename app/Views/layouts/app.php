@@ -264,6 +264,15 @@
                     </svg>
                     Approvisionnements
                 </a>
+
+                <!-- Emballages -->
+                <a href="<?= url('emballages') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/emballages') !== false ? 'active' : '' ?>">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V7a2 2 0 00-1-1.732l-6-3.464a2 2 0 00-2 0l-6 3.464A2 2 0 004 7v6a2 2 0 001 1.732l6 3.464a2 2 0 002 0l6-3.464A2 2 0 0020 13z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 12l8-5M12 12L4 7m8 5v9"/>
+                    </svg>
+                    Emballages
+                </a>
                 
                 <!-- Stocks -->
                 <a href="<?= url('stocks') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/stocks') !== false ? 'active' : '' ?>">

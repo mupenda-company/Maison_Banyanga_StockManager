@@ -7,22 +7,30 @@ ob_start();
     <div class="card">
         <div class="card-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Liste des clients</h2>
-            <div class="flex items-center space-x-3">
-                <select class="input w-auto" onchange="window.location.href='?zone_id='+this.value">
+            <form method="get" class="flex flex-col sm:flex-row sm:items-center gap-3">
+                <input
+                    type="search"
+                    name="q"
+                    value="<?= htmlspecialchars($search ?? '') ?>"
+                    placeholder="Rechercher un client..."
+                    class="input w-full sm:w-64"
+                >
+                <select name="zone_id" class="input w-auto">
                     <option value="">Toutes les zones</option>
                     <?php foreach ($zones as $zone): ?>
-                    <option value="<?= $zone['id'] ?>" <?= ($_GET['zone_id'] ?? '') == $zone['id'] ? 'selected' : '' ?>>
+                    <option value="<?= $zone['id'] ?>" <?= ($selectedZoneId ?? '') == $zone['id'] ? 'selected' : '' ?>>
                         <?= htmlspecialchars($zone['nom']) ?>
                     </option>
                     <?php endforeach; ?>
                 </select>
-                <button @click="openModal()" class="btn btn-primary">
+                <button type="submit" class="btn btn-secondary">Rechercher</button>
+                <button type="button" @click="openModal()" class="btn btn-primary">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
                     Nouveau client
                 </button>
-            </div>
+            </form>
         </div>
         <div class="card-body p-0">
             <div class="table-container">
@@ -32,6 +40,7 @@ ob_start();
                             <th>Nom</th>
                             <th>Téléphone</th>
                             <th>Zone</th>
+                            <th>Ristourne</th>
                             <th>Adresse</th>
                             <th class="text-right">Actions</th>
                         </tr>
@@ -39,7 +48,7 @@ ob_start();
                     <tbody>
                         <?php if (empty($clients)): ?>
                         <tr>
-                            <td colspan="5" class="text-center py-8 text-gray-500 dark:text-gray-400">
+                            <td colspan="6" class="text-center py-8 text-gray-500 dark:text-gray-400">
                                 Aucun client trouvé
                             </td>
                         </tr>
@@ -55,6 +64,11 @@ ob_start();
                                 <td><?= htmlspecialchars($client['telephone'] ?? '-') ?></td>
                                 <td>
                                     <span class="badge-info"><?= htmlspecialchars($client['zone_nom'] ?? 'Non définie') ?></span>
+                                </td>
+                                <td>
+                                    <span class="badge <?= ((float)($client['taux_ristourne'] ?? 5)) > 5 ? 'badge-warning' : 'badge-info' ?>">
+                                        <?= number_format((float)($client['taux_ristourne'] ?? 5), 2, '.', ' ') ?>%
+                                    </span>
                                 </td>
                                 <td class="text-sm"><?= htmlspecialchars($client['adresse'] ?? '-') ?></td>
                                 <td class="text-right">
@@ -112,6 +126,10 @@ ob_start();
                                     </div>
                                 </div>
                                 <div>
+                                    <label class="label">Taux ristourne (%)</label>
+                                    <input type="number" x-model.number="form.taux_ristourne" class="input" step="0.01" min="0">
+                                </div>
+                                <div>
                                     <label class="label">Zone *</label>
                                     <select x-model="form.zone_id" class="input" required>
                                         <option value="">Sélectionner</option>
@@ -150,12 +168,12 @@ document.addEventListener('alpine:init', () => {
         editMode: false,
         editId: null,
         loading: false,
-        form: { nom: '', telephone: '', adresse: '', zone_id: '', email: '' },
+        form: { nom: '', telephone: '', adresse: '', zone_id: '', email: '', taux_ristourne: 5 },
         
         openModal() {
             this.editMode = false;
             this.editId = null;
-            this.form = { nom: '', telephone: '', adresse: '', zone_id: '', email: '' };
+            this.form = { nom: '', telephone: '', adresse: '', zone_id: '', email: '', taux_ristourne: 5 };
             this.isOpen = true;
         },
         

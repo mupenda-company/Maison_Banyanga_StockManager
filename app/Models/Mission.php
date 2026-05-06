@@ -43,6 +43,16 @@ class Mission extends Model
                  WHERE v.id = :id",
                 ['id' => $mission['vehicule_id']]
             );
+
+            $mission['created_by_user'] = $this->db->fetch(
+                "SELECT u.nom, u.prenom
+                 FROM users u
+                 WHERE u.id = :id",
+                ['id' => $mission['created_by']]
+            );
+
+            $createdByNom = trim((($mission['created_by_user']['prenom'] ?? '') . ' ' . ($mission['created_by_user']['nom'] ?? '')));
+            $mission['created_by_nom'] = $createdByNom !== '' ? $createdByNom : 'Système';
             
             // Garantir que l'immatriculation est disponible au niveau racine pour la vue
             $mission['immatriculation'] = $mission['vehicule']['immatriculation'] ?? 'N/A';
@@ -62,15 +72,92 @@ class Mission extends Model
                  WHERE mc.mission_id = :id",
                 ['id' => $id]
             );
+
+            $mission['clients'] = $this->db->fetchAll(
+                "SELECT c.id, c.nom, c.telephone, c.adresse,
+                        COALESCE((
+                            SELECT SUM(COALESCE(vd.quantite_caisses, ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)))
+                            FROM ventes v2
+                            LEFT JOIN vente_details vd ON vd.vente_id = v2.id
+                            LEFT JOIN produits p ON vd.produit_id = p.id
+                            WHERE v2.mission_id = ?
+                              AND v2.statut = 'validee'
+                              AND v2.client_id = c.id
+                        ), 0) as quantite_caisses,
+                        COALESCE((
+                            SELECT SUM(v2.total_ttc)
+                            FROM ventes v2
+                            WHERE v2.mission_id = ?
+                              AND v2.statut = 'validee'
+                              AND v2.client_id = c.id
+                        ), 0) as montant
+                 FROM clients c
+                 WHERE EXISTS (
+                    SELECT 1
+                    FROM ventes v3
+                    WHERE v3.mission_id = ?
+                      AND v3.statut = 'validee'
+                      AND v3.client_id = c.id
+                 )
+                 ORDER BY (
+                    SELECT MAX(v4.date_vente)
+                    FROM ventes v4
+                    WHERE v4.mission_id = ?
+                      AND v4.statut = 'validee'
+                      AND v4.client_id = c.id
+                 ) DESC",
+                [$id, $id, $id, $id]
+            );
+
+            $mission['ventes'] = $this->db->fetch(
+                "SELECT 
+                        COALESCE((
+                            SELECT SUM(vd.quantite)
+                            FROM ventes v
+                            JOIN vente_details vd ON vd.vente_id = v.id
+                            WHERE v.mission_id = ? AND v.statut = 'validee'
+                        ), 0) as quantite_bouteilles,
+                        COALESCE((
+                            SELECT SUM(COALESCE(vd.quantite_caisses, ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)))
+                            FROM ventes v
+                            JOIN vente_details vd ON vd.vente_id = v.id
+                            LEFT JOIN produits p ON vd.produit_id = p.id
+                            WHERE v.mission_id = ? AND v.statut = 'validee'
+                        ), 0) as caisses_vendues,
+                        COALESCE((
+                            SELECT SUM(v.total_ttc)
+                            FROM ventes v
+                            WHERE v.mission_id = ? AND v.statut = 'validee'
+                        ), 0) as total",
+                [$id, $id, $id]
+            ) ?: ['quantite_bouteilles' => 0, 'caisses_vendues' => 0, 'total' => 0];
+
+            $mission['montant_attendu'] = (float) ($mission['ventes']['total'] ?? 0);
+            $mission['caisses_vendues_total'] = (int) ($mission['ventes']['caisses_vendues'] ?? 0);
+            $mission['retours_vides_total'] = 0;
             
             // Calculer le total du chargement
             $total = 0;
+            $totalCaisses = 0;
             foreach ($mission['chargements'] as &$item) {
+                $btlParCaisse = (int) ($item['bouteilles_par_caisses'] ?? 24);
+                if ($btlParCaisse <= 0) {
+                    $btlParCaisse = 24;
+                }
+
                 $prixCaisse = $item['prix_vente_caisses'] ?: ($item['prix_vente_unitaire'] * $item['bouteilles_par_caisses']);
-                $item['sous_total'] = ($item['quantite_chargee'] / $item['bouteilles_par_caisses']) * $prixCaisse;
+                $item['quantite_caisses'] = (int) ($item['quantite_caisses'] ?? intdiv((int) $item['quantite_chargee'], $btlParCaisse));
+                $item['caisses_vendues'] = (int) round(((int) ($item['quantite_vendue'] ?? 0)) / $btlParCaisse, 0);
+                $item['montant_vendu'] = $item['caisses_vendues'] * $prixCaisse;
+                $item['sous_total'] = ($item['quantite_chargee'] / $btlParCaisse) * $prixCaisse;
                 $total += $item['sous_total'];
+                $totalCaisses += $item['quantite_caisses'];
             }
             $mission['total_chargement'] = $total;
+            $mission['total_caisses'] = $totalCaisses;
+            $mission['total_bouteilles'] = array_sum(array_map(static function ($item) {
+                return (int) ($item['quantite_chargee'] ?? 0);
+            }, $mission['chargements']));
         }
         
         return $mission;
@@ -112,22 +199,31 @@ class Mission extends Model
             $mouvementModel = new MouvementStock();
             
             foreach ($chargements as $chargement) {
-                $chargement['mission_id'] = $missionId;
-                $this->db->insert('mission_chargements', $chargement);
-
                 $produit = (new Produit())->find($chargement['produit_id']);
                 $bouteillesParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
                 if ($bouteillesParCaisse <= 0) {
                     $bouteillesParCaisse = 24;
                 }
+
+                $quantiteCaisses = (int) ($chargement['quantite_caisses'] ?? 0);
+                if ($quantiteCaisses <= 0) {
+                    $quantiteCaisses = (int) floor(((int) ($chargement['quantite_chargee'] ?? 0)) / $bouteillesParCaisse);
+                }
+
+                $quantiteBouteilles = $quantiteCaisses * $bouteillesParCaisse;
+                $chargement['quantite_caisses'] = $quantiteCaisses;
+                $chargement['quantite_chargee'] = $quantiteBouteilles;
+                $chargement['prix_caisse'] = (float) ($produit['prix_vente_caisses'] ?: (($produit['prix_vente_unitaire'] ?? 0) * $bouteillesParCaisse));
+                $chargement['mission_id'] = $missionId;
+                $this->db->insert('mission_chargements', $chargement);
                 
                 // Transférer du stock principal vers le véhicule
                 $stockModel->updateOrCreate(
                     $chargement['produit_id'],
                     $emplacementPrincipalId,
                     [
-                        'quantite_pleine' => -$chargement['quantite_chargee'],
-                        'caisses_pleine' => -intval($chargement['quantite_chargee'] / $bouteillesParCaisse)
+                        'quantite_pleine' => -$quantiteBouteilles,
+                        'caisses_pleine' => -$quantiteCaisses
                     ]
                 );
                 
@@ -135,8 +231,8 @@ class Mission extends Model
                     $chargement['produit_id'],
                     $emplacementVehicule,
                     [
-                        'quantite_pleine' => $chargement['quantite_chargee'],
-                        'caisses_pleine' => intval($chargement['quantite_chargee'] / $bouteillesParCaisse)
+                        'quantite_pleine' => $quantiteBouteilles,
+                        'caisses_pleine' => $quantiteCaisses
                     ]
                 );
                 
@@ -145,7 +241,7 @@ class Mission extends Model
                     'produit_id' => $chargement['produit_id'],
                     'emplacement_id' => $emplacementPrincipalId,
                     'type_mouvement' => 'transfert',
-                    'quantite' => -$chargement['quantite_chargee'],
+                    'quantite' => -$quantiteBouteilles,
                     'quantite_avant' => 0,
                     'quantite_apres' => 0,
                     'reference_type' => 'mission',
@@ -228,7 +324,6 @@ class Mission extends Model
                         'emplacement_id' => $emplacementPrincipalId,
                         'type_mouvement' => 'entree',
                         'quantite' => 0,
-                        'caisses_vide' => $nbCaissesVides,
                         'reference_type' => 'mission',
                         'reference_id' => $id,
                         'motif' => 'Retour emballages vides mission ' . $mission['numero_mission'],

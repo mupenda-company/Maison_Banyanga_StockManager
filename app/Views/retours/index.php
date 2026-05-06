@@ -9,7 +9,7 @@ ob_start();
 <div class="flex items-center justify-between mb-6">
     <div>
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Retours d'emballages</h1>
-        <p class="text-gray-500 dark:text-gray-400">Suivi des bouteilles vides retournées par les clients</p>
+        <p class="text-gray-500 dark:text-gray-400">Suivi des caisses vides retournées par les clients</p>
     </div>
     <button onclick="openRetourModal()" class="btn btn-primary">
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -40,7 +40,10 @@ ob_start();
                     </tr>
                     <?php else: ?>
                         <?php foreach ($retours as $r): 
-                            $btlParCaisse = 24; // On pourrait le dynamiser mais 24 est le standard
+                            $btlParCaisse = (int) ($r['bouteilles_par_caisses'] ?? 24);
+                            if ($btlParCaisse <= 0) {
+                                $btlParCaisse = 24;
+                            }
                             $caisses = $r['quantite'] / $btlParCaisse;
                         ?>
                         <tr>
@@ -81,17 +84,22 @@ ob_start();
                     </div>
                     <div>
                         <label class="label">Produit *</label>
-                        <select x-model="form.produit_id" class="input" required>
+                        <select x-model="form.produit_id" class="input" @change="updateProduit()" required>
                             <option value="">Sélectionner</option>
                             <?php foreach ($produits as $p): ?>
-                            <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['nom']) ?></option>
+                            <option value="<?= $p['id'] ?>" data-bouteilles="<?= (int) ($p['bouteilles_par_caisses'] ?? 24) ?>">
+                                <?= htmlspecialchars($p['nom']) ?>
+                            </option>
                             <?php endforeach; ?>
                         </select>
+                        <p class="text-xs text-gray-500 mt-1" x-show="bouteillesParCaisse > 0">
+                            1 caisse = <span x-text="bouteillesParCaisse"></span> bouteilles
+                        </p>
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="label">Caisses *</label>
-                            <input type="number" x-model.number="form.caisses" class="input" min="0.01" step="0.01" required>
+                            <input type="number" x-model.number="form.caisses" @input="syncQuantite()" class="input" min="0.01" step="0.01" required>
                         </div>
                         <div>
                             <label class="label">Emplacement *</label>
@@ -121,6 +129,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('retourModal', () => ({
         isOpen: false,
         loading: false,
+        bouteillesParCaisse: 24,
         form: {
             client_id: '',
             produit_id: '',
@@ -130,15 +139,28 @@ document.addEventListener('alpine:init', () => {
         
         open() { this.isOpen = true; },
         close() { this.isOpen = false; },
+
+        updateProduit() {
+            const select = this.$root.querySelector('select[x-model="form.produit_id"]');
+            const option = select?.options[select.selectedIndex];
+            const bouteilles = parseInt(option?.dataset?.bouteilles || '24', 10);
+            this.bouteillesParCaisse = bouteilles > 0 ? bouteilles : 24;
+            this.syncQuantite();
+        },
+
+        syncQuantite() {
+            const caisses = parseFloat(this.form.caisses || 0);
+            this.form.quantite = Math.round(caisses * this.bouteillesParCaisse);
+        },
         
         async save() {
             this.loading = true;
             try {
-                // Conversion caisses -> bouteilles (24 par défaut)
+                // Conversion caisses -> bouteilles selon le produit sélectionné
                 const data = {
                     client_id: this.form.client_id,
                     produit_id: this.form.produit_id,
-                    quantite: this.form.caisses * 24,
+                    quantite: Math.round(this.form.caisses * this.bouteillesParCaisse),
                     emplacement_id: this.form.emplacement_id
                 };
 

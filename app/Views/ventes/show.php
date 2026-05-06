@@ -63,7 +63,7 @@ ob_start();
                         <tbody>
                             <?php foreach ($vente['details'] as $detail): 
                                 $btlParCaisse = (int)($detail['bouteilles_par_caisses'] ?? 24);
-                                $caisses = $detail['quantite'] / $btlParCaisse;
+                                $caisses = intdiv((int)$detail['quantite'], $btlParCaisse);
                                 $prixCaisse = $detail['prix_unitaire'] * $btlParCaisse;
                             ?>
                             <tr>
@@ -72,7 +72,7 @@ ob_start();
                                     <div class="text-[10px] text-gray-500 font-mono"><?= htmlspecialchars($detail['produit_code']) ?></div>
                                 </td>
                                 <td class="text-right">
-                                    <div class="font-bold text-gray-900 dark:text-white"><?= number_format($caisses, 2, '.', ' ') ?> cs</div>
+                                    <div class="font-bold text-gray-900 dark:text-white"><?= number_format($caisses, 0, '.', ' ') ?> cs</div>
                                     <div class="text-[10px] text-gray-400 italic"><?= number_format($detail['quantite']) ?> btl</div>
                                 </td>
                                 <td class="text-right font-medium">

@@ -47,8 +47,8 @@ class Emplacement extends Model
             "SELECT e.*, 
                     COALESCE(SUM(s.quantite_pleine), 0) as total_stock_plein,
                     COALESCE(SUM(s.quantite_vide), 0) as total_stock_vide,
-                    COALESCE(SUM(s.caisses_pleine), 0) as total_caisses_pleine,
-                    COALESCE(SUM(s.caisses_vide), 0) as total_caisses_vide
+                    CAST(COALESCE(SUM(s.caisses_pleine), 0) AS SIGNED) as total_caisses_pleine,
+                    CAST(COALESCE(SUM(s.caisses_vide), 0) AS SIGNED) as total_caisses_vide
              FROM {$this->table} e
              LEFT JOIN stocks s ON e.id = s.emplacement_id
              LEFT JOIN vehicules v ON v.emplacement_id = e.id AND v.actif = 1
