@@ -50,6 +50,7 @@ class RetourEmballage extends Model
     }
 
     /**
+<<<<<<< HEAD
      * Statistiques des retours d'emballages sur une période
      */
     public function getStats($dateDebut, $dateFin, $limit = 5)
@@ -103,12 +104,18 @@ class RetourEmballage extends Model
     }
 
     /**
+=======
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
      * Récupérer les derniers retours avec détails
      */
     public function getRecents($limit = 20)
     {
         return $this->db->fetchAll(
+<<<<<<< HEAD
             "SELECT r.*, c.nom as client_nom, p.nom as produit_nom, p.bouteilles_par_caisses, e.nom as emplacement_nom
+=======
+            "SELECT r.*, c.nom as client_nom, p.nom as produit_nom, e.nom as emplacement_nom
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
              FROM {$this->table} r
              JOIN clients c ON r.client_id = c.id
              JOIN produits p ON r.produit_id = p.id

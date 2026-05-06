@@ -169,6 +169,7 @@ class Stock extends Model
     }
     
     /**
+<<<<<<< HEAD
      * Définir un stock initial absolu
      */
     public function setInitialStock($produitId, $emplacementId, $data)
@@ -222,6 +223,8 @@ class Stock extends Model
     }
     
     /**
+=======
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
      * Déduire du stock vide
      */
     public function deduireVide($produitId, $emplacementId, $quantiteCaisses)

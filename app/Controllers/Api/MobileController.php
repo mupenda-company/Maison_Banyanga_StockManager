@@ -83,12 +83,17 @@ class MobileController extends Controller {
     public function getStock($missionId) {
         $sql = "SELECT p.id, p.nom, p.code, p.bouteilles_par_caisses,
                        p.prix_vente_unitaire, p.prix_vente_caisses,
+<<<<<<< HEAD
                        mc.quantite_caisses,
                        mc.quantite_chargee,
                        IFNULL(mc.quantite_vendue, 0) as quantite_vendue,
                        (IFNULL(mc.quantite_caisses, FLOOR(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))) -
                         FLOOR(IFNULL(mc.quantite_vendue, 0) / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))) as stock_actuel_caisses,
                        (mc.quantite_chargee - IFNULL(mc.quantite_vendue, 0)) as stock_actuel_bouteilles
+=======
+                       mc.quantite_chargee,
+                       (mc.quantite_chargee - IFNULL(mc.quantite_vendue, 0)) as stock_actuel
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                 FROM mission_chargements mc
                 JOIN produits p ON mc.produit_id = p.id
                 WHERE mc.mission_id = ?";
@@ -138,8 +143,13 @@ class MobileController extends Controller {
 
         $chargementTotals = $this->db->fetch(
             "SELECT
+<<<<<<< HEAD
                     COALESCE(SUM(COALESCE(mc.quantite_caisses, FLOOR(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24)))), 0) as caisses_chargees,
                     COALESCE(SUM(COALESCE(mc.quantite_caisses, FLOOR(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))) - FLOOR(IFNULL(mc.quantite_vendue, 0) / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))), 0) as caisses_restantes
+=======
+                    COALESCE(SUM(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24)), 0) as caisses_chargees,
+                    COALESCE(SUM((mc.quantite_chargee - IFNULL(mc.quantite_vendue, 0)) / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24)), 0) as caisses_restantes
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
              FROM mission_chargements mc
              JOIN produits p ON mc.produit_id = p.id
              WHERE mc.mission_id = :mission_id",
@@ -195,9 +205,12 @@ class MobileController extends Controller {
                 'caisses_vide' => $caissesVides,
                 'bouteilles_pleine' => (float) ($stockTotals['bouteilles_pleine'] ?? 0),
                 'bouteilles_vide' => (float) ($stockTotals['bouteilles_vide'] ?? 0),
+<<<<<<< HEAD
                 'stock_actuel_bouteilles' => array_sum(array_map(static function ($row) {
                     return (int) ($row['stock_actuel_bouteilles'] ?? 0);
                 }, $this->db->fetchAll("SELECT mc.quantite_chargee - IFNULL(mc.quantite_vendue, 0) as stock_actuel_bouteilles FROM mission_chargements mc WHERE mc.mission_id = :mission_id", ['mission_id' => $missionId]))),
+=======
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
             ]
         ]);
     }
@@ -213,7 +226,11 @@ class MobileController extends Controller {
             "SELECT v.id, v.numero_facture, v.date_vente, v.total_ttc,
                     c.nom as client_nom,
                     c.telephone as client_telephone,
+<<<<<<< HEAD
                     COALESCE(SUM(COALESCE(vd.quantite_caisses, ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0))), 0) as caisses_vendues
+=======
+                    COALESCE(SUM(ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)), 0) as caisses_vendues
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
              FROM ventes v
              JOIN clients c ON v.client_id = c.id
              LEFT JOIN vente_details vd ON vd.vente_id = v.id
@@ -346,7 +363,10 @@ class MobileController extends Controller {
             foreach ($data['produits'] as $item) {
                 $produitId = (int) ($item['produit_id'] ?? 0);
                 $quantite = (float) ($item['quantite'] ?? 0);
+<<<<<<< HEAD
                 $quantiteCaisses = (int) ($item['quantite_caisses'] ?? 0);
+=======
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
 
                 if ($produitId <= 0 || $quantite <= 0) {
                     throw new Exception('Produit ou quantité invalide');
@@ -375,6 +395,7 @@ class MobileController extends Controller {
                     throw new Exception('Stock mission insuffisant');
                 }
 
+<<<<<<< HEAD
                 if ($quantiteCaisses <= 0) {
                     $quantiteCaisses = (int) floor($quantite / $produit['bouteilles_par_caisses']);
                 }
@@ -382,6 +403,8 @@ class MobileController extends Controller {
                     throw new Exception('Quantité de caisses invalide');
                 }
 
+=======
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                 $prixInput = $item['prix_unitaire'] ?? $item['prix'] ?? null;
                 if ($prixInput === null || $prixInput === '') {
                     $prixBase = (float) ($produit['prix_vente_unitaire'] ?? 0);
@@ -394,8 +417,12 @@ class MobileController extends Controller {
 
                 $details[] = [
                     'produit_id' => $produitId,
+<<<<<<< HEAD
                     'quantite_caisses' => $quantiteCaisses,
                     'quantite' => $quantiteCaisses * (int) ($produit['bouteilles_par_caisses'] ?: 24),
+=======
+                    'quantite' => $quantite,
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                     'prix_unitaire' => $prixBase,
                     'sous_total' => $sousTotal,
                     'bouteilles_par_caisses' => (float) ($produit['bouteilles_par_caisses'] ?: 24)
@@ -426,10 +453,15 @@ class MobileController extends Controller {
                 $this->db->insert('vente_details', [
                     'vente_id' => $venteId,
                     'produit_id' => $detail['produit_id'],
+<<<<<<< HEAD
                     'quantite_caisses' => $detail['quantite_caisses'],
                     'quantite' => $detail['quantite'],
                     'prix_unitaire' => $detail['prix_unitaire'],
                     'prix_caisse' => $detail['prix_unitaire'] * (int) $detail['bouteilles_par_caisses'],
+=======
+                    'quantite' => $detail['quantite'],
+                    'prix_unitaire' => $detail['prix_unitaire'],
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                     'sous_total' => $detail['sous_total']
                 ]);
 
@@ -445,6 +477,7 @@ class MobileController extends Controller {
                     ]
                 );
 
+<<<<<<< HEAD
                 $this->db->query(
                     "UPDATE mission_chargements
                      SET quantite_vendue = IFNULL(quantite_vendue, 0) + 0
@@ -455,6 +488,8 @@ class MobileController extends Controller {
                     ]
                 );
 
+=======
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                 // 3. Déduire du stock du véhicule (pleins) pour que l'inventaire reste cohérent
                 $mouvementModel->create([
                     'produit_id' => $detail['produit_id'],
@@ -472,7 +507,11 @@ class MobileController extends Controller {
                     (int) $emplacementVehiculeId,
                     [
                         'quantite_pleine' => -$detail['quantite'],
+<<<<<<< HEAD
                         'caisses_pleine' => -$detail['quantite_caisses']
+=======
+                        'caisses_pleine' => -intdiv((int) $detail['quantite'], (int) $detail['bouteilles_par_caisses'])
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                     ]
                 );
 
@@ -482,7 +521,11 @@ class MobileController extends Controller {
                     (int) $emplacementVehiculeId,
                     [
                         'quantite_vide' => $detail['quantite'],
+<<<<<<< HEAD
                         'caisses_vide' => $detail['quantite_caisses']
+=======
+                        'caisses_vide' => intdiv((int) $detail['quantite'], (int) $detail['bouteilles_par_caisses'])
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                     ]
                 );
 

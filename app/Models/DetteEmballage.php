@@ -98,6 +98,7 @@ class DetteEmballage extends Model
              WHERE statut = 'en_cours'"
         );
     }
+<<<<<<< HEAD
 
     /**
      * Statistiques globales des dettes d'emballages
@@ -114,4 +115,6 @@ class DetteEmballage extends Model
              FROM {$this->table}"
         );
     }
+=======
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
 }

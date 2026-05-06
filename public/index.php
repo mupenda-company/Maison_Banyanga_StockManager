@@ -57,13 +57,19 @@ $routes = [
     // Stocks
     'GET::/stocks' => ['StockController', 'index'],
     'GET::/stocks/inventaire' => ['StockController', 'inventaire'],
+<<<<<<< HEAD
     'GET::/stocks/inventaire-initial' => ['StockController', 'inventaireInitial'],
+=======
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
     'GET::/stocks/mouvements' => ['StockController', 'mouvements'],
     'GET::/api/stocks' => ['StockController', 'apiGlobal'],
     'GET::/api/stocks/emplacement/(\d+)' => ['StockController', 'apiEmplacement'],
     'POST::/api/stocks/transfert' => ['StockController', 'transfert'],
     'POST::/api/stocks/ajustement' => ['StockController', 'ajustement'],
+<<<<<<< HEAD
     'POST::/api/stocks/inventaire-initial' => ['StockController', 'enregistrerInventaireInitial'],
+=======
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
     
     // Approvisionnements
     'GET::/approvisionnements' => ['ApprovisionnementController', 'index'],
@@ -77,10 +83,13 @@ $routes = [
     // Retours emballages
     'GET::/retours-emballages' => ['RetourController', 'index'],
     'POST::/api/retours-emballages' => ['RetourController', 'store'],
+<<<<<<< HEAD
 
     // Emballages
     'GET::/emballages' => ['EmballageController', 'index'],
     'GET::/emballages/suivi' => ['EmballageController', 'suivi'],
+=======
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
     
     // Ventes
     'GET::/ventes' => ['VenteController', 'index'],

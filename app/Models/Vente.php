@@ -143,6 +143,7 @@ class Vente extends Model
                 
                 $produit = $produitModel->find($detail['produit_id']);
                 $btlParCaisse = (int)($produit['bouteilles_par_caisses'] ?? 24);
+<<<<<<< HEAD
                 $quantiteCaisses = (int) ($detail['quantite_caisses'] ?? intdiv((int) $detail['quantite'], $btlParCaisse));
                 if ($quantiteCaisses <= 0) {
                     $quantiteCaisses = 1;
@@ -152,6 +153,8 @@ class Vente extends Model
                 if ($prixCaisse <= 0) {
                     $prixCaisse = (float) (($produit['prix_vente_unitaire'] ?? 0) * $btlParCaisse);
                 }
+=======
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                 
                 // VÉRIFICATION DU STOCK DISPONIBLE
                 $currentStock = $this->db->fetch(
@@ -159,11 +162,16 @@ class Vente extends Model
                     ['p' => $detail['produit_id'], 'e' => $data['emplacement_id']]
                 );
 
+<<<<<<< HEAD
                 if (!$currentStock || $currentStock['quantite_pleine'] < $quantiteBouteilles) {
+=======
+                if (!$currentStock || $currentStock['quantite_pleine'] < $detail['quantite']) {
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                     $dispo = $currentStock ? ($currentStock['quantite_pleine'] / $btlParCaisse) : 0;
                     throw new Exception("Stock insuffisant pour {$produit['nom']}. Disponible: " . number_format($dispo, 1) . " cs");
                 }
 
+<<<<<<< HEAD
                 $this->db->insert('vente_details', [
                     'vente_id' => $venteId,
                     'produit_id' => $detail['produit_id'],
@@ -173,14 +181,22 @@ class Vente extends Model
                     'prix_caisse' => $prixCaisse,
                     'sous_total' => $quantiteCaisses * $prixCaisse
                 ]);
+=======
+                $this->db->insert('vente_details', $detail);
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                 
                 // Déduire du stock (PLEIN)
                 $stockModel->updateOrCreate(
                     $detail['produit_id'],
                     $data['emplacement_id'],
                     [
+<<<<<<< HEAD
                         'quantite_pleine' => -$quantiteBouteilles,
                         'caisses_pleine' => -$quantiteCaisses
+=======
+                        'quantite_pleine' => -$detail['quantite'],
+                        'caisses_pleine' => -intdiv((int) $detail['quantite'], $btlParCaisse)
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                     ]
                 );
                 
@@ -189,8 +205,13 @@ class Vente extends Model
                     $detail['produit_id'],
                     $data['emplacement_id'],
                     [
+<<<<<<< HEAD
                         'quantite_vide' => $quantiteBouteilles,
                         'caisses_vide' => $quantiteCaisses
+=======
+                        'quantite_vide' => $detail['quantite'],
+                        'caisses_vide' => intdiv((int) $detail['quantite'], $btlParCaisse)
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                     ]
                 );
                 
@@ -199,7 +220,11 @@ class Vente extends Model
                     'produit_id' => $detail['produit_id'],
                     'emplacement_id' => $data['emplacement_id'],
                     'type_mouvement' => 'sortie',
+<<<<<<< HEAD
                     'quantite' => -$quantiteBouteilles,
+=======
+                    'quantite' => -$detail['quantite'],
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                     'reference_type' => 'vente',
                     'reference_id' => $venteId,
                     'motif' => 'Vente N° ' . $data['numero_facture'] . ' (Plein)',
@@ -211,7 +236,11 @@ class Vente extends Model
                     'produit_id' => $detail['produit_id'],
                     'emplacement_id' => $data['emplacement_id'],
                     'type_mouvement' => 'entree',
+<<<<<<< HEAD
                     'quantite' => $quantiteBouteilles,
+=======
+                    'quantite' => $detail['quantite'],
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                     'reference_type' => 'vente',
                     'reference_id' => $venteId,
                     'motif' => 'Retour vide automatique Vente N° ' . $data['numero_facture'],
@@ -281,16 +310,25 @@ class Vente extends Model
                 if ($btlParCaisse <= 0) {
                     $btlParCaisse = 24;
                 }
+<<<<<<< HEAD
                 $quantiteCaisses = (int) ($detail['quantite_caisses'] ?? intdiv((int) $detail['quantite'], $btlParCaisse));
+=======
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
 
                 $stockModel->updateOrCreate(
                     $detail['produit_id'],
                     $vente['emplacement_id'],
                     [
                         'quantite_pleine' => $detail['quantite'],
+<<<<<<< HEAD
                         'caisses_pleine' => $quantiteCaisses,
                         'quantite_vide' => -$detail['quantite'],
                         'caisses_vide' => -$quantiteCaisses
+=======
+                        'caisses_pleine' => intdiv((int) $detail['quantite'], $btlParCaisse),
+                        'quantite_vide' => -$detail['quantite'],
+                        'caisses_vide' => -intdiv((int) $detail['quantite'], $btlParCaisse)
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                     ]
                 );
             }
@@ -339,7 +377,11 @@ class Vente extends Model
                 SUM(total_ttc) as total_ttc,
                 AVG(total_ttc) as moyenne_vente,
                 (
+<<<<<<< HEAD
                     SELECT COALESCE(SUM(COALESCE(vd.quantite_caisses, ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0))), 0)
+=======
+                    SELECT COALESCE(SUM(ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)), 0)
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                     FROM vente_details vd
                     JOIN ventes v2 ON vd.vente_id = v2.id
                     JOIN produits p ON vd.produit_id = p.id
@@ -359,7 +401,11 @@ class Vente extends Model
         return $this->db->fetchAll(
             "SELECT p.id, p.code, p.nom,
                     SUM(vd.quantite) as quantite_vendue,
+<<<<<<< HEAD
                     SUM(COALESCE(vd.quantite_caisses, ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0))) as total_caisses,
+=======
+                    SUM(ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)) as total_caisses,
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                     SUM(vd.sous_total) as total_vente
              FROM vente_details vd
              JOIN ventes v ON vd.vente_id = v.id
