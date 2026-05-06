@@ -197,6 +197,7 @@ CREATE TABLE IF NOT EXISTS `missions` (
     `zone_id` INT UNSIGNED,
     `notes` TEXT,
     `montant_encaisse` DECIMAL(15,2) DEFAULT 0,
+    `caisses_vides_retournees` INT NOT NULL DEFAULT 0,
     `statut` ENUM('en_cours', 'terminee', 'annulee') NOT NULL DEFAULT 'en_cours',
     `created_by` INT UNSIGNED,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
