@@ -189,6 +189,7 @@ class AdminController extends Controller
         $allowedParams = [
             'nom_entreprise', 'logo', 'couleur_primaire',
             'adresse', 'telephone', 'email_contact',
+            'contact', 'rccm', 'id_nat', 'nif', 'numero_compte',
             'devise', 'taux_change', 'taux_tva'
         ];
         

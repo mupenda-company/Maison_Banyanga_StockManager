@@ -45,12 +45,32 @@ ob_start();
                         <input type="email" x-model="params.email_contact" class="input" placeholder="email@exemple.com">
                     </div>
                     <div>
+                        <label class="label">Contact</label>
+                        <input type="tel" x-model="params.contact" class="input" placeholder="+24398681273">
+                    </div>
+                    <div>
                         <label class="label">Téléphone</label>
                         <input type="tel" x-model="params.telephone" class="input" placeholder="+243...">
                     </div>
                     <div class="md:col-span-2">
                         <label class="label">Adresse</label>
                         <textarea x-model="params.adresse" class="input" rows="2" placeholder="Adresse complète"></textarea>
+                    </div>
+                    <div>
+                        <label class="label">RCCM</label>
+                        <input type="text" x-model="params.rccm" class="input" placeholder="CD/GOM/RCCM/15-B-0278">
+                    </div>
+                    <div>
+                        <label class="label">ID NAT</label>
+                        <input type="text" x-model="params.id_nat" class="input" placeholder="5-93-N466812 Z">
+                    </div>
+                    <div>
+                        <label class="label">NIF</label>
+                        <input type="text" x-model="params.nif" class="input" placeholder="1504690Q">
+                    </div>
+                    <div>
+                        <label class="label">N° compte</label>
+                        <input type="text" x-model="params.numero_compte" class="input" placeholder="100250288942 BK">
                     </div>
                     <div>
                         <label class="label">Devise principale</label>
@@ -121,6 +141,11 @@ function settingsComponent() {
             adresse: '<?= htmlspecialchars($params['adresse'] ?? '') ?>',
             telephone: '<?= htmlspecialchars($params['telephone'] ?? '') ?>',
             email_contact: '<?= htmlspecialchars($params['email_contact'] ?? '') ?>',
+            contact: '<?= htmlspecialchars($params['contact'] ?? '') ?>',
+            rccm: '<?= htmlspecialchars($params['rccm'] ?? '') ?>',
+            id_nat: '<?= htmlspecialchars($params['id_nat'] ?? '') ?>',
+            nif: '<?= htmlspecialchars($params['nif'] ?? '') ?>',
+            numero_compte: '<?= htmlspecialchars($params['numero_compte'] ?? '') ?>',
             devise: '<?= htmlspecialchars($params['devise'] ?? 'CDF') ?>',
             taux_change: <?= floatval($params['taux_change'] ?? 2800) ?>,
             taux_tva: <?= floatval($params['taux_tva'] ?? 16) ?>,

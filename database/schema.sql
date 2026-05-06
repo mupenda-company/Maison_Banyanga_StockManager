@@ -164,12 +164,8 @@ CREATE TABLE IF NOT EXISTS `approvisionnement_details` (
     FOREIGN KEY (`produit_id`) REFERENCES `produits`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-<<<<<<< HEAD
 ALTER TABLE `approvisionnement_details`
     ADD COLUMN `prix_caisse` DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER `quantite_bouteilles`;
-
-=======
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
 -- --------------------------------------------------------
 -- Structure de la table `dettes_emballages`
 -- --------------------------------------------------------
@@ -200,10 +196,7 @@ CREATE TABLE IF NOT EXISTS `missions` (
     `zone_id` INT UNSIGNED,
     `notes` TEXT,
     `montant_encaisse` DECIMAL(15,2) DEFAULT 0,
-<<<<<<< HEAD
     `caisses_vides_retournees` INT NOT NULL DEFAULT 0,
-=======
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
     `statut` ENUM('en_cours', 'terminee', 'annulee') NOT NULL DEFAULT 'en_cours',
     `created_by` INT UNSIGNED,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -221,10 +214,7 @@ CREATE TABLE IF NOT EXISTS `mission_chargements` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `mission_id` INT UNSIGNED NOT NULL,
     `produit_id` INT UNSIGNED NOT NULL,
-<<<<<<< HEAD
     `quantite_caisses` INT NOT NULL DEFAULT 0 COMMENT 'Quantité en caisses',
-=======
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
     `quantite_chargee` INT NOT NULL COMMENT 'Quantité en bouteilles',
     `quantite_retournee` INT DEFAULT 0 COMMENT 'Quantité retournée à la fin de mission',
     `quantite_vendue` INT DEFAULT 0 COMMENT 'Quantité vendue pendant la mission',
@@ -232,12 +222,8 @@ CREATE TABLE IF NOT EXISTS `mission_chargements` (
     FOREIGN KEY (`produit_id`) REFERENCES `produits`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-<<<<<<< HEAD
 ALTER TABLE `mission_chargements`
     ADD COLUMN `prix_caisse` DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER `quantite_caisses`;
-
-=======
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
 -- --------------------------------------------------------
 -- Structure de la table `ventes`
 -- --------------------------------------------------------
@@ -269,10 +255,7 @@ CREATE TABLE IF NOT EXISTS `vente_details` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `vente_id` INT UNSIGNED NOT NULL,
     `produit_id` INT UNSIGNED NOT NULL,
-<<<<<<< HEAD
     `quantite_caisses` INT NOT NULL DEFAULT 0 COMMENT 'Quantité en caisses',
-=======
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
     `quantite` INT NOT NULL COMMENT 'Quantité en bouteilles',
     `prix_unitaire` DECIMAL(12,2) NOT NULL,
     `sous_total` DECIMAL(12,2) NOT NULL,
@@ -280,12 +263,8 @@ CREATE TABLE IF NOT EXISTS `vente_details` (
     FOREIGN KEY (`produit_id`) REFERENCES `produits`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-<<<<<<< HEAD
 ALTER TABLE `vente_details`
     ADD COLUMN `prix_caisse` DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER `quantite_caisses`;
-
-=======
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
 -- --------------------------------------------------------
 -- Structure de la table `pertes`
 -- --------------------------------------------------------
@@ -388,10 +367,6 @@ CREATE TABLE IF NOT EXISTS `retours_emballages` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `client_id` INT UNSIGNED NOT NULL,
     `produit_id` INT UNSIGNED NOT NULL,
-<<<<<<< HEAD
-    `quantite_caisses` INT NOT NULL DEFAULT 0,
-=======
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
     `quantite` INT NOT NULL,
     `date_retour` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `emplacement_id` INT UNSIGNED NOT NULL,
@@ -402,13 +377,9 @@ CREATE TABLE IF NOT EXISTS `retours_emballages` (
     FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE CASCADE
 )ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-<<<<<<< HEAD
 ALTER TABLE `dettes_emballages`
     ADD COLUMN `quantite_dette_bouteilles` INT NOT NULL DEFAULT 0 AFTER `quantite_dette_caisses`,
     ADD COLUMN `quantite_remboursee_bouteilles` INT NOT NULL DEFAULT 0 AFTER `quantite_remboursee`;
-
-=======
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
 
 ALTER TABLE pertes ADD COLUMN type_stock ENUM('plein', 'vide') NOT NULL DEFAULT 'plein' AFTER emplacement_id;
 
@@ -463,6 +434,11 @@ INSERT INTO `parametres` (`cle`, `valeur`, `type`) VALUES
 ('adresse', 'Kinshasa, RD Congo', 'text'),
 ('telephone', '', 'text'),
 ('email_contact', '', 'text'),
+('contact', '+24398681273', 'text'),
+('rccm', 'CD/GOM/RCCM/15-B-0278', 'text'),
+('id_nat', '5-93-N466812 Z', 'text'),
+('nif', '1504690Q', 'text'),
+('numero_compte', '100250288942 BK', 'text'),
 ('devise', 'CDF', 'text'),
 ('devise_base', 'CDF', 'text'),
 ('taux_tva', '16', 'number');
