@@ -60,7 +60,6 @@ class StockController extends Controller
     }
 
     /**
-<<<<<<< HEAD
      * Inventaire initial du stock
      */
     public function inventaireInitial()
@@ -132,8 +131,6 @@ class StockController extends Controller
     }
 
     /**
-=======
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
      * Exporter les stocks en Excel (CSV)
      */
     private function exportExcel($filters)

@@ -73,7 +73,12 @@ class Parametre extends Model
             'couleur_primaire' => $this->get('couleur_primaire', '#3B82F6'),
             'adresse' => $this->get('adresse', ''),
             'telephone' => $this->get('telephone', ''),
+            'contact' => $this->get('contact', ''),
             'email_contact' => $this->get('email_contact', ''),
+            'rccm' => $this->get('rccm', ''),
+            'id_nat' => $this->get('id_nat', ''),
+            'nif' => $this->get('nif', ''),
+            'numero_compte' => $this->get('numero_compte', ''),
             'devise' => $this->get('devise', 'CDF'),
             'taux_change' => $this->get('taux_change', '2800'),
             'taux_tva' => $this->get('taux_tva', '16')
