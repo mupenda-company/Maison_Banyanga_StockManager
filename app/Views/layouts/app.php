@@ -264,7 +264,6 @@
                     </svg>
                     Approvisionnements
                 </a>
-<<<<<<< HEAD
 
                 <!-- Emballages -->
                 <a href="<?= url('emballages') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/emballages') !== false ? 'active' : '' ?>">
@@ -274,8 +273,6 @@
                     </svg>
                     Emballages
                 </a>
-=======
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                 
                 <!-- Stocks -->
                 <a href="<?= url('stocks') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/stocks') !== false ? 'active' : '' ?>">

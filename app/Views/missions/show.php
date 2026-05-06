@@ -158,11 +158,7 @@ ob_start();
                                 </p>
                             </div>
                             <div class="text-right">
-<<<<<<< HEAD
                                 <p class="font-medium"><?= number_format((int) ($client['quantite_caisses'] ?? 0), 0, '.', ' ') ?> caisses</p>
-=======
-                                <p class="font-medium"><?= number_format((int) round(($client['quantite'] ?? 0) / max((int) ($client['bouteilles_par_caisses'] ?? 24), 1)), 0, '.', ' ') ?> caisses</p>
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                                 <p class="text-sm text-gray-500"><?= format_money_converted($client['montant'] ?? 0) ?></p>
                             </div>
                         </div>
@@ -319,11 +315,7 @@ ob_start();
                                     <thead>
                                         <tr>
                                             <th>Produit</th>
-<<<<<<< HEAD
                                             <th>Chargé (caisses)</th>
-=======
-                                            <th>Chargé</th>
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                                             <th>Vendu</th>
                                             <th>Retour Pleins (btl)</th>
                                             <th>Retour Vides (caisses)</th>
@@ -333,11 +325,7 @@ ob_start();
                                         <template x-for="(c, index) in chargements" :key="index + '-' + c.produit_id">
                                             <tr>
                                                 <td x-text="c.produit_nom"></td>
-<<<<<<< HEAD
                                                 <td x-text="(c.quantite_caisses || 0) + ' cs'"></td>
-=======
-                                                <td x-text="c.quantite_chargee + ' btl'"></td>
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
                                                 <td x-text="(c.caisses_vendues || 0) + ' cs'"></td>
                                                 <td>
                                                     <input type="number" x-model.number="retours[c.produit_id]" class="input py-1 w-24" :max="c.quantite_chargee" min="0">

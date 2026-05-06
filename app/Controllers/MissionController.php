@@ -138,18 +138,12 @@ class MissionController extends Controller
         
         $chargements = [];
         foreach ($data['chargements'] as $chargement) {
-<<<<<<< HEAD
             $quantiteCaisses = (int) ($chargement['quantite_caisses'] ?? 0);
             $quantiteBouteilles = (int) ($chargement['quantite'] ?? 0);
             $chargements[] = [
                 'produit_id' => $chargement['produit_id'],
                 'quantite_caisses' => $quantiteCaisses,
                 'quantite_chargee' => $quantiteBouteilles
-=======
-            $chargements[] = [
-                'produit_id' => $chargement['produit_id'],
-                'quantite_chargee' => $chargement['quantite']
->>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
             ];
         }
         
