@@ -60,6 +60,80 @@ class StockController extends Controller
     }
 
     /**
+<<<<<<< HEAD
+     * Inventaire initial du stock
+     */
+    public function inventaireInitial()
+    {
+        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+
+        $emplacementPrincipal = $this->emplacementModel->getPrincipal();
+        $produits = $this->produitModel->getActive();
+        $stocks = [];
+
+        foreach ($this->stockModel->getByEmplacement($emplacementPrincipal['id']) as $stock) {
+            $stocks[$stock['produit_id']] = $stock;
+        }
+
+        $this->view('stocks/inventaire_initial', [
+            'produits' => $produits,
+            'emplacement' => $emplacementPrincipal,
+            'stocks' => $stocks
+        ]);
+    }
+
+    /**
+     * Enregistrer l'inventaire initial
+     */
+    public function enregistrerInventaireInitial()
+    {
+        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+
+        $data = $this->getJsonInput();
+
+        $errors = $this->validate($data, [
+            'emplacement_id' => 'required|numeric',
+            'lignes' => 'required'
+        ]);
+
+        if (!empty($errors)) {
+            return $this->error('Erreurs de validation', 422, $errors);
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            $totalProduits = 0;
+            foreach ($data['lignes'] as $ligne) {
+                $produitId = (int) ($ligne['produit_id'] ?? 0);
+                $caissesPleines = (int) ($ligne['caisses_pleine'] ?? 0);
+                $caissesVides = (int) ($ligne['caisses_vide'] ?? 0);
+
+                if ($produitId <= 0 || ($caissesPleines <= 0 && $caissesVides <= 0)) {
+                    continue;
+                }
+
+                $this->stockModel->setInitialStock($produitId, (int) $data['emplacement_id'], [
+                    'caisses_pleine' => $caissesPleines,
+                    'caisses_vide' => $caissesVides
+                ]);
+                $totalProduits++;
+            }
+
+            $this->db->commit();
+
+            return $this->success([
+                'total_produits' => $totalProduits
+            ], 'Inventaire initial enregistré avec succès');
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            return $this->error($e->getMessage(), 400);
+        }
+    }
+
+    /**
+=======
+>>>>>>> 4dfb7cff4d92b9d22e94a6ec77f9e0d319c68f13
      * Exporter les stocks en Excel (CSV)
      */
     private function exportExcel($filters)

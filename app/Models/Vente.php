@@ -143,6 +143,15 @@ class Vente extends Model
                 
                 $produit = $produitModel->find($detail['produit_id']);
                 $btlParCaisse = (int)($produit['bouteilles_par_caisses'] ?? 24);
+                $quantiteCaisses = (int) ($detail['quantite_caisses'] ?? intdiv((int) $detail['quantite'], $btlParCaisse));
+                if ($quantiteCaisses <= 0) {
+                    $quantiteCaisses = 1;
+                }
+                $quantiteBouteilles = $quantiteCaisses * $btlParCaisse;
+                $prixCaisse = (float) ($detail['prix_caisse'] ?? ($produit['prix_vente_caisses'] ?? ($produit['prix_vente_unitaire'] * $btlParCaisse)));
+                if ($prixCaisse <= 0) {
+                    $prixCaisse = (float) (($produit['prix_vente_unitaire'] ?? 0) * $btlParCaisse);
+                }
                 
                 // VÉRIFICATION DU STOCK DISPONIBLE
                 $currentStock = $this->db->fetch(
@@ -150,20 +159,28 @@ class Vente extends Model
                     ['p' => $detail['produit_id'], 'e' => $data['emplacement_id']]
                 );
 
-                if (!$currentStock || $currentStock['quantite_pleine'] < $detail['quantite']) {
+                if (!$currentStock || $currentStock['quantite_pleine'] < $quantiteBouteilles) {
                     $dispo = $currentStock ? ($currentStock['quantite_pleine'] / $btlParCaisse) : 0;
                     throw new Exception("Stock insuffisant pour {$produit['nom']}. Disponible: " . number_format($dispo, 1) . " cs");
                 }
 
-                $this->db->insert('vente_details', $detail);
+                $this->db->insert('vente_details', [
+                    'vente_id' => $venteId,
+                    'produit_id' => $detail['produit_id'],
+                    'quantite_caisses' => $quantiteCaisses,
+                    'quantite' => $quantiteBouteilles,
+                    'prix_unitaire' => $prixCaisse / $btlParCaisse,
+                    'prix_caisse' => $prixCaisse,
+                    'sous_total' => $quantiteCaisses * $prixCaisse
+                ]);
                 
                 // Déduire du stock (PLEIN)
                 $stockModel->updateOrCreate(
                     $detail['produit_id'],
                     $data['emplacement_id'],
                     [
-                        'quantite_pleine' => -$detail['quantite'],
-                        'caisses_pleine' => -intdiv((int) $detail['quantite'], $btlParCaisse)
+                        'quantite_pleine' => -$quantiteBouteilles,
+                        'caisses_pleine' => -$quantiteCaisses
                     ]
                 );
                 
@@ -172,8 +189,8 @@ class Vente extends Model
                     $detail['produit_id'],
                     $data['emplacement_id'],
                     [
-                        'quantite_vide' => $detail['quantite'],
-                        'caisses_vide' => intdiv((int) $detail['quantite'], $btlParCaisse)
+                        'quantite_vide' => $quantiteBouteilles,
+                        'caisses_vide' => $quantiteCaisses
                     ]
                 );
                 
@@ -182,7 +199,7 @@ class Vente extends Model
                     'produit_id' => $detail['produit_id'],
                     'emplacement_id' => $data['emplacement_id'],
                     'type_mouvement' => 'sortie',
-                    'quantite' => -$detail['quantite'],
+                    'quantite' => -$quantiteBouteilles,
                     'reference_type' => 'vente',
                     'reference_id' => $venteId,
                     'motif' => 'Vente N° ' . $data['numero_facture'] . ' (Plein)',
@@ -194,7 +211,7 @@ class Vente extends Model
                     'produit_id' => $detail['produit_id'],
                     'emplacement_id' => $data['emplacement_id'],
                     'type_mouvement' => 'entree',
-                    'quantite' => $detail['quantite'],
+                    'quantite' => $quantiteBouteilles,
                     'reference_type' => 'vente',
                     'reference_id' => $venteId,
                     'motif' => 'Retour vide automatique Vente N° ' . $data['numero_facture'],
@@ -264,15 +281,16 @@ class Vente extends Model
                 if ($btlParCaisse <= 0) {
                     $btlParCaisse = 24;
                 }
+                $quantiteCaisses = (int) ($detail['quantite_caisses'] ?? intdiv((int) $detail['quantite'], $btlParCaisse));
 
                 $stockModel->updateOrCreate(
                     $detail['produit_id'],
                     $vente['emplacement_id'],
                     [
                         'quantite_pleine' => $detail['quantite'],
-                        'caisses_pleine' => intdiv((int) $detail['quantite'], $btlParCaisse),
+                        'caisses_pleine' => $quantiteCaisses,
                         'quantite_vide' => -$detail['quantite'],
-                        'caisses_vide' => -intdiv((int) $detail['quantite'], $btlParCaisse)
+                        'caisses_vide' => -$quantiteCaisses
                     ]
                 );
             }
@@ -321,7 +339,7 @@ class Vente extends Model
                 SUM(total_ttc) as total_ttc,
                 AVG(total_ttc) as moyenne_vente,
                 (
-                    SELECT COALESCE(SUM(ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)), 0)
+                    SELECT COALESCE(SUM(COALESCE(vd.quantite_caisses, ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0))), 0)
                     FROM vente_details vd
                     JOIN ventes v2 ON vd.vente_id = v2.id
                     JOIN produits p ON vd.produit_id = p.id
@@ -341,7 +359,7 @@ class Vente extends Model
         return $this->db->fetchAll(
             "SELECT p.id, p.code, p.nom,
                     SUM(vd.quantite) as quantite_vendue,
-                    SUM(ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)) as total_caisses,
+                    SUM(COALESCE(vd.quantite_caisses, ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0))) as total_caisses,
                     SUM(vd.sous_total) as total_vente
              FROM vente_details vd
              JOIN ventes v ON vd.vente_id = v.id

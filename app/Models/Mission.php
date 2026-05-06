@@ -6,7 +6,7 @@
 class Mission extends Model
 {
     protected $table = 'missions';
-    protected $fillable = ['numero_mission', 'vehicule_id', 'chauffeur_id', 'date_depart', 'date_retour', 'zone_id', 'notes', 'statut', 'montant_encaisse', 'created_by'];
+    protected $fillable = ['numero_mission', 'vehicule_id', 'chauffeur_id', 'date_depart', 'date_retour', 'zone_id', 'notes', 'statut', 'montant_encaisse', 'caisses_vides_retournees', 'created_by'];
     
     /**
      * Générer un numéro de mission unique
@@ -76,7 +76,7 @@ class Mission extends Model
             $mission['clients'] = $this->db->fetchAll(
                 "SELECT c.id, c.nom, c.telephone, c.adresse,
                         COALESCE((
-                            SELECT SUM(ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0))
+                            SELECT SUM(COALESCE(vd.quantite_caisses, ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)))
                             FROM ventes v2
                             LEFT JOIN vente_details vd ON vd.vente_id = v2.id
                             LEFT JOIN produits p ON vd.produit_id = p.id
@@ -118,7 +118,7 @@ class Mission extends Model
                             WHERE v.mission_id = ? AND v.statut = 'validee'
                         ), 0) as quantite_bouteilles,
                         COALESCE((
-                            SELECT SUM(ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0))
+                            SELECT SUM(COALESCE(vd.quantite_caisses, ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)))
                             FROM ventes v
                             JOIN vente_details vd ON vd.vente_id = v.id
                             LEFT JOIN produits p ON vd.produit_id = p.id
@@ -134,7 +134,8 @@ class Mission extends Model
 
             $mission['montant_attendu'] = (float) ($mission['ventes']['total'] ?? 0);
             $mission['caisses_vendues_total'] = (int) ($mission['ventes']['caisses_vendues'] ?? 0);
-            $mission['retours_vides_total'] = 0;
+            $mission['caisses_vides_retournees'] = (int) ($mission['caisses_vides_retournees'] ?? 0);
+            $mission['retours_vides_total'] = $mission['caisses_vides_retournees'];
             
             // Calculer le total du chargement
             $total = 0;
@@ -146,10 +147,10 @@ class Mission extends Model
                 }
 
                 $prixCaisse = $item['prix_vente_caisses'] ?: ($item['prix_vente_unitaire'] * $item['bouteilles_par_caisses']);
-                $item['quantite_caisses'] = intdiv((int) $item['quantite_chargee'], $btlParCaisse);
-                $item['caisses_vendues'] = (int) round(((int) ($item['quantite_vendue'] ?? 0)) / $btlParCaisse, 0);
+                $item['quantite_caisses'] = (int) ($item['quantite_caisses'] ?? intdiv((int) $item['quantite_chargee'], $btlParCaisse));
+                $item['caisses_vendues'] = (int) intdiv((int) ($item['quantite_vendue'] ?? 0), $btlParCaisse);
                 $item['montant_vendu'] = $item['caisses_vendues'] * $prixCaisse;
-                $item['sous_total'] = ($item['quantite_chargee'] / $btlParCaisse) * $prixCaisse;
+                $item['sous_total'] = $item['quantite_caisses'] * $prixCaisse;
                 $total += $item['sous_total'];
                 $totalCaisses += $item['quantite_caisses'];
             }
@@ -199,22 +200,31 @@ class Mission extends Model
             $mouvementModel = new MouvementStock();
             
             foreach ($chargements as $chargement) {
-                $chargement['mission_id'] = $missionId;
-                $this->db->insert('mission_chargements', $chargement);
-
                 $produit = (new Produit())->find($chargement['produit_id']);
                 $bouteillesParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
                 if ($bouteillesParCaisse <= 0) {
                     $bouteillesParCaisse = 24;
                 }
+
+                $quantiteCaisses = (int) ($chargement['quantite_caisses'] ?? 0);
+                if ($quantiteCaisses <= 0) {
+                    $quantiteCaisses = (int) floor(((int) ($chargement['quantite_chargee'] ?? 0)) / $bouteillesParCaisse);
+                }
+
+                $quantiteBouteilles = $quantiteCaisses * $bouteillesParCaisse;
+                $chargement['quantite_caisses'] = $quantiteCaisses;
+                $chargement['quantite_chargee'] = $quantiteBouteilles;
+                $chargement['prix_caisse'] = (float) ($produit['prix_vente_caisses'] ?: (($produit['prix_vente_unitaire'] ?? 0) * $bouteillesParCaisse));
+                $chargement['mission_id'] = $missionId;
+                $this->db->insert('mission_chargements', $chargement);
                 
                 // Transférer du stock principal vers le véhicule
                 $stockModel->updateOrCreate(
                     $chargement['produit_id'],
                     $emplacementPrincipalId,
                     [
-                        'quantite_pleine' => -$chargement['quantite_chargee'],
-                        'caisses_pleine' => -intval($chargement['quantite_chargee'] / $bouteillesParCaisse)
+                        'quantite_pleine' => -$quantiteBouteilles,
+                        'caisses_pleine' => -$quantiteCaisses
                     ]
                 );
                 
@@ -222,8 +232,8 @@ class Mission extends Model
                     $chargement['produit_id'],
                     $emplacementVehicule,
                     [
-                        'quantite_pleine' => $chargement['quantite_chargee'],
-                        'caisses_pleine' => intval($chargement['quantite_chargee'] / $bouteillesParCaisse)
+                        'quantite_pleine' => $quantiteBouteilles,
+                        'caisses_pleine' => $quantiteCaisses
                     ]
                 );
                 
@@ -232,7 +242,7 @@ class Mission extends Model
                     'produit_id' => $chargement['produit_id'],
                     'emplacement_id' => $emplacementPrincipalId,
                     'type_mouvement' => 'transfert',
-                    'quantite' => -$chargement['quantite_chargee'],
+                    'quantite' => -$quantiteBouteilles,
                     'quantite_avant' => 0,
                     'quantite_apres' => 0,
                     'reference_type' => 'mission',
@@ -302,8 +312,10 @@ class Mission extends Model
             }
 
             // 2. Gérer les VIDES retournés
+            $totalVidesRetournes = 0;
             foreach ($vides_retournes as $produitId => $nbCaissesVides) {
                 if ($nbCaissesVides > 0) {
+                    $totalVidesRetournes += (int) $nbCaissesVides;
                     // Les vides retournés vont à l'entrepôt principal
                     $stockModel->updateOrCreate($produitId, $emplacementPrincipalId, [
                         'caisses_vide' => $nbCaissesVides
@@ -340,6 +352,18 @@ class Mission extends Model
 
             if ($hasMontantEncaisseColumn) {
                 $updateData['montant_encaisse'] = $montant_encaisse;
+            }
+
+            $hasVidesRetournesColumn = (bool) $this->db->fetchColumn(
+                "SELECT COUNT(*)
+                 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'missions'
+                   AND COLUMN_NAME = 'caisses_vides_retournees'"
+            );
+
+            if ($hasVidesRetournesColumn) {
+                $updateData['caisses_vides_retournees'] = $totalVidesRetournes;
             }
 
             $this->update($id, $updateData);

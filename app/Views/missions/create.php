@@ -33,6 +33,7 @@ ob_start();
                     try {
                         const chargementsValides = chargements.filter(c => c.produit_id && c.quantite > 0).map(c => ({
                             produit_id: parseInt(c.produit_id),
+                            quantite_caisses: parseInt(c.quantite_caisses || 0),
                             quantite: parseInt(c.quantite)
                         }));
                         
