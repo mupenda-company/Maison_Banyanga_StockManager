@@ -1,3 +1,2 @@
-
-./config/config.php
-./node_modules/
+config/config.php
+node_modules
