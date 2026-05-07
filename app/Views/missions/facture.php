@@ -49,11 +49,20 @@
             $prixCaisse = (float) ($chargement['prix_caisse'] ?? 0);
             $prixBouteille = $btlParCaisse > 0 && $prixCaisse > 0 ? $prixCaisse / $btlParCaisse : (float) ($chargement['prix_vente_unitaire'] ?? 0);
 
-            $totalCaissesChargees += $btlParCaisse > 0 ? ($quantiteChargee / $btlParCaisse) : 0;
-            $totalCaissesVendues += $btlParCaisse > 0 ? ($quantiteVendue / $btlParCaisse) : 0;
-            $totalCaissesRetournees += $btlParCaisse > 0 ? ($quantiteRetournee / $btlParCaisse) : 0;
+            $totalCaissesChargees += $btlParCaisse > 0 ? round($quantiteChargee / $btlParCaisse, 0) : 0;
+            $totalCaissesVendues += $btlParCaisse > 0 ? round($quantiteVendue / $btlParCaisse, 0) : 0;
+            $totalCaissesRetournees += $btlParCaisse > 0 ? round($quantiteRetournee / $btlParCaisse, 0) : 0;
             $totalRendu += $quantiteRetournee * $prixBouteille;
         }
+
+        $montantAttendu = (float) ($mission['montant_attendu'] ?? 0);
+        $montantEncaisse = (float) ($mission['montant_encaisse'] ?? 0);
+        $montantEcart = round($montantEncaisse - $montantAttendu, 2);
+        $caissesVidesAttendues = (int) ($mission['caisses_vides_attendues'] ?? 0);
+        $caissesVidesRetournees = (int) ($mission['caisses_vides_retournees'] ?? 0);
+        $caissesVidesEcart = $caissesVidesAttendues - $caissesVidesRetournees;
+        $justificationCloture = trim((string) ($mission['justification_cloture'] ?? ''));
+        $hasDiscrepancy = abs($montantEcart) > 0.01 || $caissesVidesEcart !== 0;
 
         $renderMissionFooter = function () use ($mission, $totalCaissesChargees, $totalCaissesVendues, $totalCaissesRetournees, $totalRendu) {
             ?>
@@ -61,18 +70,18 @@
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
                     <div class="flex items-center justify-between gap-3 rounded border border-gray-200 bg-white px-3 py-2">
                         <p class="text-gray-500 uppercase text-[11px] leading-tight">Total chargés</p>
-                        <p class="font-bold whitespace-nowrap"><?= number_format($totalCaissesChargees, 1, ',', ' ') ?> cs</p>
+                        <p class="font-bold whitespace-nowrap"><?= number_format($totalCaissesChargees, 0, ',', ' ') ?> cs</p>
                     </div>
                     <div class="flex items-center justify-between gap-3 rounded border border-gray-200 bg-white px-3 py-2">
                         <p class="text-gray-500 uppercase text-[11px] leading-tight">Total vendus</p>
-                        <p class="font-bold whitespace-nowrap"><?= number_format($totalCaissesVendues, 1, ',', ' ') ?> cs</p>
+                        <p class="font-bold whitespace-nowrap"><?= number_format($totalCaissesVendues, 0, ',', ' ') ?> cs</p>
                     </div>
                     <div class="flex items-center justify-between gap-3 rounded border border-gray-200 bg-white px-3 py-2">
                         <p class="text-gray-500 uppercase text-[11px] leading-tight">Total retournés</p>
-                        <p class="font-bold whitespace-nowrap"><?= number_format($totalCaissesRetournees, 1, ',', ' ') ?> cs</p>
+                        <p class="font-bold whitespace-nowrap"><?= number_format($totalCaissesRetournees, 0, ',', ' ') ?> cs</p>
                     </div>
                     <div class="flex items-center justify-between gap-3 rounded border border-gray-200 bg-white px-3 py-2">
-                        <p class="text-gray-500 uppercase text-[11px] leading-tight">Valeur totale</p>
+                        <p class="text-gray-500 uppercase text-[11px] leading-tight">Valeur des retours</p>
                         <p class="font-bold text-base whitespace-nowrap"><?= format_money_converted($totalRendu) ?></p>
                     </div>
                 </div>
@@ -149,18 +158,51 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 text-sm">
+        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-4 text-sm">
             <div class="p-3 bg-gray-50 rounded-lg border flex items-center justify-between gap-3">
                 <p class="text-gray-500 uppercase text-xs">Montant attendu</p>
-                <p class="text-base font-bold whitespace-nowrap"><?= format_money_converted($mission['montant_attendu'] ?? 0) ?></p>
+                <p class="text-base font-bold whitespace-nowrap"><?= format_money_converted($montantAttendu) ?></p>
             </div>
             <div class="p-3 bg-gray-50 rounded-lg border flex items-center justify-between gap-3">
-                <p class="text-gray-500 uppercase text-xs">Montant rendu</p>
-                <p class="text-base font-bold text-green-700 whitespace-nowrap"><?= format_money_converted($mission['montant_encaisse'] ?? 0) ?></p>
+                <p class="text-gray-500 uppercase text-xs">Montant encaissé</p>
+                <p class="text-base font-bold text-green-700 whitespace-nowrap"><?= format_money_converted($montantEncaisse) ?></p>
             </div>
             <div class="p-3 bg-gray-50 rounded-lg border flex items-center justify-between gap-3">
-                <p class="text-gray-500 uppercase text-xs">Caisses vides</p>
-                <p class="text-base font-bold whitespace-nowrap"><?= number_format((int) ($mission['caisses_vides_retournees'] ?? 0), 0, ',', ' ') ?></p>
+                <p class="text-gray-500 uppercase text-xs">Écart caisse</p>
+                <p class="text-base font-bold whitespace-nowrap <?= abs($montantEcart) > 0.01 ? 'text-red-600' : 'text-green-700' ?>"><?= format_money_converted($montantEcart) ?></p>
+            </div>
+            <div class="p-3 bg-gray-50 rounded-lg border flex items-center justify-between gap-3">
+                <p class="text-gray-500 uppercase text-xs">Caisses vides attendues</p>
+                <p class="text-base font-bold whitespace-nowrap"><?= number_format($caissesVidesAttendues, 0, ',', ' ') ?></p>
+            </div>
+            <div class="p-3 bg-gray-50 rounded-lg border flex items-center justify-between gap-3">
+                <p class="text-gray-500 uppercase text-xs">Caisses vides retournées</p>
+                <p class="text-base font-bold whitespace-nowrap"><?= number_format($caissesVidesRetournees, 0, ',', ' ') ?></p>
+            </div>
+            <div class="p-3 bg-gray-50 rounded-lg border flex items-center justify-between gap-3">
+                <p class="text-gray-500 uppercase text-xs">Écart vides</p>
+                <p class="text-base font-bold whitespace-nowrap <?= $caissesVidesEcart !== 0 ? 'text-red-600' : 'text-green-700' ?>"><?= number_format($caissesVidesEcart, 0, ',', ' ') ?></p>
+            </div>
+        </div>
+
+        <div class="mb-6 p-4 rounded-lg border <?= $hasDiscrepancy ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200' ?>">
+            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
+                <div>
+                    <p class="text-sm font-semibold <?= $hasDiscrepancy ? 'text-red-700' : 'text-green-700' ?>">
+                        <?= $hasDiscrepancy ? 'Des écarts ont été constatés.' : 'Aucun écart détecté sur la clôture.' ?>
+                    </p>
+                    <p class="text-xs text-gray-600 mt-1">
+                        <?= $hasDiscrepancy
+                            ? 'La mission a été clôturée avec justification. Vérifiez le détail des montants et des emballages ci-dessus.'
+                            : 'Les montants et les caisses vides sont cohérents.' ?>
+                    </p>
+                </div>
+                <div class="text-sm text-right whitespace-nowrap">
+                    <p class="text-gray-500 uppercase text-[11px]">Justification</p>
+                    <p class="font-medium <?= $justificationCloture !== '' ? 'text-gray-900' : 'text-gray-500 italic' ?>">
+                        <?= $justificationCloture !== '' ? htmlspecialchars($justificationCloture) : 'Aucune justification enregistrée' ?>
+                    </p>
+                </div>
             </div>
         </div>
 
@@ -197,16 +239,16 @@
                         $quantiteRetournee = (int) ($chargement['quantite_retournee'] ?? 0);
                         $prixCaisse = (float) ($chargement['prix_caisse'] ?? 0);
                         $prixBouteille = $btlParCaisse > 0 && $prixCaisse > 0 ? $prixCaisse / $btlParCaisse : (float) ($chargement['prix_vente_unitaire'] ?? 0);
-                        $caissesChargees = $btlParCaisse > 0 ? ($quantiteChargee / $btlParCaisse) : 0;
-                        $caissesVendues = $btlParCaisse > 0 ? ($quantiteVendue / $btlParCaisse) : 0;
-                        $caissesRetournees = $btlParCaisse > 0 ? ($quantiteRetournee / $btlParCaisse) : 0;
+                        $caissesChargees = $btlParCaisse > 0 ? round($quantiteChargee / $btlParCaisse, 0) : 0;
+                        $caissesVendues = $btlParCaisse > 0 ? round($quantiteVendue / $btlParCaisse, 0) : 0;
+                        $caissesRetournees = $btlParCaisse > 0 ? round($quantiteRetournee / $btlParCaisse, 0) : 0;
                         $valeurRetour = $quantiteRetournee * $prixBouteille;
                     ?>
                     <tr>
                         <td class="py-1.5 font-medium leading-tight"><?= htmlspecialchars($chargement['produit_nom'] ?? '') ?></td>
-                        <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesChargees, 1, ',', ' ') ?> cs</td>
-                        <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesVendues, 1, ',', ' ') ?> cs</td>
-                        <td class="py-1.5 text-center font-semibold whitespace-nowrap"><?= number_format($caissesRetournees, 1, ',', ' ') ?> cs</td>
+                        <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesChargees, 0, ',', ' ') ?> cs</td>
+                        <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesVendues, 0, ',', ' ') ?> cs</td>
+                        <td class="py-1.5 text-center font-semibold whitespace-nowrap"><?= number_format($caissesRetournees, 0, ',', ' ') ?> cs</td>
                         <td class="py-1.5 text-right whitespace-nowrap"><?= format_money_converted($valeurRetour) ?></td>
                     </tr>
                     <?php endforeach; ?>

@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS `clients` (
     `actif` TINYINT(1) NOT NULL DEFAULT 1,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY `uk_clients_numero_client` (`numero_client`),
     FOREIGN KEY (`zone_id`) REFERENCES `zones`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -196,6 +197,7 @@ CREATE TABLE IF NOT EXISTS `missions` (
     `date_retour` DATETIME NULL,
     `zone_id` INT UNSIGNED,
     `notes` TEXT,
+    `justification_cloture` TEXT,
     `montant_encaisse` DECIMAL(15,2) DEFAULT 0,
     `caisses_vides_retournees` INT NOT NULL DEFAULT 0,
     `statut` ENUM('en_cours', 'terminee', 'annulee') NOT NULL DEFAULT 'en_cours',

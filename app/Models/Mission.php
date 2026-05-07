@@ -6,7 +6,36 @@
 class Mission extends Model
 {
     protected $table = 'missions';
-    protected $fillable = ['numero_mission', 'vehicule_id', 'chauffeur_id', 'date_depart', 'date_retour', 'zone_id', 'notes', 'statut', 'montant_encaisse', 'caisses_vides_retournees', 'created_by'];
+    protected $fillable = ['numero_mission', 'vehicule_id', 'chauffeur_id', 'date_depart', 'date_retour', 'zone_id', 'notes', 'justification_cloture', 'statut', 'montant_encaisse', 'caisses_vides_retournees', 'created_by'];
+
+    private static bool $justificationColumnChecked = false;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->ensureJustificationClosureColumn();
+    }
+
+    private function ensureJustificationClosureColumn(): void
+    {
+        if (self::$justificationColumnChecked) {
+            return;
+        }
+
+        $exists = (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*)
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'missions'
+               AND COLUMN_NAME = 'justification_cloture'"
+        );
+
+        if (!$exists) {
+            $this->db->query("ALTER TABLE missions ADD justification_cloture TEXT NULL AFTER notes");
+        }
+
+        self::$justificationColumnChecked = true;
+    }
     
     /**
      * Générer un numéro de mission unique
@@ -154,6 +183,10 @@ class Mission extends Model
             $mission['caisses_vendues_total'] = (int) ($mission['ventes']['caisses_vendues'] ?? 0);
             $mission['caisses_vides_retournees'] = (int) ($mission['caisses_vides_retournees'] ?? 0);
             $mission['retours_vides_total'] = $mission['caisses_vides_retournees'];
+            $mission['caisses_vides_attendues'] = $mission['caisses_vendues_total'];
+            $mission['caisses_vides_ecart'] = $mission['caisses_vides_attendues'] - $mission['caisses_vides_retournees'];
+            $mission['montant_ecart'] = round((float) ($mission['montant_encaisse'] ?? 0) - $mission['montant_attendu'], 2);
+            $mission['justification_cloture'] = trim((string) ($mission['justification_cloture'] ?? ''));
             
             // Calculer le total du chargement
             $total = 0;
@@ -282,7 +315,7 @@ class Mission extends Model
     /**
      * Terminer une mission avec retour de vides et réintégration des invendus
      */
-    public function terminer($id, $invendus, $vides_retournes, $montant_encaisse, $emplacementPrincipalId)
+    public function terminer($id, $invendus, $vides_retournes, $montant_encaisse, $emplacementPrincipalId, $justificationCloture = null)
     {
         try {
             $this->db->beginTransaction();
@@ -333,6 +366,11 @@ class Mission extends Model
                 'date_retour' => date('Y-m-d H:i:s'),
                 'notes' => ($mission['notes'] ?? '') . "\nMission terminée. Montant encaissé: " . $montant_encaisse
             ];
+
+            $justificationCloture = trim((string) $justificationCloture);
+            if ($justificationCloture !== '') {
+                $updateData['justification_cloture'] = $justificationCloture;
+            }
 
             $hasMontantEncaisseColumn = (bool) $this->db->fetchColumn(
                 "SELECT COUNT(*)

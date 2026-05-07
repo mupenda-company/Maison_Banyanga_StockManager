@@ -82,10 +82,20 @@ ob_start();
                     <p class="stat-value"><?= number_format((int)($kpis['caisses_retournees'] ?? 0), 0, '.', ' ') ?></p>
                 </div>
                 <div class="stat-card">
+                    <p class="stat-label">Dette d'emballages</p>
+                    <p class="stat-value text-red-600"><?= number_format((int)($dette_emballages ?? 0), 0, '.', ' ') ?></p>
+                </div>
+                <div class="stat-card">
                     <p class="stat-label">Ristourne</p>
                     <p class="stat-value"><?= number_format((float)($kpis['taux_ristourne'] ?? 5), 2, '.', ' ') ?>%</p>
                 </div>
             </div>
+
+            <?php if ((int) ($dette_emballages ?? 0) > 0): ?>
+            <div class="p-4 rounded-lg border border-red-200 bg-red-50 text-red-800 text-sm">
+                Ce client a une dette d'emballages de <?= number_format((int) $dette_emballages, 0, '.', ' ') ?> caisse(s). Les emballages manquants doivent être retournés via le module de gestion des emballages.
+            </div>
+            <?php endif; ?>
             
             <!-- Historique des achats -->
             <div class="card">

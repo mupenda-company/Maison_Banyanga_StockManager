@@ -90,12 +90,31 @@ class ClientController extends Controller
         if (!empty($errors)) {
             return $this->error('Erreurs de validation', 422, $errors);
         }
+
+        $numeroClient = trim((string) ($data['numero_client'] ?? ''));
+        if ($numeroClient !== '') {
+            $existingClientId = !empty($data['id']) ? (int) $data['id'] : 0;
+            $duplicateSql = "SELECT COUNT(*)
+                             FROM clients
+                             WHERE numero_client = :numero_client";
+            $duplicateParams = ['numero_client' => $numeroClient];
+            if ($existingClientId > 0) {
+                $duplicateSql .= " AND id <> :client_id";
+                $duplicateParams['client_id'] = $existingClientId;
+            }
+
+            $duplicateCount = (int) $this->db->fetchColumn($duplicateSql, $duplicateParams);
+
+            if ($duplicateCount > 0) {
+                return $this->error('Ce numéro client existe déjà. Merci d’en choisir un autre.', 422);
+            }
+        }
         
         if (!empty($data['id'])) {
             $this->clientModel->update($data['id'], [
                 'nom' => $data['nom'],
                 'telephone' => $data['telephone'] ?? null,
-                'numero_client' => $data['numero_client'] ?? null,
+                'numero_client' => $numeroClient !== '' ? $numeroClient : null,
                 'adresse' => $data['adresse'] ?? null,
                 'zone_id' => $data['zone_id'],
                 'taux_ristourne' => isset($data['taux_ristourne']) && $data['taux_ristourne'] !== ''
@@ -107,7 +126,7 @@ class ClientController extends Controller
             $this->clientModel->create([
                 'nom' => $data['nom'],
                 'telephone' => $data['telephone'] ?? null,
-                'numero_client' => $data['numero_client'] ?? null,
+                'numero_client' => $numeroClient !== '' ? $numeroClient : null,
                 'adresse' => $data['adresse'] ?? null,
                 'zone_id' => $data['zone_id'],
                 'taux_ristourne' => isset($data['taux_ristourne']) && $data['taux_ristourne'] !== ''
@@ -145,7 +164,9 @@ class ClientController extends Controller
         ]);
 
         $kpis = $this->clientModel->getKpis($id, $dateDebut, $dateFin);
-        
+
+        $detteEmballages = (int) ($this->clientModel->getDettesEmballages($id)['total'] ?? 0);
+
         // Récupérer la dernière ristourne active (en attente)
         $ristourneModel = new Ristourne();
         $ristournes = $ristourneModel->getAllWithDetails(['client_id' => $id]);
@@ -180,7 +201,8 @@ class ClientController extends Controller
                 'date_fin' => $dateFin,
             ],
             'ristourne' => $ristourneActive,
-            'dettes' => $dettes
+            'dettes' => $dettes,
+            'dette_emballages' => $detteEmballages
         ]);
     }
 

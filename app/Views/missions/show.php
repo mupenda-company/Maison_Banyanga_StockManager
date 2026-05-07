@@ -235,10 +235,15 @@ ob_start();
             retours: {},
             vides_retournes: {},
             montant_encaisse: 0,
+            justification_cloture: '',
             missionSummary: {
                 caissesVendues: <?= (int) ($mission['caisses_vendues_total'] ?? 0) ?>,
+                caissesVidesAttendues: <?= (int) ($mission['caisses_vides_attendues'] ?? 0) ?>,
                 retoursVides: <?= (int) ($mission['retours_vides_total'] ?? 0) ?>,
-                montantAttendu: <?= json_encode((float) ($mission['montant_attendu'] ?? 0)) ?>
+                montantAttendu: <?= json_encode((float) ($mission['montant_attendu'] ?? 0)) ?>,
+                montantEncaisse: <?= json_encode((float) ($mission['montant_encaisse'] ?? 0)) ?>,
+                montantEcart: <?= json_encode((float) ($mission['montant_ecart'] ?? 0)) ?>,
+                caissesVidesEcart: <?= json_encode((int) ($mission['caisses_vides_ecart'] ?? 0)) ?>
             },
             chargements: <?= htmlspecialchars(json_encode($mission['chargements'] ?? []), ENT_QUOTES, 'UTF-8') ?>,
             
@@ -256,14 +261,43 @@ ob_start();
                 return parseFloat(this.missionSummary.montantAttendu || 0);
             },
 
+            getMontantEcart() {
+                return parseFloat(this.montant_encaisse || 0) - this.getTotalAttendu();
+            },
+
+            getCaissesVidesAttendues() {
+                return parseInt(this.missionSummary.caissesVidesAttendues || 0, 10);
+            },
+
             getTotalVidesRetournees() {
                 return Object.values(this.vides_retournes).reduce((total, value) => total + (parseInt(value, 10) || 0), 0);
             },
 
+            getCaissesVidesEcart() {
+                return this.getCaissesVidesAttendues() - this.getTotalVidesRetournees();
+            },
+
+            hasDiscrepancy() {
+                return Math.abs(this.getMontantEcart()) > 0.01 || this.getCaissesVidesEcart() !== 0;
+            },
+
+            getClosureMessage() {
+                return this.hasDiscrepancy()
+                    ? 'Des écarts ont été détectés : la justification devient obligatoire.'
+                    : 'Aucun écart détecté : la clôture peut être validée directement.';
+            },
+
             async submit() {
+                if (this.hasDiscrepancy() && this.justification_cloture.trim() === '') {
+                    App.notify('La justification de clôture est obligatoire en cas d’écart.', 'error');
+                    return;
+                }
+
                 const ok = await App.confirm({
                     title: 'Clôturer la mission ?',
-                    message: 'Confirmer la clôture de la mission ?',
+                    message: this.hasDiscrepancy()
+                        ? 'Des écarts ont été détectés. Confirmer la clôture avec justification ?'
+                        : 'Confirmer la clôture de la mission ?',
                     confirmText: 'Clôturer',
                     cancelText: 'Annuler',
                     type: 'warning'
@@ -274,7 +308,8 @@ ob_start();
                     await App.api('/api/missions/<?= $mission['id'] ?>/terminer', 'POST', {
                         retours: this.retours,
                         vides_retournes: this.vides_retournes,
-                        montant_encaisse: App.convertMoney(this.montant_encaisse, window.DEVISE, window.BASE_DEVISE)
+                        montant_encaisse: App.convertMoney(this.montant_encaisse, window.DEVISE, window.BASE_DEVISE),
+                        justification_cloture: this.justification_cloture
                     });
                     App.notify('Mission clôturée avec succès');
                     location.reload();
@@ -294,14 +329,17 @@ ob_start();
         <div class="flex items-center justify-center min-h-screen px-4">
             <div class="fixed inset-0 bg-black bg-opacity-50" @click="isOpen = false" x-show="isOpen" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"></div>
             
-            <div class="modal-content relative w-full max-w-3xl bg-white dark:bg-gray-800 rounded-lg shadow-xl" 
+            <div class="modal-content relative w-full max-w-3xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-700" 
                  x-show="isOpen"
                  x-transition:enter="transition ease-out duration-300"
                  x-transition:enter-start="opacity-0 translate-y-4"
                  x-transition:enter-end="opacity-100 translate-y-0">
-                <div class="card-header flex items-center justify-between border-b p-4">
-                    <h3 class="text-lg font-semibold">Clôture de la mission N° <?= htmlspecialchars($mission['numero_mission']) ?></h3>
-                    <button @click="isOpen = false" class="text-gray-400 hover:text-gray-500">
+                <div class="card-header flex items-center justify-between border-b p-4 bg-gray-50 dark:bg-gray-900/60">
+                    <div>
+                        <h3 class="text-lg font-semibold">Clôture de la mission N° <?= htmlspecialchars($mission['numero_mission']) ?></h3>
+                        <p class="text-xs text-gray-500 mt-1">Vérifiez les montants, les caisses vides et la justification avant validation.</p>
+                    </div>
+                    <button @click="isOpen = false" class="text-gray-400 hover:text-gray-500 rounded-full p-1 hover:bg-gray-100 dark:hover:bg-gray-800">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -309,6 +347,23 @@ ob_start();
                 <div class="p-6">
                     <form @submit.prevent="submit()">
                         <div class="space-y-6">
+                            <div class="rounded-xl border p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4" :class="hasDiscrepancy() ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'">
+                                <div>
+                                    <p class="text-sm font-semibold" :class="hasDiscrepancy() ? 'text-amber-800' : 'text-emerald-800'" x-text="hasDiscrepancy() ? 'Clôture avec justification obligatoire' : 'Clôture cohérente'"></p>
+                                    <p class="text-xs mt-1" :class="hasDiscrepancy() ? 'text-amber-700' : 'text-emerald-700'" x-text="getClosureMessage()"></p>
+                                </div>
+                                <div class="grid grid-cols-2 gap-3 text-sm min-w-[260px]">
+                                    <div class="rounded-lg bg-white/90 dark:bg-gray-800/90 border px-3 py-2">
+                                        <p class="text-[11px] uppercase text-gray-500">Écart caisse</p>
+                                        <p class="font-semibold" :class="Math.abs(getMontantEcart()) > 0.01 ? 'text-red-600' : 'text-green-600'" x-text="App.formatMoney(getMontantEcart(), window.DEVISE)"></p>
+                                    </div>
+                                    <div class="rounded-lg bg-white/90 dark:bg-gray-800/90 border px-3 py-2">
+                                        <p class="text-[11px] uppercase text-gray-500">Écart vides</p>
+                                        <p class="font-semibold" :class="getCaissesVidesEcart() !== 0 ? 'text-red-600' : 'text-green-600'" x-text="getCaissesVidesEcart() + ' cs'"></p>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Tableau des retours -->
                             <div class="overflow-x-auto">
                                 <table class="table w-full text-sm">
@@ -317,8 +372,8 @@ ob_start();
                                             <th>Produit</th>
                                             <th>Chargé (caisses)</th>
                                             <th>Vendu</th>
-                                            <th>Retour Pleins (btl)</th>
-                                            <th>Retour Vides (caisses)</th>
+                                            <th>Invendus (btl)</th>
+                                            <th>Caisses vides retournées</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -342,20 +397,50 @@ ob_start();
                             <!-- Section Financière -->
                             <div class="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label class="label">Montant à donner à l'agent (<span x-text="window.DEVISE"></span>)</label>
+                                    <label class="label">Montant encaissé réel (<span x-text="window.DEVISE"></span>)</label>
                                     <input type="number" x-model.number="montant_encaisse" class="input text-xl font-bold text-green-600" step="0.01" required>
-                                    <p class="text-xs text-gray-500 mt-2">Montant calculé automatiquement à partir des caisses vendues.</p>
+                                    <p class="text-xs text-gray-500 mt-2">Saisir le montant réellement remis à la clôture.</p>
+                                    <div class="mt-4">
+                                        <label class="label">Justification de clôture</label>
+                                        <textarea x-model="justification_cloture" class="input" rows="4" placeholder="Obligatoire s'il existe un écart de caisse ou d'emballages."></textarea>
+                                        <p class="text-xs mt-2" :class="hasDiscrepancy() ? 'text-red-500' : 'text-gray-500'">
+                                            <span x-show="hasDiscrepancy()">Une justification est requise pour valider la clôture.</span>
+                                            <span x-show="!hasDiscrepancy()">La justification reste facultative si tout est conforme.</span>
+                                        </p>
+                                    </div>
                                 </div>
                                 <div class="text-right">
-                                    <p class="text-sm text-gray-500 uppercase">Caisses vendues</p>
-                                    <p class="text-2xl font-bold text-primary-600" x-text="missionSummary.caissesVendues + ' cs'"></p>
-                                    <p class="text-sm text-gray-500 uppercase mt-4">Caisses vides retournées</p>
-                                    <p class="text-2xl font-bold text-orange-500" x-text="getTotalVidesRetournees() + ' cs'"></p>
-                                    <p class="text-sm text-gray-500 uppercase mt-4">Montant attendu</p>
-                                    <p class="text-2xl font-bold text-primary-600" x-text="App.formatMoneyConverted(getTotalAttendu(), window.BASE_DEVISE, window.DEVISE)"></p>
-                                    <p class="text-xs mt-1" :class="montant_encaisse >= App.convertMoney(getTotalAttendu(), window.BASE_DEVISE, window.DEVISE) ? 'text-green-500' : 'text-red-500'">
-                                        Ecart: <span x-text="App.formatMoney(montant_encaisse - App.convertMoney(getTotalAttendu(), window.BASE_DEVISE, window.DEVISE), window.DEVISE)"></span>
-                                    </p>
+                                    <div class="mb-4 p-3 rounded-lg border bg-white dark:bg-gray-800 text-left">
+                                        <p class="text-xs uppercase text-gray-500">Résumé de clôture</p>
+                                        <p class="text-sm font-semibold mt-1" :class="hasDiscrepancy() ? 'text-red-700' : 'text-green-700'" x-text="getClosureMessage()"></p>
+                                    </div>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+                                        <div class="p-3 border rounded-lg bg-white dark:bg-gray-800">
+                                            <p class="text-[11px] uppercase text-gray-500">Montant attendu</p>
+                                            <p class="text-lg font-bold text-primary-600" x-text="App.formatMoneyConverted(getTotalAttendu(), window.BASE_DEVISE, window.DEVISE)"></p>
+                                        </div>
+                                        <div class="p-3 border rounded-lg bg-white dark:bg-gray-800">
+                                            <p class="text-[11px] uppercase text-gray-500">Montant encaissé</p>
+                                            <p class="text-lg font-bold text-green-600" x-text="App.formatMoneyConverted(App.convertMoney(montant_encaisse, window.DEVISE, window.BASE_DEVISE), window.BASE_DEVISE, window.DEVISE)"></p>
+                                        </div>
+                                        <div class="p-3 border rounded-lg bg-white dark:bg-gray-800">
+                                            <p class="text-[11px] uppercase text-gray-500">Écart caisse</p>
+                                            <p class="text-lg font-bold" :class="Math.abs(getMontantEcart()) > 0.01 ? 'text-red-600' : 'text-green-600'" x-text="App.formatMoney(getMontantEcart(), window.DEVISE)"></p>
+                                        </div>
+                                        <div class="p-3 border rounded-lg bg-white dark:bg-gray-800">
+                                            <p class="text-[11px] uppercase text-gray-500">Caisses vides retournées</p>
+                                            <p class="text-lg font-bold text-orange-500" x-text="getTotalVidesRetournees() + ' / ' + getCaissesVidesAttendues() + ' cs'"></p>
+                                            <p class="text-xs mt-1" :class="getCaissesVidesEcart() === 0 ? 'text-green-600' : 'text-red-600'">
+                                                Écart: <span x-text="getCaissesVidesEcart() + ' cs'"></span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="mt-4 p-3 rounded-lg" :class="hasDiscrepancy() ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'">
+                                        <p class="text-sm font-semibold" :class="hasDiscrepancy() ? 'text-red-700' : 'text-green-700'">
+                                            <span x-show="hasDiscrepancy()">Des écarts sont détectés : une justification est requise.</span>
+                                            <span x-show="!hasDiscrepancy()">Aucun écart détecté : la clôture est cohérente.</span>
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -9,11 +9,13 @@ class Client extends Model
     protected $fillable = ['nom', 'telephone', 'numero_client', 'adresse', 'zone_id', 'email', 'taux_ristourne', 'notes', 'actif'];
 
     private static bool $numeroClientColumnChecked = false;
+    private static bool $numeroClientUniqueIndexChecked = false;
 
     public function __construct()
     {
         parent::__construct();
         $this->ensureNumeroClientColumn();
+        $this->ensureNumeroClientUniqueIndex();
     }
 
     private function ensureNumeroClientColumn(): void
@@ -35,6 +37,40 @@ class Client extends Model
         }
 
         self::$numeroClientColumnChecked = true;
+    }
+
+    private function ensureNumeroClientUniqueIndex(): void
+    {
+        if (self::$numeroClientUniqueIndexChecked) {
+            return;
+        }
+
+        $exists = (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*)
+             FROM information_schema.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'clients'
+               AND INDEX_NAME = 'uk_clients_numero_client'"
+        );
+
+        if (!$exists) {
+            $hasDuplicates = (bool) $this->db->fetchColumn(
+                "SELECT COUNT(*)
+                 FROM (
+                     SELECT numero_client
+                     FROM clients
+                     WHERE numero_client IS NOT NULL AND numero_client <> ''
+                     GROUP BY numero_client
+                     HAVING COUNT(*) > 1
+                 ) duplicates"
+            );
+
+            if (!$hasDuplicates) {
+                $this->db->query("ALTER TABLE clients ADD UNIQUE KEY uk_clients_numero_client (numero_client)");
+            }
+        }
+
+        self::$numeroClientUniqueIndexChecked = true;
     }
     
     /**
@@ -185,6 +221,7 @@ class Client extends Model
                        JOIN produits p ON r.produit_id = p.id
                        WHERE {$returnWhere}";
         $caissesRetournees = (int) $this->db->fetchColumn($returnsSql, $returnParams);
+        $detteEmballages = max(0, $caissesAchetees - $caissesRetournees);
 
         $tauxRistourne = (float) ($client['taux_ristourne'] ?? 5);
         $montantRistourne = ($caTotal * $tauxRistourne) / 100;
@@ -194,6 +231,7 @@ class Client extends Model
             'caisses_achetees' => $caissesAchetees,
             'ca_total' => $caTotal,
             'caisses_retournees' => $caissesRetournees,
+            'dette_emballages' => $detteEmballages,
             'taux_ristourne' => $tauxRistourne,
             'montant_ristourne' => $montantRistourne,
         ];
@@ -272,19 +310,8 @@ class Client extends Model
      */
     public function getDettesEmballages($clientId)
     {
-        $result = $this->db->fetch(
-            "SELECT 
-                (SELECT COALESCE(SUM(vd.quantite), 0) 
-                 FROM ventes v 
-                 JOIN vente_details vd ON v.id = vd.vente_id 
-                 WHERE v.client_id = :client_id AND v.statut = 'validee') 
-                - 
-                (SELECT COALESCE(SUM(r.quantite), 0) 
-                 FROM retours_emballages r 
-                 WHERE r.client_id = :client_id2) as total",
-            ['client_id' => $clientId, 'client_id2' => $clientId]
-        );
-        
-        return ['total' => $result['total'] ?? 0];
+        $kpis = $this->getKpis($clientId);
+
+        return ['total' => (int) ($kpis['dette_emballages'] ?? 0)];
     }
 }

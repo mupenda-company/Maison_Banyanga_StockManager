@@ -218,13 +218,36 @@ class MissionController extends Controller
         if ($montant_encaisse <= 0 && $montant_attendu > 0) {
             $montant_encaisse = $montant_attendu;
         }
+
+        $caissesVidesAttendues = (int) ($mission['caisses_vides_attendues'] ?? 0);
+        $caissesVidesRetournees = 0;
+        foreach ($vides_retournes as $nbCaisses) {
+            $caissesVidesRetournees += (int) $nbCaisses;
+        }
+
+        $montantEcart = round($montant_encaisse - $montant_attendu, 2);
+        $caissesEcart = $caissesVidesAttendues - $caissesVidesRetournees;
+        $hasDiscrepancy = abs($montantEcart) > 0.01 || $caissesEcart !== 0;
+        $justificationCloture = trim((string) ($data['justification_cloture'] ?? ''));
+
+        if ($hasDiscrepancy && $justificationCloture === '') {
+            return $this->error(
+                'Une justification est obligatoire lorsqu’il y a un écart entre le montant attendu et le montant encaissé, ou entre les caisses vides attendues et retournées.',
+                422,
+                [
+                    'montant_ecart' => $montantEcart,
+                    'caisses_vides_ecart' => $caissesEcart,
+                ]
+            );
+        }
         
         $result = $this->missionModel->terminer(
             $id, 
             $retours, 
             $vides_retournes, 
             $montant_encaisse, 
-            $emplacementPrincipal['id']
+            $emplacementPrincipal['id'],
+            $justificationCloture
         );
         
         if ($result['success']) {
