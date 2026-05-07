@@ -33,7 +33,11 @@ class Vehicule extends Model
     public function getDisponibles()
     {
         return $this->db->fetchAll(
-            "SELECT v.*, u.nom as agent_nom, u.prenom as agent_prenom
+            "SELECT v.*, u.nom as agent_nom, u.prenom as agent_prenom,
+                    COALESCE((SELECT SUM(s.quantite_pleine) FROM stocks s WHERE s.emplacement_id = v.emplacement_id), 0) as stock_plein,
+                    COALESCE((SELECT SUM(s.quantite_vide) FROM stocks s WHERE s.emplacement_id = v.emplacement_id), 0) as stock_vide,
+                    COALESCE((SELECT SUM(s.caisses_pleine) FROM stocks s WHERE s.emplacement_id = v.emplacement_id), 0) as stock_caisses_pleine,
+                    COALESCE((SELECT SUM(s.caisses_vide) FROM stocks s WHERE s.emplacement_id = v.emplacement_id), 0) as stock_caisses_vide
              FROM {$this->table} v
              LEFT JOIN users u ON v.agent_responsable_id = u.id
              LEFT JOIN emplacements e ON v.emplacement_id = e.id

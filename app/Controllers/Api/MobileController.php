@@ -84,6 +84,22 @@ class MobileController extends Controller {
      * Voir le stock disponible dans le véhicule de la mission
      */
     public function getStock($missionId) {
+        $mission = $this->db->fetch(
+            "SELECT id, statut
+             FROM missions
+             WHERE id = :id
+             LIMIT 1",
+            ['id' => (int) $missionId]
+        );
+
+        if (!$mission) {
+            return $this->error('Mission non trouvée', 404);
+        }
+
+        if (($mission['statut'] ?? null) !== 'en_cours') {
+            return $this->error('Mission clôturée', 409);
+        }
+
         $sql = "SELECT p.id, p.nom, p.code, p.bouteilles_par_caisses,
                        p.prix_vente_unitaire, p.prix_vente_caisses,
                        mc.quantite_caisses,
@@ -123,6 +139,10 @@ class MobileController extends Controller {
 
         if (!$mission) {
             return $this->error('Mission non trouvée', 404);
+        }
+
+        if (($mission['statut'] ?? null) !== 'en_cours') {
+            return $this->error('Mission clôturée', 409);
         }
 
         $emplacementId = (int) ($mission['vehicule_emplacement_id'] ?? 0);

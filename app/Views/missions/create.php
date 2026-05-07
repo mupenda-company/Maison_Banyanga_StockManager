@@ -87,6 +87,31 @@ ob_start();
                         <input type="datetime-local" x-model="date_depart" class="input" required>
                     </div>
                 </div>
+
+                <template x-if="vehicule_id">
+                    <div class="mb-6 p-4 rounded-lg border border-blue-100 bg-blue-50">
+                        <template x-for="v in vehicules" :key="v.id + '-summary'">
+                            <div x-show="String(v.id) === String(vehicule_id)" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                <div class="p-3 bg-white rounded-lg border">
+                                    <p class="text-xs uppercase text-gray-500">Caisses pleines déjà dans le véhicule</p>
+                                    <p class="text-lg font-bold text-green-700" x-text="Math.round(parseFloat(v.stock_caisses_pleine || 0)) + ' cs'"></p>
+                                </div>
+                                <div class="p-3 bg-white rounded-lg border">
+                                    <p class="text-xs uppercase text-gray-500">Caisses vides déjà dans le véhicule</p>
+                                    <p class="text-lg font-bold text-gray-700" x-text="Math.round(parseFloat(v.stock_caisses_vide || 0)) + ' cs'"></p>
+                                </div>
+                                <div class="p-3 bg-white rounded-lg border">
+                                    <p class="text-xs uppercase text-gray-500">Bouteilles pleines</p>
+                                    <p class="text-lg font-bold text-primary-600" x-text="Math.round(parseFloat(v.stock_plein || 0)) + ' btl'"></p>
+                                </div>
+                                <div class="p-3 bg-white rounded-lg border">
+                                    <p class="text-xs uppercase text-gray-500">Bouteilles vides</p>
+                                    <p class="text-lg font-bold text-orange-600" x-text="Math.round(parseFloat(v.stock_vide || 0)) + ' btl'"></p>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
                 
                 <!-- Chargement -->
                 <div class="mb-6">

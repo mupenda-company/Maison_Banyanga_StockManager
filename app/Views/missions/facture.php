@@ -10,20 +10,103 @@
             size: A4;
             margin: 8mm;
         }
-        thead { display: table-header-group; }
-        tfoot { display: table-footer-group; }
-        tr { break-inside: avoid; page-break-inside: avoid; }
-        .mission-page { break-after: page; page-break-after: always; }
-        .mission-page:last-child { break-after: auto; page-break-after: auto; }
+        body {
+            margin: 0;
+            background: #f8fafc;
+            color: #0f172a;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .max-w-4xl { max-width: 56rem; }
+        .mx-auto { margin-left: auto; margin-right: auto; }
+        .space-y-5 > * + * { margin-top: 1.25rem; }
+        .p-4 { padding: 1rem; }
+        .p-6 { padding: 1.5rem; }
+        .p-3 { padding: 0.75rem; }
+        .p-2 { padding: 0.5rem; }
+        .mb-1 { margin-bottom: 0.25rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .mb-6 { margin-bottom: 1.5rem; }
+        .mt-1 { margin-top: 0.25rem; }
+        .mt-3 { margin-top: 0.75rem; }
+        .mt-6 { margin-top: 1.5rem; }
+        .pt-2 { padding-top: 0.5rem; }
+        .pt-4 { padding-top: 1rem; }
+        .pb-4 { padding-bottom: 1rem; }
+        .border { border: 1px solid #dbe2ea; }
+        .border-t { border-top: 1px solid #dbe2ea; }
+        .border-b { border-bottom: 1px solid #dbe2ea; }
+        .border-gray-200 { border-color: #e2e8f0; }
+        .border-gray-400 { border-color: #94a3b8; }
+        .border-red-200 { border-color: #fecaca; }
+        .border-green-200 { border-color: #bbf7d0; }
+        .rounded { border-radius: 0.375rem; }
+        .rounded-lg { border-radius: 0.75rem; }
+        .bg-white { background: #ffffff; }
+        .bg-gray-50 { background: #f8fafc; }
+        .bg-red-50 { background: #fef2f2; }
+        .bg-green-50 { background: #f0fdf4; }
+        .text-gray-500 { color: #64748b; }
+        .text-gray-600 { color: #475569; }
+        .text-gray-700 { color: #334155; }
+        .text-gray-900 { color: #0f172a; }
+        .text-blue-600 { color: #2563eb; }
+        .text-red-600 { color: #dc2626; }
+        .text-green-700 { color: #15803d; }
+        .font-bold { font-weight: 700; }
+        .font-semibold { font-weight: 600; }
+        .font-medium { font-weight: 500; }
+        .uppercase { text-transform: uppercase; }
+        .tracking-wider { letter-spacing: 0.08em; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .text-xs { font-size: 0.75rem; }
+        .text-sm { font-size: 0.875rem; }
+        .text-base { font-size: 1rem; }
+        .text-lg { font-size: 1.125rem; }
+        .text-xl { font-size: 1.25rem; }
+        .leading-tight { line-height: 1.2; }
+        .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .whitespace-nowrap { white-space: nowrap; }
+        .min-w-0 { min-width: 0; }
+        .w-full { width: 100%; }
+        .flex { display: flex; }
+        .grid { display: grid; }
+        .items-center { align-items: center; }
+        .items-start { align-items: flex-start; }
+        .items-end { align-items: flex-end; }
+        .justify-between { justify-content: space-between; }
+        .justify-center { justify-content: center; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-3 { gap: 0.75rem; }
+        .gap-4 { gap: 1rem; }
+        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+        .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .max-w-4xl { width: min(56rem, calc(100vw - 16px)); }
         .compact-table th,
         .compact-table td {
             padding-top: 0.35rem;
             padding-bottom: 0.35rem;
             line-height: 1.15rem;
         }
+        .shadow-sm {
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+        }
+        thead { display: table-header-group; }
+        tfoot { display: table-footer-group; }
+        tr { break-inside: avoid; page-break-inside: avoid; }
+        .mission-page { break-after: page; page-break-after: always; }
+        .mission-page:last-child { break-after: auto; page-break-after: auto; }
         @media print {
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                background: #ffffff;
+            }
             .no-print { display: none !important; }
+            .shadow-sm { box-shadow: none; }
         }
     </style>
 </head>
@@ -115,7 +198,7 @@
         };
     ?>
     <div class="max-w-4xl mx-auto space-y-5">
-        <div class="flex justify-between items-start gap-4 mb-6 border-b pb-4">
+        <div class="flex justify-between items-start gap-4 mb-6 border-b pb-4 bg-white rounded-lg p-4 shadow-sm">
             <div>
                 <?php if ($companyLogo): ?>
                 <img src="<?= $companyLogo ?>" alt="Logo" class="h-12 mb-1 object-contain">

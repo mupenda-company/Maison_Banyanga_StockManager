@@ -338,24 +338,51 @@ class Mission extends Model
 
             // 2. Gérer les VIDES retournés
             $totalVidesRetournes = 0;
+            $emplacementVehicule = (int) ($mission['vehicule']['emplacement_id'] ?? 0);
             foreach ($vides_retournes as $produitId => $nbCaissesVides) {
                 if ($nbCaissesVides > 0) {
                     $totalVidesRetournes += (int) $nbCaissesVides;
-                    // Les vides retournés vont à l'entrepôt principal
-                    $stockModel->updateOrCreate($produitId, $emplacementPrincipalId, [
-                        'caisses_vide' => $nbCaissesVides
-                    ]);
+                    $produit = (new Produit())->find($produitId);
+                    $bouteillesParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+                    if ($bouteillesParCaisse <= 0) {
+                        $bouteillesParCaisse = 24;
+                    }
 
-                    // Mouvement pour les vides
+                    $quantiteBouteillesVides = $nbCaissesVides * $bouteillesParCaisse;
+
+                    if ($emplacementVehicule > 0) {
+                        $mouvementModel->create([
+                            'produit_id' => $produitId,
+                            'emplacement_id' => $emplacementVehicule,
+                            'type_mouvement' => 'sortie',
+                            'quantite' => -$quantiteBouteillesVides,
+                            'reference_type' => 'mission',
+                            'reference_id' => $id,
+                            'motif' => 'Retour emballages vides mission ' . $mission['numero_mission'],
+                            'created_by' => $_SESSION['user_id']
+                        ]);
+
+                        $stockModel->updateOrCreate($produitId, $emplacementVehicule, [
+                            'quantite_vide' => -$quantiteBouteillesVides,
+                            'caisses_vide' => -$nbCaissesVides
+                        ]);
+                    }
+
+                    // Les vides retournés vont à l'entrepôt principal
                     $mouvementModel->create([
                         'produit_id' => $produitId,
                         'emplacement_id' => $emplacementPrincipalId,
                         'type_mouvement' => 'entree',
-                        'quantite' => 0,
+                        'quantite' => $quantiteBouteillesVides,
                         'reference_type' => 'mission',
                         'reference_id' => $id,
                         'motif' => 'Retour emballages vides mission ' . $mission['numero_mission'],
                         'created_by' => $_SESSION['user_id']
+                    ]);
+
+                    $stockModel->updateOrCreate($produitId, $emplacementPrincipalId, [
+                        'quantite_vide' => $quantiteBouteillesVides,
+                        'caisses_vide' => $nbCaissesVides
                     ]);
                 }
             }
