@@ -38,6 +38,7 @@ ob_start();
                     <thead>
                         <tr>
                             <th>Nom</th>
+                            <th>N° client</th>
                             <th>Téléphone</th>
                             <th>Zone</th>
                             <th>Ristourne</th>
@@ -48,7 +49,7 @@ ob_start();
                     <tbody>
                         <?php if (empty($clients)): ?>
                         <tr>
-                            <td colspan="6" class="text-center py-8 text-gray-500 dark:text-gray-400">
+                            <td colspan="7" class="text-center py-8 text-gray-500 dark:text-gray-400">
                                 Aucun client trouvé
                             </td>
                         </tr>
@@ -61,6 +62,7 @@ ob_start();
                                     <div class="text-xs text-gray-500"><?= htmlspecialchars($client['email']) ?></div>
                                     <?php endif; ?>
                                 </td>
+                                <td><?= htmlspecialchars($client['numero_client'] ?? '-') ?></td>
                                 <td><?= htmlspecialchars($client['telephone'] ?? '-') ?></td>
                                 <td>
                                     <span class="badge-info"><?= htmlspecialchars($client['zone_nom'] ?? 'Non définie') ?></span>
@@ -121,13 +123,19 @@ ob_start();
                                         <input type="tel" x-model="form.telephone" class="input">
                                     </div>
                                     <div>
+                                        <label class="label">N° client</label>
+                                        <input type="text" x-model="form.numero_client" class="input" placeholder="Numéro client">
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
                                         <label class="label">Email</label>
                                         <input type="email" x-model="form.email" class="input">
                                     </div>
-                                </div>
-                                <div>
-                                    <label class="label">Taux ristourne (%)</label>
-                                    <input type="number" x-model.number="form.taux_ristourne" class="input" step="0.01" min="0">
+                                    <div>
+                                        <label class="label">Taux ristourne (%)</label>
+                                        <input type="number" x-model.number="form.taux_ristourne" class="input" step="0.01" min="0">
+                                    </div>
                                 </div>
                                 <div>
                                     <label class="label">Zone *</label>
@@ -168,12 +176,12 @@ document.addEventListener('alpine:init', () => {
         editMode: false,
         editId: null,
         loading: false,
-        form: { nom: '', telephone: '', adresse: '', zone_id: '', email: '', taux_ristourne: 5 },
+        form: { nom: '', telephone: '', numero_client: '', adresse: '', zone_id: '', email: '', taux_ristourne: 5 },
         
         openModal() {
             this.editMode = false;
             this.editId = null;
-            this.form = { nom: '', telephone: '', adresse: '', zone_id: '', email: '', taux_ristourne: 5 };
+            this.form = { nom: '', telephone: '', numero_client: '', adresse: '', zone_id: '', email: '', taux_ristourne: 5 };
             this.isOpen = true;
         },
         

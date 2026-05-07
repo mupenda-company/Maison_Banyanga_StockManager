@@ -6,7 +6,36 @@
 class Client extends Model
 {
     protected $table = 'clients';
-    protected $fillable = ['nom', 'telephone', 'adresse', 'zone_id', 'email', 'taux_ristourne', 'notes', 'actif'];
+    protected $fillable = ['nom', 'telephone', 'numero_client', 'adresse', 'zone_id', 'email', 'taux_ristourne', 'notes', 'actif'];
+
+    private static bool $numeroClientColumnChecked = false;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->ensureNumeroClientColumn();
+    }
+
+    private function ensureNumeroClientColumn(): void
+    {
+        if (self::$numeroClientColumnChecked) {
+            return;
+        }
+
+        $exists = (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*)
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'clients'
+               AND COLUMN_NAME = 'numero_client'"
+        );
+
+        if (!$exists) {
+            $this->db->query("ALTER TABLE clients ADD numero_client VARCHAR(50) NULL AFTER telephone");
+        }
+
+        self::$numeroClientColumnChecked = true;
+    }
     
     /**
      * Récupérer avec la zone
@@ -66,10 +95,11 @@ class Client extends Model
 
         $term = trim((string) $term);
         if ($term !== '') {
-            $where .= " AND (c.nom LIKE :term_nom OR c.telephone LIKE :term_telephone OR c.email LIKE :term_email OR c.adresse LIKE :term_adresse OR z.nom LIKE :term_zone)";
+            $where .= " AND (c.nom LIKE :term_nom OR c.telephone LIKE :term_telephone OR c.numero_client LIKE :term_numero_client OR c.email LIKE :term_email OR c.adresse LIKE :term_adresse OR z.nom LIKE :term_zone)";
             $likeTerm = '%' . $term . '%';
             $params['term_nom'] = $likeTerm;
             $params['term_telephone'] = $likeTerm;
+            $params['term_numero_client'] = $likeTerm;
             $params['term_email'] = $likeTerm;
             $params['term_adresse'] = $likeTerm;
             $params['term_zone'] = $likeTerm;

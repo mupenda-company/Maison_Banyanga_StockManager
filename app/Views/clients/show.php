@@ -49,6 +49,10 @@ ob_start();
                 <div class="card-body">
                     <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
                         <div>
+                            <p class="text-sm text-gray-500">N° client</p>
+                            <p class="font-medium"><?= htmlspecialchars($client['numero_client'] ?? 'N/A') ?></p>
+                        </div>
+                        <div>
                             <p class="text-sm text-gray-500">Téléphone</p>
                             <p class="font-medium"><?= htmlspecialchars($client['telephone'] ?? 'N/A') ?></p>
                         </div>

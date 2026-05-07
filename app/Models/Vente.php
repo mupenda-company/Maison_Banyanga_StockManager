@@ -50,7 +50,7 @@ class Vente extends Model
         $vente = $this->db->fetch(
             "SELECT v.*, u.nom as created_by_nom, u.prenom as created_by_prenom, 
                     e.nom as emplacement_nom, c.nom as client_nom, c.telephone as client_telephone,
-                    c.adresse as client_adresse, z.nom as zone_nom
+                    c.numero_client as client_numero, c.adresse as client_adresse, z.nom as zone_nom
              FROM {$this->table} v
              LEFT JOIN users u ON v.created_by = u.id
              LEFT JOIN emplacements e ON v.emplacement_id = e.id

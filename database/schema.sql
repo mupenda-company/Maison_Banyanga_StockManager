@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS `clients` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `nom` VARCHAR(150) NOT NULL,
     `telephone` VARCHAR(20),
+    `numero_client` VARCHAR(50),
     `adresse` TEXT,
     `zone_id` INT UNSIGNED,
     `email` VARCHAR(100),

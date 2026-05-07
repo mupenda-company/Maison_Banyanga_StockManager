@@ -95,6 +95,7 @@ class ClientController extends Controller
             $this->clientModel->update($data['id'], [
                 'nom' => $data['nom'],
                 'telephone' => $data['telephone'] ?? null,
+                'numero_client' => $data['numero_client'] ?? null,
                 'adresse' => $data['adresse'] ?? null,
                 'zone_id' => $data['zone_id'],
                 'taux_ristourne' => isset($data['taux_ristourne']) && $data['taux_ristourne'] !== ''
@@ -106,6 +107,7 @@ class ClientController extends Controller
             $this->clientModel->create([
                 'nom' => $data['nom'],
                 'telephone' => $data['telephone'] ?? null,
+                'numero_client' => $data['numero_client'] ?? null,
                 'adresse' => $data['adresse'] ?? null,
                 'zone_id' => $data['zone_id'],
                 'taux_ristourne' => isset($data['taux_ristourne']) && $data['taux_ristourne'] !== ''
