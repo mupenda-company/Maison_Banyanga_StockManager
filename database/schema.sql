@@ -449,7 +449,7 @@ INSERT INTO `emplacements` (`code`, `nom`, `type`, `capacite`) VALUES
 ('ENT-001', 'Entrepôt Principal', 'fixe', 1000000);
 
 -- Produit par defauf pour m'evite de tous les ecrire hahha
-INSERT INTO `produits` (`id`, `code`, `nom`, `description`, `categorie`, `unite_base`, `caisses_par_caisses`, `prix_achat_unitaire`, `prix_vente_unitaire`, `prix_vente_caisses`, `seuil_alerte`, `actif`) VALUES
+INSERT INTO `produits` (`id`, `code`, `nom`, `description`, `categorie`, `unite_base`, `bouteilles_par_caisses`, `prix_achat_unitaire`, `prix_vente_unitaire`, `prix_vente_caisses`, `seuil_alerte`, `actif`) VALUES
 (1, 'PRD-0001', 'PRIMUS 72CL', '', 'Alcolisé', 'caisse', 12, 3023.67, 3250.00, 39000.00, 10, 1),
 (2, 'PRD-0002', 'PRIMUS 50CL', '', 'Alcolisé', 'caisse', 20, 2336.70, 2500.00, 50000.00, 10, 1),
 (3, 'PRD-0003', 'TURBO KING 72CL', '', 'Alcolisé', 'caisse', 12, 3182.00, 3416.67, 41000.00, 10, 1),
