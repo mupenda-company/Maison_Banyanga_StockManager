@@ -11,20 +11,34 @@ class Vente extends Model
     /**
      * Générer un numéro de facture unique
      */
-    public function generateNumeroFacture()
+    public function generateNumeroFacture($prefix = 'FAC-')
     {
-        $prefix = 'FAC-' . date('Ymd');
-        $last = $this->db->fetchColumn(
-            "SELECT MAX(numero_facture) FROM {$this->table} WHERE numero_facture LIKE :prefix",
+        $prefix = rtrim((string) $prefix);
+        if ($prefix === '') {
+            $prefix = 'FAC-';
+        }
+
+        if (substr($prefix, -1) !== '-') {
+            $prefix .= '-';
+        }
+
+        $rows = $this->db->fetchAll(
+            "SELECT numero_facture FROM {$this->table} WHERE numero_facture LIKE :prefix",
             ['prefix' => $prefix . '%']
         );
-        
-        if ($last) {
-            $num = (int) substr($last, -4) + 1;
-        } else {
-            $num = 1;
+
+        $count = 0;
+        $pattern = '/^' . preg_quote($prefix, '/') . '\\d{4}$/';
+
+        foreach ($rows as $row) {
+            $numeroFacture = (string) ($row['numero_facture'] ?? '');
+            if (preg_match($pattern, $numeroFacture)) {
+                $count++;
+            }
         }
-        
+
+        $num = $count + 1;
+
         return $prefix . str_pad($num, 4, '0', STR_PAD_LEFT);
     }
     

@@ -416,7 +416,7 @@ class MobileController extends Controller {
             $totalTva = $totalHt * ($tva / 100);
             $totalTtc = $totalHt + $totalTva;
 
-            $numeroFacture = 'MOB-' . date('YmdHis');
+            $numeroFacture = $venteModel->generateNumeroFacture('MOB-');
 
             $venteId = $venteModel->create([
                 'numero_facture' => $numeroFacture,
