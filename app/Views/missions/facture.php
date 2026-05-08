@@ -84,6 +84,7 @@
         .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .grid-cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
         .max-w-4xl { width: min(56rem, calc(100vw - 16px)); }
         .compact-table th,
         .compact-table td {
@@ -121,6 +122,7 @@
 
         $totalCaissesChargees = 0;
         $totalCaissesVendues = 0;
+        $totalCaissesRestantes = 0;
         $totalCaissesRetournees = 0;
         $totalRendu = 0;
 
@@ -131,10 +133,15 @@
             $quantiteRetournee = (int) ($chargement['quantite_retournee'] ?? 0);
             $prixCaisse = (float) ($chargement['prix_caisse'] ?? 0);
             $prixBouteille = $btlParCaisse > 0 && $prixCaisse > 0 ? $prixCaisse / $btlParCaisse : (float) ($chargement['prix_vente_unitaire'] ?? 0);
+            $caissesChargees = $btlParCaisse > 0 ? round($quantiteChargee / $btlParCaisse, 0) : 0;
+            $caissesVendues = $btlParCaisse > 0 ? round($quantiteVendue / $btlParCaisse, 0) : 0;
+            $caissesRestantes = max(0, $caissesChargees - $caissesVendues);
+            $caissesRetournees = $btlParCaisse > 0 ? round($quantiteRetournee / $btlParCaisse, 0) : 0;
 
-            $totalCaissesChargees += $btlParCaisse > 0 ? round($quantiteChargee / $btlParCaisse, 0) : 0;
-            $totalCaissesVendues += $btlParCaisse > 0 ? round($quantiteVendue / $btlParCaisse, 0) : 0;
-            $totalCaissesRetournees += $btlParCaisse > 0 ? round($quantiteRetournee / $btlParCaisse, 0) : 0;
+            $totalCaissesChargees += $caissesChargees;
+            $totalCaissesVendues += $caissesVendues;
+            $totalCaissesRestantes += $caissesRestantes;
+            $totalCaissesRetournees += $caissesRetournees;
             $totalRendu += $quantiteRetournee * $prixBouteille;
         }
 
@@ -147,10 +154,10 @@
         $justificationCloture = trim((string) ($mission['justification_cloture'] ?? ''));
         $hasDiscrepancy = abs($montantEcart) > 0.01 || $caissesVidesEcart !== 0;
 
-        $renderMissionFooter = function () use ($mission, $totalCaissesChargees, $totalCaissesVendues, $totalCaissesRetournees, $totalRendu) {
+        $renderMissionFooter = function () use ($mission, $totalCaissesChargees, $totalCaissesVendues, $totalCaissesRestantes, $totalCaissesRetournees, $totalRendu) {
             ?>
             <div class="p-3 border rounded-lg bg-gray-50 text-sm mt-3">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-2">
                     <div class="flex items-center justify-between gap-3 rounded border border-gray-200 bg-white px-3 py-2">
                         <p class="text-gray-500 uppercase text-[11px] leading-tight">Total chargés</p>
                         <p class="font-bold whitespace-nowrap"><?= number_format($totalCaissesChargees, 0, ',', ' ') ?> cs</p>
@@ -158,6 +165,10 @@
                     <div class="flex items-center justify-between gap-3 rounded border border-gray-200 bg-white px-3 py-2">
                         <p class="text-gray-500 uppercase text-[11px] leading-tight">Total vendus</p>
                         <p class="font-bold whitespace-nowrap"><?= number_format($totalCaissesVendues, 0, ',', ' ') ?> cs</p>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 rounded border border-gray-200 bg-white px-3 py-2">
+                        <p class="text-gray-500 uppercase text-[11px] leading-tight">Total restants</p>
+                        <p class="font-bold whitespace-nowrap"><?= number_format($totalCaissesRestantes, 0, ',', ' ') ?> cs</p>
                     </div>
                     <div class="flex items-center justify-between gap-3 rounded border border-gray-200 bg-white px-3 py-2">
                         <p class="text-gray-500 uppercase text-[11px] leading-tight">Total retournés</p>
@@ -291,14 +302,14 @@
 
         <?php if (empty($chargements)): ?>
         <div class="mission-page">
-            <div class="mb-6 p-6 text-center text-gray-500 border rounded-lg">Aucun produit retourné</div>
+            <div class="mb-6 p-6 text-center text-gray-500 border rounded-lg">Aucun produit chargé</div>
             <?php $renderMissionFooter(); ?>
         </div>
         <?php else: ?>
         <?php foreach ($chargementsPages as $pageIndex => $pageChargements): ?>
         <div class="mission-page <?= $pageIndex === $pagesCount - 1 ? '' : '' ?>">
             <div class="mb-4 flex items-end justify-between gap-4">
-                <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Produits retournés</h3>
+                <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Bilan des chargements</h3>
                 <?php if ($pagesCount > 1): ?>
                 <p class="text-xs text-gray-500">Page <?= $pageIndex + 1 ?> / <?= $pagesCount ?></p>
                 <?php endif; ?>
@@ -309,6 +320,7 @@
                         <th class="text-left py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Produit</th>
                         <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Chargé</th>
                         <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Vendu</th>
+                        <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Restant</th>
                         <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Retourné</th>
                         <th class="text-right py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Valeur estimée</th>
                     </tr>
@@ -324,6 +336,7 @@
                         $prixBouteille = $btlParCaisse > 0 && $prixCaisse > 0 ? $prixCaisse / $btlParCaisse : (float) ($chargement['prix_vente_unitaire'] ?? 0);
                         $caissesChargees = $btlParCaisse > 0 ? round($quantiteChargee / $btlParCaisse, 0) : 0;
                         $caissesVendues = $btlParCaisse > 0 ? round($quantiteVendue / $btlParCaisse, 0) : 0;
+                        $caissesRestantes = max(0, $caissesChargees - $caissesVendues);
                         $caissesRetournees = $btlParCaisse > 0 ? round($quantiteRetournee / $btlParCaisse, 0) : 0;
                         $valeurRetour = $quantiteRetournee * $prixBouteille;
                     ?>
@@ -331,6 +344,7 @@
                         <td class="py-1.5 font-medium leading-tight"><?= htmlspecialchars($chargement['produit_nom'] ?? '') ?></td>
                         <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesChargees, 0, ',', ' ') ?> cs</td>
                         <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesVendues, 0, ',', ' ') ?> cs</td>
+                        <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesRestantes, 0, ',', ' ') ?> cs</td>
                         <td class="py-1.5 text-center font-semibold whitespace-nowrap"><?= number_format($caissesRetournees, 0, ',', ' ') ?> cs</td>
                         <td class="py-1.5 text-right whitespace-nowrap"><?= format_money_converted($valeurRetour) ?></td>
                     </tr>
