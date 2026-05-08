@@ -18,11 +18,56 @@ ob_start();
                     zone_id: '',
                     date_depart: '<?= date('Y-m-d\TH:i') ?>',
                     notes: '',
-                    chargements: [{ produit_id: '', quantite: 0 }],
+                    chargements: [{ produit_id: '', quantite: 0, quantite_caisses: 0, stock_depart_caisses: 0, stock_depart_bouteilles: 0, auto_vehicle_stock: false }],
                     vehicules: [],
                     produits: [],
                     zones: [],
-                    loading: false
+                    loading: false,
+                    loadingVehiculeStock: false,
+                    newChargement() {
+                        return { produit_id: '', quantite: 0, quantite_caisses: 0, stock_depart_caisses: 0, stock_depart_bouteilles: 0, auto_vehicle_stock: false };
+                    },
+                    async loadVehiculeStock() {
+                        if (!this.vehicule_id) {
+                            this.chargements = [this.newChargement()];
+                            return;
+                        }
+
+                        this.loadingVehiculeStock = true;
+                        try {
+                            const response = await App.api('/api/vehicules/' + this.vehicule_id);
+                            const vehicule = response.data || response;
+                            const stockVehicule = Array.isArray(vehicule.stock) ? vehicule.stock : [];
+
+                            this.chargements = stockVehicule
+                                .filter((item) => parseFloat(item.caisses_pleine || 0) > 0 || parseFloat(item.quantite_pleine || 0) > 0)
+                                .map((item) => ({
+                                    produit_id: String(item.produit_id),
+                                    quantite: 0,
+                                    quantite_caisses: 0,
+                                    stock_depart_caisses: parseFloat(item.caisses_pleine || 0),
+                                    stock_depart_bouteilles: parseFloat(item.quantite_pleine || 0),
+                                    auto_vehicle_stock: true
+                                }));
+
+                            if (this.chargements.length === 0) {
+                                this.chargements = [this.newChargement()];
+                            }
+                        } catch (e) {
+                            App.notify('Impossible de charger le stock du véhicule', 'error');
+                            this.chargements = [this.newChargement()];
+                        } finally {
+                            this.loadingVehiculeStock = false;
+                        }
+                    },
+                    addChargement() {
+                        this.chargements.push(this.newChargement());
+                    },
+                    removeChargement(index) {
+                        if (!this.chargements[index]?.auto_vehicle_stock) {
+                            this.chargements.splice(index, 1);
+                        }
+                    }
                 }"
                 x-init="
                     App.api('/api/vehicules?disponibles=true').then(r => { vehicules = r.data || r; });
@@ -31,14 +76,19 @@ ob_start();
                 @submit.prevent="async () => {
                     loading = true;
                     try {
-                        const chargementsValides = chargements.filter(c => c.produit_id && c.quantite > 0).map(c => ({
+                        const chargementsValides = chargements.filter(c => c.produit_id && (
+                            parseInt(c.quantite_caisses || 0) > 0 ||
+                            parseInt(c.quantite || 0) > 0 ||
+                            parseFloat(c.stock_depart_caisses || 0) > 0 ||
+                            parseFloat(c.stock_depart_bouteilles || 0) > 0
+                        )).map(c => ({
                             produit_id: parseInt(c.produit_id),
                             quantite_caisses: parseInt(c.quantite_caisses || 0),
-                            quantite: parseInt(c.quantite)
+                            quantite: parseInt(c.quantite || 0)
                         }));
                         
                         if (chargementsValides.length === 0) {
-                            throw new Error('Ajoutez au moins un produit');
+                            throw new Error('Ajoutez au moins un produit présent dans le véhicule ou une quantité à charger');
                         }
                         
                         if (!vehicule_id) {
@@ -66,7 +116,7 @@ ob_start();
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div>
                         <label class="label">Véhicule *</label>
-                        <select x-model="vehicule_id" class="input" required>
+                        <select x-model="vehicule_id" @change="loadVehiculeStock()" class="input" required>
                             <option value="">Sélectionner un véhicule disponible</option>
                             <template x-for="v in vehicules" :key="v.id">
                                 <option :value="v.id" x-text="v.immatriculation + ' - ' + (v.agent_nom || 'Sans agent')"></option>
@@ -90,6 +140,10 @@ ob_start();
 
                 <template x-if="vehicule_id">
                     <div class="mb-6 p-4 rounded-lg border border-blue-100 bg-blue-50">
+                        <div class="flex items-center justify-between mb-3">
+                            <p class="text-xs uppercase tracking-wider text-gray-500 font-semibold">Stock du véhicule sélectionné</p>
+                            <p class="text-xs text-gray-500" x-show="loadingVehiculeStock">Chargement...</p>
+                        </div>
                         <template x-for="v in vehicules" :key="v.id + '-summary'">
                             <div x-show="String(v.id) === String(vehicule_id)" class="grid grid-cols-1 md:grid-cols-4 gap-3">
                                 <div class="p-3 bg-white rounded-lg border">
@@ -117,7 +171,7 @@ ob_start();
                 <div class="mb-6">
                     <div class="flex items-center justify-between mb-2">
                         <label class="label mb-0">Chargement des produits</label>
-                        <button type="button" @click="chargements.push({ produit_id: '', quantite: 0 })" class="btn-secondary btn-sm">
+                        <button type="button" @click="addChargement()" class="btn-secondary btn-sm">
                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                             </svg>
@@ -130,8 +184,8 @@ ob_start();
                             <thead class="bg-gray-50 dark:bg-gray-700">
                                 <tr>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Produit</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Stock entrepôt</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Quantité à charger</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Stock véhicule</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Ajout mission</th>
                                     <th class="px-4 py-3"></th>
                                 </tr>
                             </thead>
@@ -143,21 +197,26 @@ ob_start();
                                         }
                                     }">
                                         <td class="px-4 py-2">
-                                            <select x-model="chargement.produit_id" class="input w-full" required>
-                                                <option value="">Sélectionner un produit</option>
-                                                <template x-for="p in produits" :key="p.id">
-                                                    <option :value="p.id" x-text="p.nom + ' (' + p.code + ')'"></option>
+                                            <div class="space-y-1">
+                                                <select x-model="chargement.produit_id" class="input w-full" :disabled="chargement.auto_vehicle_stock" required>
+                                                    <option value="">Sélectionner un produit</option>
+                                                    <template x-for="p in produits" :key="p.id">
+                                                        <option :value="p.id" x-text="p.nom + ' (' + p.code + ')' "></option>
+                                                    </template>
+                                                </select>
+                                                <template x-if="chargement.auto_vehicle_stock">
+                                                    <p class="text-xs text-emerald-600 font-medium">Ligne issue du stock du véhicule</p>
                                                 </template>
-                                            </select>
+                                            </div>
                                         </td>
                                         <td class="px-4 py-2 text-sm">
-                                            <template x-if="selectedProduit">
+                                            <template x-if="chargement.auto_vehicle_stock">
                                                 <div class="flex flex-col">
-                                                    <span class="font-bold text-primary-600" x-text="Math.round(parseFloat(selectedProduit.stock_caisses_pleine || 0)) + ' cs'"></span>
-                                                    <span class="text-xs text-gray-400" x-text="'(' + selectedProduit.stock_plein + ' btl)'"></span>
+                                                    <span class="font-bold text-green-700" x-text="Math.round(parseFloat(chargement.stock_depart_caisses || 0)) + ' cs'"></span>
+                                                    <span class="text-xs text-gray-400" x-text="'(' + Math.round(parseFloat(chargement.stock_depart_bouteilles || 0)) + ' btl)'"></span>
                                                 </div>
                                             </template>
-                                            <template x-if="!selectedProduit">
+                                            <template x-if="!chargement.auto_vehicle_stock">
                                                 <span class="text-gray-400">-</span>
                                             </template>
                                         </td>
@@ -165,15 +224,15 @@ ob_start();
                                             <div class="flex items-center space-x-2">
                                                 <input type="number" x-model.number="chargement.quantite_caisses" 
                                                        @input="if(selectedProduit) chargement.quantite = Math.round(chargement.quantite_caisses) * selectedProduit.bouteilles_par_caisses; chargement.quantite_caisses = Math.round(chargement.quantite_caisses || 0)"
-                                                       class="input w-24" min="1" step="1" placeholder="Caisses">
+                                                       class="input w-24" min="0" step="1" placeholder="Caisses">
                                                 <span class="text-xs text-gray-500">=</span>
                                                 <input type="number" x-model.number="chargement.quantite" 
                                                        @input="if(selectedProduit) { chargement.quantite = Math.round(chargement.quantite || 0); chargement.quantite_caisses = Math.round(chargement.quantite / selectedProduit.bouteilles_par_caisses) }"
-                                                       class="input w-24" min="1" step="1" placeholder="Btl">
+                                                       class="input w-24" min="0" step="1" placeholder="Btl">
                                             </div>
                                         </td>
                                         <td class="px-4 py-2">
-                                            <button type="button" @click="chargements.splice(index, 1)" class="text-red-500 hover:text-red-700" x-show="chargements.length > 1">
+                                            <button type="button" @click="chargements.splice(index, 1)" class="text-red-500 hover:text-red-700" x-show="!chargement.auto_vehicle_stock && chargements.length > 1">
                                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                                 </svg>

@@ -103,6 +103,7 @@ $routes = [
     // Véhicules
     'GET::/vehicules' => ['VehiculeController', 'index'],
     'GET::/api/vehicules' => ['VehiculeController', 'apiList'],
+    'GET::/api/vehicules/(\d+)' => ['VehiculeController', 'apiShow'],
     'GET::/vehicules/(\d+)' => ['VehiculeController', 'show'],
     'POST::/api/vehicules' => ['VehiculeController', 'store'],
     'PUT::/api/vehicules/(\d+)' => ['VehiculeController', 'update'],

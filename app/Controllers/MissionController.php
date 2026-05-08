@@ -118,6 +118,48 @@ class MissionController extends Controller
         if (!empty($errors)) {
             return $this->error('Erreurs de validation', 422, $errors);
         }
+
+        $vehicule = $this->vehiculeModel->getWithStock((int) ($data['vehicule_id'] ?? 0));
+        if (!$vehicule) {
+            return $this->error('Véhicule non trouvé', 404);
+        }
+
+        $stockVehiculeProduits = [];
+        foreach (($vehicule['stock'] ?? []) as $stock) {
+            $stockVehiculeProduits[(int) ($stock['produit_id'] ?? 0)] = true;
+        }
+
+        $chargements = [];
+        foreach ($data['chargements'] as $chargement) {
+            $produitId = (int) ($chargement['produit_id'] ?? 0);
+            $quantiteCaisses = (int) ($chargement['quantite_caisses'] ?? 0);
+            $quantiteBouteilles = (int) ($chargement['quantite'] ?? 0);
+
+            if ($produitId <= 0) {
+                continue;
+            }
+
+            if ($quantiteCaisses <= 0 && $quantiteBouteilles <= 0 && empty($stockVehiculeProduits[$produitId])) {
+                continue;
+            }
+
+            if (!isset($chargements[$produitId])) {
+                $chargements[$produitId] = [
+                    'produit_id' => $produitId,
+                    'quantite_caisses' => 0,
+                    'quantite_chargee' => 0
+                ];
+            }
+
+            $chargements[$produitId]['quantite_caisses'] += $quantiteCaisses;
+            $chargements[$produitId]['quantite_chargee'] += $quantiteBouteilles;
+        }
+
+        $chargements = array_values($chargements);
+
+        if (empty($chargements)) {
+            return $this->error('Ajoutez au moins un produit présent dans le véhicule ou une quantité à charger avant de lancer la mission.', 422);
+        }
         
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
         
@@ -131,17 +173,6 @@ class MissionController extends Controller
             'statut' => 'en_cours',
             'created_by' => $_SESSION['user_id']
         ];
-        
-        $chargements = [];
-        foreach ($data['chargements'] as $chargement) {
-            $quantiteCaisses = (int) ($chargement['quantite_caisses'] ?? 0);
-            $quantiteBouteilles = (int) ($chargement['quantite'] ?? 0);
-            $chargements[] = [
-                'produit_id' => $chargement['produit_id'],
-                'quantite_caisses' => $quantiteCaisses,
-                'quantite_chargee' => $quantiteBouteilles
-            ];
-        }
         
         $result = $this->missionModel->createWithChargement(
             $missionData,

@@ -48,6 +48,22 @@ class VehiculeController extends Controller
         
         return $this->success($vehicules);
     }
+
+    /**
+     * API détail d'un véhicule avec stock
+     */
+    public function apiShow($id)
+    {
+        $this->requireAuth();
+
+        $vehicule = $this->vehiculeModel->getWithStock($id);
+
+        if (!$vehicule) {
+            return $this->error('Véhicule non trouvé', 404);
+        }
+
+        return $this->success($vehicule);
+    }
     
     /**
      * Afficher un véhicule
