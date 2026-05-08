@@ -82,7 +82,9 @@
                 <thead>
                     <tr class="border-b-2 border-gray-200">
                         <th class="text-left py-2 font-semibold text-gray-500 uppercase">Produit</th>
-                        <th class="text-right py-2 font-semibold text-gray-500 uppercase">Caisses</th>
+                        <th class="text-right py-2 font-semibold text-gray-500 uppercase">Stock départ</th>
+                        <th class="text-right py-2 font-semibold text-gray-500 uppercase">Ajout mission</th>
+                        <th class="text-right py-2 font-semibold text-gray-500 uppercase">Total réel</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
@@ -90,19 +92,27 @@
                     <?php foreach ($mission['chargements'] as $chargement): ?>
                     <?php
                         $btlParCaisse = (int)($chargement['bouteilles_par_caisses'] ?? 24);
-                        $quantite = (float)($chargement['quantite_chargee'] ?? 0);
-                        $caisses = $btlParCaisse > 0 ? ($quantite / $btlParCaisse) : 0;
-                        $totalCaisses += $caisses;
+                        if ($btlParCaisse <= 0) {
+                            $btlParCaisse = 24;
+                        }
+
+                        $stockDepartCaisses = (int) ($chargement['caisses_deja_dans_vehicule'] ?? 0);
+                        $ajoutMissionCaisses = (int) ($chargement['quantite_caisses'] ?? 0);
+                        $totalReelCaisses = (int) ($chargement['caisses_total'] ?? ($stockDepartCaisses + $ajoutMissionCaisses));
+                        $totalCaisses += $totalReelCaisses;
                     ?>
                     <tr>
                         <td class="py-2 font-medium"><?= htmlspecialchars($chargement['produit_nom']) ?></td>
-                        <td class="py-2 text-right font-medium"><?= number_format($caisses, 1, ',', ' ') ?> cs</td>
+                        <td class="py-2 text-right font-medium"><?= number_format($stockDepartCaisses, 1, ',', ' ') ?> cs</td>
+                        <td class="py-2 text-right font-medium"><?= number_format($ajoutMissionCaisses, 1, ',', ' ') ?> cs</td>
+                        <td class="py-2 text-right font-bold text-blue-600"><?= number_format($totalReelCaisses, 1, ',', ' ') ?> cs</td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
                 <tfoot class="border-t-2 border-gray-200">
                     <tr>
                         <td class="py-2 font-bold">Total</td>
+                        <td colspan="2"></td>
                         <td class="py-2 text-right font-bold"><?= number_format($totalCaisses, 1, ',', ' ') ?> cs</td>
                     </tr>
                 </tfoot>
