@@ -116,7 +116,7 @@ ob_start();
                                     <div class="font-medium"><?= htmlspecialchars($item['produit_nom']) ?></div>
                                     <div class="text-xs text-gray-500"><?= htmlspecialchars($item['produit_code']) ?></div>
                                 </td>
-                                <td class="text-right"><?= number_format((int) ($item['quantite_caisses'] ?? 0), 0, '.', ' ') ?> cs</td>
+                                <td class="text-right"><?= number_format((int) ($item['caisses_total'] ?? $item['quantite_caisses'] ?? 0), 0, '.', ' ') ?> cs</td>
                                 <td class="text-right"><?= format_money_converted($prixCaisse) ?></td>
                                 <td class="text-right font-medium"><?= format_money_converted($item['sous_total'] ?? 0) ?></td>
                             </tr>
@@ -380,10 +380,10 @@ ob_start();
                                         <template x-for="(c, index) in chargements" :key="index + '-' + c.produit_id">
                                             <tr>
                                                 <td x-text="c.produit_nom"></td>
-                                                <td x-text="(c.quantite_caisses || 0) + ' cs'"></td>
+                                                <td x-text="(c.caisses_total || c.quantite_caisses || 0) + ' cs'"></td>
                                                 <td x-text="(c.caisses_vendues || 0) + ' cs'"></td>
                                                 <td>
-                                                    <input type="number" x-model.number="retours[c.produit_id]" class="input py-1 w-24" :max="c.quantite_chargee" min="0">
+                                                    <input type="number" x-model.number="retours[c.produit_id]" class="input py-1 w-24" :max="Math.max((c.stock_total_bouteilles || 0) - (c.quantite_vendue || 0), 0)" min="0">
                                                 </td>
                                                 <td>
                                                     <input type="number" x-model.number="vides_retournes[c.produit_id]" class="input py-1 w-24" min="0">

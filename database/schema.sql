@@ -218,6 +218,7 @@ CREATE TABLE IF NOT EXISTS `mission_chargements` (
     `mission_id` INT UNSIGNED NOT NULL,
     `produit_id` INT UNSIGNED NOT NULL,
     `quantite_caisses` INT NOT NULL DEFAULT 0 COMMENT 'Quantité en caisses',
+    `caisses_deja_dans_vehicule` INT NOT NULL DEFAULT 0 COMMENT 'Caisses déjà présentes dans le véhicule au départ',
     `quantite_chargee` INT NOT NULL COMMENT 'Quantité en bouteilles',
     `quantite_retournee` INT DEFAULT 0 COMMENT 'Quantité retournée à la fin de mission',
     `quantite_vendue` INT DEFAULT 0 COMMENT 'Quantité vendue pendant la mission',

@@ -37,7 +37,7 @@ class MissionController extends Controller
         
         $missions = $this->db->fetchAll(
             "SELECT m.*, v.immatriculation, u.nom as agent_nom, u.prenom as agent_prenom, z.nom as zone_nom,
-                    COALESCE((SELECT SUM(COALESCE(mc.quantite_caisses, FLOOR(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))))
+                    COALESCE((SELECT SUM(COALESCE(mc.caisses_deja_dans_vehicule, 0) + COALESCE(mc.quantite_caisses, FLOOR(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))))
                               FROM mission_chargements mc
                               JOIN produits p ON mc.produit_id = p.id
                               WHERE mc.mission_id = m.id), 0) as total_caisses,

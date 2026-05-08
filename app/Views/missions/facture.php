@@ -133,7 +133,8 @@
             $quantiteRetournee = (int) ($chargement['quantite_retournee'] ?? 0);
             $prixCaisse = (float) ($chargement['prix_caisse'] ?? 0);
             $prixBouteille = $btlParCaisse > 0 && $prixCaisse > 0 ? $prixCaisse / $btlParCaisse : (float) ($chargement['prix_vente_unitaire'] ?? 0);
-            $caissesChargees = $btlParCaisse > 0 ? round($quantiteChargee / $btlParCaisse, 0) : 0;
+            $caissesDejaDansVehicule = (int) ($chargement['caisses_deja_dans_vehicule'] ?? 0);
+            $caissesChargees = $caissesDejaDansVehicule + ($btlParCaisse > 0 ? round($quantiteChargee / $btlParCaisse, 0) : 0);
             $caissesVendues = $btlParCaisse > 0 ? round($quantiteVendue / $btlParCaisse, 0) : 0;
             $caissesRestantes = max(0, $caissesChargees - $caissesVendues);
             $caissesRetournees = $btlParCaisse > 0 ? round($quantiteRetournee / $btlParCaisse, 0) : 0;
@@ -334,7 +335,8 @@
                         $quantiteRetournee = (int) ($chargement['quantite_retournee'] ?? 0);
                         $prixCaisse = (float) ($chargement['prix_caisse'] ?? 0);
                         $prixBouteille = $btlParCaisse > 0 && $prixCaisse > 0 ? $prixCaisse / $btlParCaisse : (float) ($chargement['prix_vente_unitaire'] ?? 0);
-                        $caissesChargees = $btlParCaisse > 0 ? round($quantiteChargee / $btlParCaisse, 0) : 0;
+                        $caissesDejaDansVehicule = (int) ($chargement['caisses_deja_dans_vehicule'] ?? 0);
+                        $caissesChargees = $caissesDejaDansVehicule + ($btlParCaisse > 0 ? round($quantiteChargee / $btlParCaisse, 0) : 0);
                         $caissesVendues = $btlParCaisse > 0 ? round($quantiteVendue / $btlParCaisse, 0) : 0;
                         $caissesRestantes = max(0, $caissesChargees - $caissesVendues);
                         $caissesRetournees = $btlParCaisse > 0 ? round($quantiteRetournee / $btlParCaisse, 0) : 0;

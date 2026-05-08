@@ -9,11 +9,13 @@ class Mission extends Model
     protected $fillable = ['numero_mission', 'vehicule_id', 'chauffeur_id', 'date_depart', 'date_retour', 'zone_id', 'notes', 'justification_cloture', 'statut', 'montant_encaisse', 'caisses_vides_retournees', 'created_by'];
 
     private static bool $justificationColumnChecked = false;
+    private static bool $chargementDepartColumnChecked = false;
 
     public function __construct()
     {
         parent::__construct();
         $this->ensureJustificationClosureColumn();
+        $this->ensureChargementDepartColumn();
     }
 
     private function ensureJustificationClosureColumn(): void
@@ -35,6 +37,27 @@ class Mission extends Model
         }
 
         self::$justificationColumnChecked = true;
+    }
+
+    private function ensureChargementDepartColumn(): void
+    {
+        if (self::$chargementDepartColumnChecked) {
+            return;
+        }
+
+        $exists = (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*)
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'mission_chargements'
+               AND COLUMN_NAME = 'caisses_deja_dans_vehicule'"
+        );
+
+        if (!$exists) {
+            $this->db->query("ALTER TABLE mission_chargements ADD caisses_deja_dans_vehicule INT NOT NULL DEFAULT 0 AFTER quantite_caisses");
+        }
+
+        self::$chargementDepartColumnChecked = true;
     }
     
     /**
@@ -198,17 +221,21 @@ class Mission extends Model
                 }
 
                 $prixCaisse = $item['prix_vente_caisses'] ?: ($item['prix_vente_unitaire'] * $item['bouteilles_par_caisses']);
+                $stockDepartCaisses = (int) ($item['caisses_deja_dans_vehicule'] ?? 0);
                 $item['quantite_caisses'] = (int) ($item['quantite_caisses'] ?? intdiv((int) $item['quantite_chargee'], $btlParCaisse));
                 $item['caisses_vendues'] = (int) intdiv((int) ($item['quantite_vendue'] ?? 0), $btlParCaisse);
+                $item['caisses_total'] = $stockDepartCaisses + $item['quantite_caisses'];
+                $item['stock_depart_bouteilles'] = $stockDepartCaisses * $btlParCaisse;
+                $item['stock_total_bouteilles'] = $item['stock_depart_bouteilles'] + (int) ($item['quantite_chargee'] ?? 0);
                 $item['montant_vendu'] = $item['caisses_vendues'] * $prixCaisse;
-                $item['sous_total'] = $item['quantite_caisses'] * $prixCaisse;
+                $item['sous_total'] = $item['caisses_total'] * $prixCaisse;
                 $total += $item['sous_total'];
-                $totalCaisses += $item['quantite_caisses'];
+                $totalCaisses += $item['caisses_total'];
             }
             $mission['total_chargement'] = $total;
             $mission['total_caisses'] = $totalCaisses;
             $mission['total_bouteilles'] = array_sum(array_map(static function ($item) {
-                return (int) ($item['quantite_chargee'] ?? 0);
+                return (int) ($item['stock_total_bouteilles'] ?? 0);
             }, $mission['chargements']));
         }
         
@@ -257,6 +284,25 @@ class Mission extends Model
                     $bouteillesParCaisse = 24;
                 }
 
+                $stockVehicule = $this->db->fetch(
+                    "SELECT quantite_pleine, caisses_pleine
+                     FROM stocks
+                     WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id
+                     LIMIT 1",
+                    [
+                        'produit_id' => $chargement['produit_id'],
+                        'emplacement_id' => $emplacementVehicule
+                    ]
+                );
+
+                $caissesDejaDansVehicule = 0;
+                if ($stockVehicule) {
+                    $caissesDejaDansVehicule = (int) ($stockVehicule['caisses_pleine'] ?? 0);
+                    if ($caissesDejaDansVehicule <= 0) {
+                        $caissesDejaDansVehicule = (int) floor(((int) ($stockVehicule['quantite_pleine'] ?? 0)) / $bouteillesParCaisse);
+                    }
+                }
+
                 $quantiteCaisses = (int) ($chargement['quantite_caisses'] ?? 0);
                 if ($quantiteCaisses <= 0) {
                     $quantiteCaisses = (int) floor(((int) ($chargement['quantite_chargee'] ?? 0)) / $bouteillesParCaisse);
@@ -265,6 +311,7 @@ class Mission extends Model
                 $quantiteBouteilles = $quantiteCaisses * $bouteillesParCaisse;
                 $chargement['quantite_caisses'] = $quantiteCaisses;
                 $chargement['quantite_chargee'] = $quantiteBouteilles;
+                $chargement['caisses_deja_dans_vehicule'] = $caissesDejaDansVehicule;
                 $chargement['prix_caisse'] = (float) ($produit['prix_vente_caisses'] ?: (($produit['prix_vente_unitaire'] ?? 0) * $bouteillesParCaisse));
                 $chargement['mission_id'] = $missionId;
                 $this->db->insert('mission_chargements', $chargement);
