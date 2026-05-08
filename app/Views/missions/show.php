@@ -96,8 +96,10 @@ ob_start();
                     <table class="table">
                         <thead>
                             <tr>
-                                <th>Produit</th>
-                                <th class="text-right">Caisses</th>
+                                <th class="text-left">Produit</th>
+                                <th class="text-right">Stock départ</th>
+                                <th class="text-right">Ajout mission</th>
+                                <th class="text-right">Total réel</th>
                                 <th class="text-right">Prix caisse</th>
                                 <th class="text-right">Sous-total</th>
                             </tr>
@@ -110,13 +112,18 @@ ob_start();
                                     $btlParCaisse = 24;
                                 }
                                 $prixCaisse = $item['prix_vente_caisses'] ?: ($item['prix_vente_unitaire'] * $btlParCaisse);
+                                $stockDepartCaisses = (int) ($item['caisses_deja_dans_vehicule'] ?? 0);
+                                $ajoutMissionCaisses = (int) ($item['quantite_caisses'] ?? 0);
+                                $totalReelCaisses = (int) ($item['caisses_total'] ?? ($stockDepartCaisses + $ajoutMissionCaisses));
                             ?>
                             <tr>
                                 <td>
                                     <div class="font-medium"><?= htmlspecialchars($item['produit_nom']) ?></div>
                                     <div class="text-xs text-gray-500"><?= htmlspecialchars($item['produit_code']) ?></div>
                                 </td>
-                                <td class="text-right"><?= number_format((int) ($item['caisses_total'] ?? $item['quantite_caisses'] ?? 0), 0, '.', ' ') ?> cs</td>
+                                <td class="text-right"><?= number_format($stockDepartCaisses, 0, '.', ' ') ?> cs</td>
+                                <td class="text-right"><?= number_format($ajoutMissionCaisses, 0, '.', ' ') ?> cs</td>
+                                <td class="text-right font-semibold text-primary-600"><?= number_format($totalReelCaisses, 0, '.', ' ') ?> cs</td>
                                 <td class="text-right"><?= format_money_converted($prixCaisse) ?></td>
                                 <td class="text-right font-medium"><?= format_money_converted($item['sous_total'] ?? 0) ?></td>
                             </tr>
@@ -124,7 +131,7 @@ ob_start();
                         </tbody>
                         <tfoot class="bg-gray-50 dark:bg-gray-700/50">
                             <tr>
-                                <td colspan="3" class="text-right font-bold">Total caisses</td>
+                                <td colspan="3" class="text-right font-bold">Total caisses réelles</td>
                                 <td class="text-right font-bold text-primary-600">
                                     <?= format_money_converted($mission['total_chargement'] ?? 0) ?>
                                 </td>
@@ -380,7 +387,9 @@ ob_start();
                                         <template x-for="(c, index) in chargements" :key="index + '-' + c.produit_id">
                                             <tr>
                                                 <td x-text="c.produit_nom"></td>
-                                                <td x-text="(c.caisses_total || c.quantite_caisses || 0) + ' cs'"></td>
+                                                <td x-text="(c.caisses_deja_dans_vehicule || 0) + ' cs'"></td>
+                                                <td x-text="(c.quantite_caisses || 0) + ' cs'"></td>
+                                                <td x-text="(c.caisses_total || c.quantite_caisses || 0) + ' cs'" class="font-semibold text-primary-600"></td>
                                                 <td x-text="(c.caisses_vendues || 0) + ' cs'"></td>
                                                 <td>
                                                     <input type="number" x-model.number="retours[c.produit_id]" class="input py-1 w-24" :max="Math.max((c.stock_total_bouteilles || 0) - (c.quantite_vendue || 0), 0)" min="0">
