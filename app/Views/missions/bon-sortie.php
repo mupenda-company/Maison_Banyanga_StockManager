@@ -27,7 +27,7 @@
     ?>
     <div class="max-w-4xl mx-auto">
         <!-- En-tête -->
-        <div class="flex justify-between items-start mb-5 border-b pb-4 gap-4">
+        <div class="grid grid-cols-3 items-start mb-5 border-b pb-4 gap-4">
             <div>
                 <?php if ($companyLogo): ?>
                 <img src="<?= $companyLogo ?>" alt="Logo" class="h-14 mb-2 object-contain">
@@ -41,12 +41,16 @@
                 <?php if (!empty($params['nif'])): ?><p class="text-xs text-gray-600">NIF: <?= htmlspecialchars($params['nif']) ?></p><?php endif; ?>
                 <?php if (!empty($params['numero_compte'])): ?><p class="text-xs text-gray-600">N° compte: <?= htmlspecialchars($params['numero_compte']) ?></p><?php endif; ?>
             </div>
-            <div class="text-center">
+            <div class="text-center self-center">
                 <h2 class="text-lg font-bold text-blue-600 uppercase">BON DE SORTIE</h2>
                 <p class="text-base font-semibold mt-1"><?= htmlspecialchars($mission['numero_mission']) ?></p>
                 <p class="text-xs text-gray-600 mt-2">
                     Date: <?= date('d/m/Y H:i', strtotime($mission['date_depart'])) ?>
                 </p>
+            </div>
+            <div class="text-right text-xs text-gray-600 self-center">
+                <p class="uppercase font-semibold tracking-wide text-gray-500">Mission</p>
+                <p class="font-semibold text-gray-900"><?= htmlspecialchars($mission['numero_mission']) ?></p>
             </div>
         </div>
         

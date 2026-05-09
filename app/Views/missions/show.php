@@ -272,6 +272,22 @@ ob_start();
                 return parseFloat(this.montant_encaisse || 0) - this.getTotalAttendu();
             },
 
+            getTotalRetoursPleinsAttendues() {
+                return (this.chargements || []).reduce((total, c) => {
+                    const totalReel = parseInt(c.caisses_total || ((c.caisses_deja_dans_vehicule || 0) + (c.quantite_caisses || 0)), 10) || 0;
+                    const vendues = parseInt(c.caisses_vendues || Math.floor((c.quantite_vendue || 0) / Math.max(parseInt(c.bouteilles_par_caisses || 24, 10) || 24, 1)), 10) || 0;
+                    return total + Math.max(totalReel - vendues, 0);
+                }, 0);
+            },
+
+            getTotalRetoursPleins() {
+                return Object.values(this.retours).reduce((total, value) => total + (parseInt(value, 10) || 0), 0);
+            },
+
+            getRetoursPleinEcart() {
+                return this.getTotalRetoursPleinsAttendues() - this.getTotalRetoursPleins();
+            },
+
             getCaissesVidesAttendues() {
                 return parseInt(this.missionSummary.caissesVidesAttendues || 0, 10);
             },
@@ -285,7 +301,7 @@ ob_start();
             },
 
             hasDiscrepancy() {
-                return Math.abs(this.getMontantEcart()) > 0.01 || this.getCaissesVidesEcart() !== 0;
+                return Math.abs(this.getMontantEcart()) > 0.01 || this.getRetoursPleinEcart() !== 0 || this.getCaissesVidesEcart() !== 0;
             },
 
             getClosureMessage() {
@@ -377,22 +393,20 @@ ob_start();
                                     <thead>
                                         <tr>
                                             <th>Produit</th>
-                                            <th>Stock départ</th>
-                                            <th>Ajout mission</th>
                                             <th>Total réel</th>
-                                            <th>Retours (btl)</th>
-                                            <th>Caisses vides retournées</th>
+                                            <th>Total vendu</th>
+                                            <th>Retours plein</th>
+                                            <th>Retour vide</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <template x-for="(c, index) in chargements" :key="index + '-' + c.produit_id">
                                             <tr>
                                                 <td x-text="c.produit_nom"></td>
-                                                <td x-text="(c.caisses_deja_dans_vehicule || 0) + ' cs'"></td>
-                                                <td x-text="(c.quantite_caisses || 0) + ' cs'"></td>
                                                 <td x-text="(c.caisses_total || ((c.caisses_deja_dans_vehicule || 0) + (c.quantite_caisses || 0))) + ' cs'" class="font-semibold text-primary-600"></td>
+                                                <td x-text="(c.caisses_vendues || Math.floor((c.quantite_vendue || 0) / Math.max(parseInt(c.bouteilles_par_caisses || 24, 10) || 24, 1))) + ' cs'"></td>
                                                 <td>
-                                                    <input type="number" x-model.number="retours[c.produit_id]" class="input py-1 w-24" :max="Math.max((c.stock_total_bouteilles || 0) - (c.quantite_vendue || 0), 0)" min="0">
+                                                    <input type="number" x-model.number="retours[c.produit_id]" class="input py-1 w-24" :max="Math.max((c.caisses_total || ((c.caisses_deja_dans_vehicule || 0) + (c.quantite_caisses || 0))) - (c.caisses_vendues || Math.floor((c.quantite_vendue || 0) / Math.max(parseInt(c.bouteilles_par_caisses || 24, 10) || 24, 1))), 0)" min="0">
                                                 </td>
                                                 <td>
                                                     <input type="number" x-model.number="vides_retournes[c.produit_id]" class="input py-1 w-24" min="0">

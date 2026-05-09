@@ -235,6 +235,20 @@ class MissionController extends Controller
                 $retours[$produitId] = (int) $quantite;
             }
         }
+
+        $retoursPleinsAttendues = 0;
+        if (!empty($mission['chargements']) && is_array($mission['chargements'])) {
+            foreach ($mission['chargements'] as $chargement) {
+                $totalReel = (int) ($chargement['caisses_total'] ?? (($chargement['caisses_deja_dans_vehicule'] ?? 0) + ($chargement['quantite_caisses'] ?? 0)));
+                $vendues = (int) ($chargement['caisses_vendues'] ?? floor(((int) ($chargement['quantite_vendue'] ?? 0)) / max((int) ($chargement['bouteilles_par_caisses'] ?? 24), 1)));
+                $retoursPleinsAttendues += max($totalReel - $vendues, 0);
+            }
+        }
+
+        $retoursPleinsRetournes = 0;
+        foreach ($retours as $quantite) {
+            $retoursPleinsRetournes += max((int) $quantite, 0);
+        }
         
         // Préparer les retours de caisses vides
         $vides_retournes = [];
@@ -257,16 +271,18 @@ class MissionController extends Controller
         }
 
         $montantEcart = round($montant_encaisse - $montant_attendu, 2);
+        $retoursPleinsEcart = $retoursPleinsAttendues - $retoursPleinsRetournes;
         $caissesEcart = $caissesVidesAttendues - $caissesVidesRetournees;
-        $hasDiscrepancy = abs($montantEcart) > 0.01 || $caissesEcart !== 0;
+        $hasDiscrepancy = abs($montantEcart) > 0.01 || $retoursPleinsEcart !== 0 || $caissesEcart !== 0;
         $justificationCloture = trim((string) ($data['justification_cloture'] ?? ''));
 
         if ($hasDiscrepancy && $justificationCloture === '') {
             return $this->error(
-                'Une justification est obligatoire lorsqu’il y a un écart entre le montant attendu et le montant encaissé, ou entre les caisses vides attendues et retournées.',
+                'Une justification est obligatoire lorsqu’il y a un écart entre le montant attendu et le montant encaissé, les retours pleins attendus et retournés, ou les caisses vides attendues et retournées.',
                 422,
                 [
                     'montant_ecart' => $montantEcart,
+                    'retours_pleins_ecart' => $retoursPleinsEcart,
                     'caisses_vides_ecart' => $caissesEcart,
                 ]
             );

@@ -124,6 +124,7 @@
         $totalCaissesVendues = 0;
         $totalCaissesRestantes = 0;
         $totalCaissesRetournees = 0;
+        $totalValeurEstimee = 0;
 
         foreach ($chargements as $chargement) {
             $btlParCaisse = (int) ($chargement['bouteilles_par_caisses'] ?? 24);
@@ -137,11 +138,13 @@
             $caissesVendues = $btlParCaisse > 0 ? round($quantiteVendue / $btlParCaisse, 0) : 0;
             $caissesRestantes = max(0, $caissesChargees - $caissesVendues);
             $caissesRetournees = $btlParCaisse > 0 ? round($quantiteRetournee / $btlParCaisse, 0) : 0;
+            $valeurEstimee = $caissesRestantes * $prixCaisse;
 
             $totalCaissesChargees += $caissesChargees;
             $totalCaissesVendues += $caissesVendues;
             $totalCaissesRestantes += $caissesRestantes;
             $totalCaissesRetournees += $caissesRetournees;
+            $totalValeurEstimee += $valeurEstimee;
         }
 
         $montantAttendu = (float) ($mission['montant_attendu'] ?? 0);
@@ -153,26 +156,15 @@
         $justificationCloture = trim((string) ($mission['justification_cloture'] ?? ''));
         $hasDiscrepancy = abs($montantEcart) > 0.01 || $caissesVidesEcart !== 0;
 
-        $renderMissionFooter = function () use ($mission, $totalCaissesChargees, $totalCaissesVendues, $totalCaissesRestantes, $totalCaissesRetournees, $totalRendu) {
+        $renderMissionFooter = function () use ($totalCaissesChargees, $totalCaissesVendues, $totalCaissesRestantes, $totalValeurEstimee) {
             ?>
-            <div class="p-3 border rounded-lg bg-gray-50 text-sm mt-3">
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-2">
-                    <div class="flex items-center justify-between gap-3 rounded border border-gray-200 bg-white px-3 py-2">
-                        <p class="text-gray-500 uppercase text-[11px] leading-tight">Total chargés</p>
-                        <p class="font-bold whitespace-nowrap"><?= number_format($totalCaissesChargees, 0, ',', ' ') ?> cs</p>
-                    </div>
-                    <div class="flex items-center justify-between gap-3 rounded border border-gray-200 bg-white px-3 py-2">
-                        <p class="text-gray-500 uppercase text-[11px] leading-tight">Total vendus</p>
-                        <p class="font-bold whitespace-nowrap"><?= number_format($totalCaissesVendues, 0, ',', ' ') ?> cs</p>
-                    </div>
-                    <div class="flex items-center justify-between gap-3 rounded border border-gray-200 bg-white px-3 py-2">
-                        <p class="text-gray-500 uppercase text-[11px] leading-tight">Total restants</p>
-                        <p class="font-bold whitespace-nowrap"><?= number_format($totalCaissesRestantes, 0, ',', ' ') ?> cs</p>
-                    </div>
-                    <div class="flex items-center justify-between gap-3 rounded border border-gray-200 bg-white px-3 py-2">
-                        <p class="text-gray-500 uppercase text-[11px] leading-tight">Total retournés</p>
-                        <p class="font-bold whitespace-nowrap"><?= number_format($totalCaissesRetournees, 0, ',', ' ') ?> cs</p>
-                    </div>
+            <div class="mt-3 border-t border-gray-200 pt-2 text-sm">
+                <div class="grid grid-cols-5 gap-2 items-center rounded-md bg-gray-50 px-3 py-2">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-gray-600">Total</div>
+                    <div class="text-right font-bold whitespace-nowrap"><?= number_format($totalCaissesChargees, 0, ',', ' ') ?> cs</div>
+                    <div class="text-right font-bold whitespace-nowrap"><?= number_format($totalCaissesVendues, 0, ',', ' ') ?> cs</div>
+                    <div class="text-right font-bold whitespace-nowrap"><?= number_format($totalCaissesRestantes, 0, ',', ' ') ?> cs</div>
+                    <div class="text-right font-bold whitespace-nowrap text-primary-600"><?= format_money_converted($totalValeurEstimee) ?></div>
                 </div>
             </div>
 
@@ -197,7 +189,7 @@
         };
     ?>
     <div class="max-w-4xl mx-auto space-y-5">
-        <div class="flex justify-between items-start gap-4 mb-6 border-b pb-4 bg-white rounded-lg p-4 shadow-sm">
+        <div class="grid grid-cols-3 gap-4 items-start mb-6 border-b pb-4 bg-white rounded-lg p-4 shadow-sm">
             <div>
                 <?php if ($companyLogo): ?>
                 <img src="<?= $companyLogo ?>" alt="Logo" class="h-12 mb-1 object-contain">
@@ -215,13 +207,17 @@
                     </p>
                 </div>
             </div>
-            <div class="text-center leading-tight">
+            <div class="text-center leading-tight self-center">
                 <h2 class="text-lg font-bold text-blue-600 uppercase">Facture de fin de mission</h2>
                 <p class="text-sm font-semibold mt-1"><?= htmlspecialchars($mission['numero_mission'] ?? '') ?></p>
                 <p class="text-xs text-gray-600 mt-1 flex flex-col items-center gap-0.5">
                     <span>Départ: <?= !empty($mission['date_depart']) ? date('d/m/Y H:i', strtotime($mission['date_depart'])) : '-' ?></span>
                     <span>Retour: <?= !empty($mission['date_retour']) ? date('d/m/Y H:i', strtotime($mission['date_retour'])) : '-' ?></span>
                 </p>
+            </div>
+            <div class="text-right text-xs text-gray-600 self-center">
+                <p class="uppercase font-semibold tracking-wide text-gray-500">Mission</p>
+                <p class="font-semibold text-gray-900"><?= htmlspecialchars($mission['numero_mission'] ?? '') ?></p>
             </div>
         </div>
 
@@ -323,7 +319,7 @@
                         $caissesChargees = $caissesDejaDansVehicule + ($btlParCaisse > 0 ? round($quantiteChargee / $btlParCaisse, 0) : 0);
                         $caissesVendues = $btlParCaisse > 0 ? round($quantiteVendue / $btlParCaisse, 0) : 0;
                         $caissesRestantes = max(0, $caissesChargees - $caissesVendues);
-                        $valeurEstimee = $caissesChargees * $prixCaisse;
+                        $valeurEstimee = $caissesRestantes * $prixCaisse;
                     ?>
                     <tr>
                         <td class="py-1.5 font-medium leading-tight"><?= htmlspecialchars($chargement['produit_nom'] ?? '') ?></td>

@@ -77,7 +77,7 @@ ob_start();
             <div>
                 <p class="stat-label">Alertes stock</p>
                 <p class="stat-value text-red-600 dark:text-red-400">
-                    <?= count($produitsAlerte) ?>
+                    <?= $nbProduitsAlerte ?? count($produitsAlerte) ?>
                 </p>
             </div>
             <div class="w-12 h-12 bg-red-100 dark:bg-red-900/50 rounded-full flex items-center justify-center">

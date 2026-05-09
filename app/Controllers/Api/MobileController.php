@@ -102,15 +102,31 @@ class MobileController extends Controller {
             return $this->error('Mission clôturée', 409);
         }
 
+        $hasCaissesDejaColumn = (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*)
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'mission_chargements'
+               AND COLUMN_NAME = 'caisses_deja_dans_vehicule'"
+        );
+
+        $stockInitialCaissesExpr = $hasCaissesDejaColumn
+            ? 'COALESCE(mc.caisses_deja_dans_vehicule, 0)'
+            : '0';
+        $stockInitialBouteillesExpr = $hasCaissesDejaColumn
+            ? '(COALESCE(mc.caisses_deja_dans_vehicule, 0) * COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))'
+            : '0';
+
         $sql = "SELECT p.id, p.nom, p.code, p.bouteilles_par_caisses,
                        p.prix_vente_unitaire, p.prix_vente_caisses,
+                       {$stockInitialCaissesExpr} as caisses_deja_dans_vehicule,
                        mc.quantite_caisses,
                        mc.quantite_chargee,
                        IFNULL(mc.quantite_vendue, 0) as quantite_vendue,
-                       (IFNULL(mc.quantite_caisses, FLOOR(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))) -
+                       (({$stockInitialCaissesExpr} + IFNULL(mc.quantite_caisses, FLOOR(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24)))) -
                         FLOOR(IFNULL(mc.quantite_vendue, 0) / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))) as stock_actuel_caisses,
-                       (mc.quantite_chargee - IFNULL(mc.quantite_vendue, 0)) as stock_actuel_bouteilles,
-                       (IFNULL(mc.quantite_caisses, FLOOR(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))) -
+                       (($stockInitialBouteillesExpr) + IFNULL(mc.quantite_chargee, 0) - IFNULL(mc.quantite_vendue, 0)) as stock_actuel_bouteilles,
+                       (({$stockInitialCaissesExpr} + IFNULL(mc.quantite_caisses, FLOOR(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24)))) -
                         FLOOR(IFNULL(mc.quantite_vendue, 0) / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))) as stock_actuel
                 FROM mission_chargements mc
                 JOIN produits p ON mc.produit_id = p.id
@@ -386,6 +402,11 @@ class MobileController extends Controller {
                     throw new Exception('Produit non trouvé');
                 }
 
+                $bouteillesParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+                if ($bouteillesParCaisse <= 0) {
+                    $bouteillesParCaisse = 24;
+                }
+
                 // Verrouiller la ligne pour éviter les ventes concurrentes sur le même chargement
                 $chargement = $this->db->fetch(
                     "SELECT quantite_chargee, IFNULL(quantite_vendue, 0) as quantite_vendue
@@ -399,13 +420,34 @@ class MobileController extends Controller {
                     throw new Exception('Chargement mission introuvable pour ce produit');
                 }
 
-                $stockActuelMission = (float) $chargement['quantite_chargee'] - (float) $chargement['quantite_vendue'];
+                $stockVehicule = $this->db->fetch(
+                    "SELECT quantite_pleine, caisses_pleine
+                     FROM stocks
+                     WHERE produit_id = :p AND emplacement_id = :e
+                     LIMIT 1
+                     FOR UPDATE",
+                    [
+                        'p' => $produitId,
+                        'e' => (int) $emplacementVehiculeId
+                    ]
+                );
+
+                if ($stockVehicule) {
+                    $stockActuelMission = (float) ($stockVehicule['quantite_pleine'] ?? 0);
+                } else {
+                    $caissesDejaDansVehicule = (int) ($chargement['caisses_deja_dans_vehicule'] ?? 0);
+                    $stockActuelMission = ($caissesDejaDansVehicule * $bouteillesParCaisse)
+                        + (float) ($chargement['quantite_chargee'] ?? 0)
+                        - (float) ($chargement['quantite_vendue'] ?? 0);
+                }
+
                 if ($quantite > $stockActuelMission) {
-                    throw new Exception('Stock mission insuffisant');
+                    $disponibleCs = max($stockActuelMission / $bouteillesParCaisse, 0);
+                    throw new Exception('Stock mission insuffisant. Disponible: ' . number_format($disponibleCs, 1) . ' cs');
                 }
 
                 if ($quantiteCaisses <= 0) {
-                    $quantiteCaisses = (int) floor($quantite / $produit['bouteilles_par_caisses']);
+                    $quantiteCaisses = (int) floor($quantite / $bouteillesParCaisse);
                 }
                 if ($quantiteCaisses <= 0) {
                     throw new Exception('Quantité de caisses invalide');
@@ -415,24 +457,24 @@ class MobileController extends Controller {
                 if ($prixCaisseInput === null || $prixCaisseInput === '') {
                     $prixCaisseBase = (float) ($produit['prix_vente_caisses'] ?? 0);
                     if ($prixCaisseBase <= 0) {
-                        $prixCaisseBase = (float) (($produit['prix_vente_unitaire'] ?? 0) * ($produit['bouteilles_par_caisses'] ?: 24));
+                        $prixCaisseBase = (float) (($produit['prix_vente_unitaire'] ?? 0) * $bouteillesParCaisse);
                     }
                 } else {
                     $prixCaisseBase = convert_money((float) $prixCaisseInput, $fromDevise, $toDevise);
                 }
 
-                $prixUnitaireBase = $prixCaisseBase / ($produit['bouteilles_par_caisses'] ?: 24);
+                $prixUnitaireBase = $prixCaisseBase / $bouteillesParCaisse;
                 $sousTotal = $quantiteCaisses * $prixCaisseBase;
                 $totalHt += $sousTotal;
 
                 $details[] = [
                     'produit_id' => $produitId,
                     'quantite_caisses' => $quantiteCaisses,
-                    'quantite' => $quantiteCaisses * (int) ($produit['bouteilles_par_caisses'] ?: 24),
+                    'quantite' => $quantiteCaisses * $bouteillesParCaisse,
                     'prix_unitaire' => $prixUnitaireBase,
                     'prix_caisse' => $prixCaisseBase,
                     'sous_total' => $sousTotal,
-                    'bouteilles_par_caisses' => (float) ($produit['bouteilles_par_caisses'] ?: 24)
+                    'bouteilles_par_caisses' => (float) $bouteillesParCaisse
                 ];
             }
 
