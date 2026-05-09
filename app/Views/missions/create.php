@@ -24,6 +24,9 @@ ob_start();
                     zones: [],
                     loading: false,
                     loadingVehiculeStock: false,
+                    getProduit(produitId) {
+                        return this.produits.find(p => String(p.id) === String(produitId)) || null;
+                    },
                     newChargement() {
                         return { produit_id: '', quantite: 0, quantite_caisses: 0, stock_depart_caisses: 0, stock_depart_bouteilles: 0, auto_vehicle_stock: false };
                     },
@@ -43,6 +46,8 @@ ob_start();
                                 .filter((item) => parseFloat(item.caisses_pleine || 0) > 0 || parseFloat(item.quantite_pleine || 0) > 0)
                                 .map((item) => ({
                                     produit_id: String(item.produit_id),
+                                    produit_nom: item.produit_nom || '',
+                                    produit_code: item.produit_code || '',
                                     quantite: 0,
                                     quantite_caisses: 0,
                                     stock_depart_caisses: parseFloat(item.caisses_pleine || 0),
@@ -191,21 +196,25 @@ ob_start();
                             </thead>
                             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                 <template x-for="(chargement, index) in chargements" :key="index">
-                                    <tr x-data="{ 
-                                        get selectedProduit() { 
-                                            return produits.find(p => p.id == chargement.produit_id) || null 
-                                        }
-                                    }">
+                                    <tr>
                                         <td class="px-4 py-2">
                                             <div class="space-y-1">
-                                                <select x-model="chargement.produit_id" class="input w-full" :disabled="chargement.auto_vehicle_stock" required>
-                                                    <option value="">Sélectionner un produit</option>
-                                                    <template x-for="p in produits" :key="p.id">
-                                                        <option :value="p.id" x-text="p.nom + ' (' + p.code + ')' "></option>
-                                                    </template>
-                                                </select>
                                                 <template x-if="chargement.auto_vehicle_stock">
-                                                    <p class="text-xs text-emerald-600 font-medium">Ligne issue du stock du véhicule</p>
+                                                    <div>
+                                                        <div class="input w-full bg-gray-50 dark:bg-gray-700/50 flex items-center justify-between gap-3">
+                                                            <span class="font-medium" x-text="chargement.produit_nom || 'Produit du véhicule'"></span>
+                                                            <span class="text-xs text-gray-500" x-text="chargement.produit_code || ''"></span>
+                                                        </div>
+                                                        <p class="text-xs text-emerald-600 font-medium mt-1">Ligne issue du stock du véhicule</p>
+                                                    </div>
+                                                </template>
+                                                <template x-if="!chargement.auto_vehicle_stock">
+                                                    <select x-model="chargement.produit_id" class="input w-full" required>
+                                                        <option value="">Sélectionner un produit</option>
+                                                        <template x-for="p in produits" :key="p.id">
+                                                            <option :value="p.id" x-text="p.nom + ' (' + p.code + ')' "></option>
+                                                        </template>
+                                                    </select>
                                                 </template>
                                             </div>
                                         </td>
@@ -217,18 +226,24 @@ ob_start();
                                                 </div>
                                             </template>
                                             <template x-if="!chargement.auto_vehicle_stock">
-                                                <span class="text-gray-400">-</span>
+                                                <template x-if="getProduit(chargement.produit_id)">
+                                                    <div class="flex flex-col">
+                                                        <span class="font-bold text-primary-600" x-text="Math.round(parseFloat(getProduit(chargement.produit_id).stock_caisses_pleine || 0)) + ' cs'"></span>
+                                                        <span class="text-xs text-gray-400" x-text="'(' + Math.round(parseFloat(getProduit(chargement.produit_id).stock_plein || 0)) + ' btl)'"></span>
+                                                    </div>
+                                                </template>
+                                                <span class="text-gray-400" x-show="!getProduit(chargement.produit_id)">-</span>
                                             </template>
                                         </td>
                                         <td class="px-4 py-2">
                                             <div class="flex items-center space-x-2">
                                                 <input type="number" x-model.number="chargement.quantite_caisses" 
-                                                       @input="if(selectedProduit) chargement.quantite = Math.round(chargement.quantite_caisses) * selectedProduit.bouteilles_par_caisses; chargement.quantite_caisses = Math.round(chargement.quantite_caisses || 0)"
-                                                       class="input w-24" min="0" step="1" placeholder="Caisses">
+                                                       @input="const produit = getProduit(chargement.produit_id); if (produit) { chargement.quantite = Math.round(chargement.quantite_caisses || 0) * (parseInt(produit.bouteilles_par_caisses || 24)); } chargement.quantite_caisses = Math.max(0, Math.round(chargement.quantite_caisses || 0));"
+                                                       class="input w-24" min="0" step="1" :max="Math.round(parseFloat(chargement.auto_vehicle_stock ? (chargement.stock_depart_caisses || 0) : (getProduit(chargement.produit_id) ? getProduit(chargement.produit_id).stock_caisses_pleine : 0)))" placeholder="Caisses">
                                                 <span class="text-xs text-gray-500">=</span>
                                                 <input type="number" x-model.number="chargement.quantite" 
-                                                       @input="if(selectedProduit) { chargement.quantite = Math.round(chargement.quantite || 0); chargement.quantite_caisses = Math.round(chargement.quantite / selectedProduit.bouteilles_par_caisses) }"
-                                                       class="input w-24" min="0" step="1" placeholder="Btl">
+                                                       @input="const produit = getProduit(chargement.produit_id); if (produit) { chargement.quantite = Math.max(0, Math.round(chargement.quantite || 0)); chargement.quantite_caisses = Math.round(chargement.quantite / (parseInt(produit.bouteilles_par_caisses || 24))); }"
+                                                       class="input w-24" min="0" step="1" :max="Math.round(parseFloat(chargement.auto_vehicle_stock ? (chargement.stock_depart_bouteilles || 0) : (getProduit(chargement.produit_id) ? getProduit(chargement.produit_id).stock_plein : 0)))" placeholder="Btl">
                                             </div>
                                         </td>
                                         <td class="px-4 py-2">

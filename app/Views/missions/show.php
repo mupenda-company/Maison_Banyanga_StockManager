@@ -377,9 +377,10 @@ ob_start();
                                     <thead>
                                         <tr>
                                             <th>Produit</th>
-                                            <th>Chargé (caisses)</th>
-                                            <th>Vendu</th>
-                                            <th>Invendus (btl)</th>
+                                            <th>Stock départ</th>
+                                            <th>Ajout mission</th>
+                                            <th>Total réel</th>
+                                            <th>Retours (btl)</th>
                                             <th>Caisses vides retournées</th>
                                         </tr>
                                     </thead>
@@ -389,8 +390,7 @@ ob_start();
                                                 <td x-text="c.produit_nom"></td>
                                                 <td x-text="(c.caisses_deja_dans_vehicule || 0) + ' cs'"></td>
                                                 <td x-text="(c.quantite_caisses || 0) + ' cs'"></td>
-                                                <td x-text="(c.caisses_total || c.quantite_caisses || 0) + ' cs'" class="font-semibold text-primary-600"></td>
-                                                <td x-text="(c.caisses_vendues || 0) + ' cs'"></td>
+                                                <td x-text="(c.caisses_total || ((c.caisses_deja_dans_vehicule || 0) + (c.quantite_caisses || 0))) + ' cs'" class="font-semibold text-primary-600"></td>
                                                 <td>
                                                     <input type="number" x-model.number="retours[c.produit_id]" class="input py-1 w-24" :max="Math.max((c.stock_total_bouteilles || 0) - (c.quantite_vendue || 0), 0)" min="0">
                                                 </td>

@@ -124,7 +124,6 @@
         $totalCaissesVendues = 0;
         $totalCaissesRestantes = 0;
         $totalCaissesRetournees = 0;
-        $totalRendu = 0;
 
         foreach ($chargements as $chargement) {
             $btlParCaisse = (int) ($chargement['bouteilles_par_caisses'] ?? 24);
@@ -143,7 +142,6 @@
             $totalCaissesVendues += $caissesVendues;
             $totalCaissesRestantes += $caissesRestantes;
             $totalCaissesRetournees += $caissesRetournees;
-            $totalRendu += $quantiteRetournee * $prixBouteille;
         }
 
         $montantAttendu = (float) ($mission['montant_attendu'] ?? 0);
@@ -175,19 +173,8 @@
                         <p class="text-gray-500 uppercase text-[11px] leading-tight">Total retournés</p>
                         <p class="font-bold whitespace-nowrap"><?= number_format($totalCaissesRetournees, 0, ',', ' ') ?> cs</p>
                     </div>
-                    <div class="flex items-center justify-between gap-3 rounded border border-gray-200 bg-white px-3 py-2">
-                        <p class="text-gray-500 uppercase text-[11px] leading-tight">Valeur des retours</p>
-                        <p class="font-bold text-base whitespace-nowrap"><?= format_money_converted($totalRendu) ?></p>
-                    </div>
                 </div>
             </div>
-
-            <?php if (!empty($mission['notes'])): ?>
-            <div class="mt-3 p-3 bg-gray-50 rounded-lg border text-sm">
-                <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Notes</h4>
-                <p class="text-gray-700"><?= htmlspecialchars($mission['notes']) ?></p>
-            </div>
-            <?php endif; ?>
 
             <div class="grid grid-cols-3 gap-4 mt-6 pt-4 border-t">
                 <div class="text-center">
@@ -228,10 +215,10 @@
                     </p>
                 </div>
             </div>
-            <div class="text-right leading-tight">
+            <div class="text-center leading-tight">
                 <h2 class="text-lg font-bold text-blue-600 uppercase">Facture de fin de mission</h2>
                 <p class="text-sm font-semibold mt-1"><?= htmlspecialchars($mission['numero_mission'] ?? '') ?></p>
-                <p class="text-xs text-gray-600 mt-1 flex flex-col items-end gap-0.5">
+                <p class="text-xs text-gray-600 mt-1 flex flex-col items-center gap-0.5">
                     <span>Départ: <?= !empty($mission['date_depart']) ? date('d/m/Y H:i', strtotime($mission['date_depart'])) : '-' ?></span>
                     <span>Retour: <?= !empty($mission['date_retour']) ? date('d/m/Y H:i', strtotime($mission['date_retour'])) : '-' ?></span>
                 </p>
@@ -322,7 +309,6 @@
                         <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Chargé</th>
                         <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Vendu</th>
                         <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Restant</th>
-                        <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Retourné</th>
                         <th class="text-right py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Valeur estimée</th>
                     </tr>
                 </thead>
@@ -332,23 +318,19 @@
                         $btlParCaisse = (int) ($chargement['bouteilles_par_caisses'] ?? 24);
                         $quantiteChargee = (int) ($chargement['quantite_chargee'] ?? 0);
                         $quantiteVendue = (int) ($chargement['quantite_vendue'] ?? 0);
-                        $quantiteRetournee = (int) ($chargement['quantite_retournee'] ?? 0);
                         $prixCaisse = (float) ($chargement['prix_caisse'] ?? 0);
-                        $prixBouteille = $btlParCaisse > 0 && $prixCaisse > 0 ? $prixCaisse / $btlParCaisse : (float) ($chargement['prix_vente_unitaire'] ?? 0);
                         $caissesDejaDansVehicule = (int) ($chargement['caisses_deja_dans_vehicule'] ?? 0);
                         $caissesChargees = $caissesDejaDansVehicule + ($btlParCaisse > 0 ? round($quantiteChargee / $btlParCaisse, 0) : 0);
                         $caissesVendues = $btlParCaisse > 0 ? round($quantiteVendue / $btlParCaisse, 0) : 0;
                         $caissesRestantes = max(0, $caissesChargees - $caissesVendues);
-                        $caissesRetournees = $btlParCaisse > 0 ? round($quantiteRetournee / $btlParCaisse, 0) : 0;
-                        $valeurRetour = $quantiteRetournee * $prixBouteille;
+                        $valeurEstimee = $caissesChargees * $prixCaisse;
                     ?>
                     <tr>
                         <td class="py-1.5 font-medium leading-tight"><?= htmlspecialchars($chargement['produit_nom'] ?? '') ?></td>
                         <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesChargees, 0, ',', ' ') ?> cs</td>
                         <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesVendues, 0, ',', ' ') ?> cs</td>
                         <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesRestantes, 0, ',', ' ') ?> cs</td>
-                        <td class="py-1.5 text-center font-semibold whitespace-nowrap"><?= number_format($caissesRetournees, 0, ',', ' ') ?> cs</td>
-                        <td class="py-1.5 text-right whitespace-nowrap"><?= format_money_converted($valeurRetour) ?></td>
+                        <td class="py-1.5 text-right whitespace-nowrap"><?= format_money_converted($valeurEstimee) ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>

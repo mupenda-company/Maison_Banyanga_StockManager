@@ -41,8 +41,8 @@
                 <?php if (!empty($params['nif'])): ?><p class="text-xs text-gray-600">NIF: <?= htmlspecialchars($params['nif']) ?></p><?php endif; ?>
                 <?php if (!empty($params['numero_compte'])): ?><p class="text-xs text-gray-600">N° compte: <?= htmlspecialchars($params['numero_compte']) ?></p><?php endif; ?>
             </div>
-            <div class="text-right">
-                <h2 class="text-lg font-bold text-blue-600">BON DE SORTIE</h2>
+            <div class="text-center">
+                <h2 class="text-lg font-bold text-blue-600 uppercase">BON DE SORTIE</h2>
                 <p class="text-base font-semibold mt-1"><?= htmlspecialchars($mission['numero_mission']) ?></p>
                 <p class="text-xs text-gray-600 mt-2">
                     Date: <?= date('d/m/Y H:i', strtotime($mission['date_depart'])) ?>

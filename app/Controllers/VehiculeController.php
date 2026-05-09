@@ -92,11 +92,12 @@ class VehiculeController extends Controller
         // Stats du mois
         $stats = $this->db->fetch(
             "SELECT COUNT(DISTINCT m.id) as nb_missions, 
-                    COALESCE(SUM(vd.quantite), 0) as total_livre,
+                    COALESCE(SUM(COALESCE(vd.quantite_caisses, CASE WHEN p.bouteilles_par_caisses > 0 THEN FLOOR(vd.quantite / p.bouteilles_par_caisses) ELSE vd.quantite END)), 0) as total_livre,
                     COALESCE(SUM(vd.quantite * vd.prix_unitaire), 0) as total_ca
              FROM missions m
              LEFT JOIN ventes v ON m.id = v.mission_id
              LEFT JOIN vente_details vd ON v.id = vd.vente_id
+             LEFT JOIN produits p ON vd.produit_id = p.id
              WHERE m.vehicule_id = :vehicule_id 
              AND m.statut = 'terminee'
              AND v.statut = 'validee'
