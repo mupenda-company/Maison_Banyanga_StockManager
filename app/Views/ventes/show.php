@@ -56,6 +56,8 @@ ob_start();
                             <tr>
                                 <th>Produit</th>
                                 <th class="text-right">Quantité (Caisses)</th>
+                                <th class="text-right">Emballages reçus</th>
+                                <th class="text-right">Dette</th>
                                 <th class="text-right">Prix par Caisse</th>
                                 <th class="text-right">Sous-total</th>
                             </tr>
@@ -64,6 +66,8 @@ ob_start();
                             <?php foreach ($vente['details'] as $detail): 
                                 $btlParCaisse = (int)($detail['bouteilles_par_caisses'] ?? 24);
                                 $caisses = intdiv((int)$detail['quantite'], $btlParCaisse);
+                                $caissesVidesRecues = (int)($detail['caisses_vides_recues'] ?? 0);
+                                $detteCaisses = max(0, $caisses - $caissesVidesRecues);
                                 $prixCaisse = $detail['prix_unitaire'] * $btlParCaisse;
                             ?>
                             <tr>
@@ -76,6 +80,12 @@ ob_start();
                                     <div class="text-[10px] text-gray-400 italic"><?= number_format($detail['quantite']) ?> btl</div>
                                 </td>
                                 <td class="text-right font-medium">
+                                    <?= number_format($caissesVidesRecues, 0, '.', ' ') ?> cs
+                                </td>
+                                <td class="text-right font-bold <?= $detteCaisses > 0 ? 'text-red-600' : 'text-green-600' ?>">
+                                    <?= number_format($detteCaisses, 0, '.', ' ') ?> cs
+                                </td>
+                                <td class="text-right font-medium">
                                     <?= format_money_converted($prixCaisse) ?>
                                 </td>
                                 <td class="text-right font-bold text-primary-600">
@@ -86,19 +96,41 @@ ob_start();
                         </tbody>
                         <tfoot class="bg-gray-50 dark:bg-gray-700/50">
                             <tr>
-                                <td colspan="3" class="text-right font-medium text-gray-600 dark:text-gray-400">Total HT</td>
+                                <td colspan="5" class="text-right font-medium text-gray-600 dark:text-gray-400">Total HT</td>
                                 <td class="text-right font-bold text-gray-900 dark:text-white"><?= format_money_converted($vente['total_ht'] ?? 0) ?></td>
                             </tr>
                             <tr>
-                                <td colspan="3" class="text-right font-medium text-gray-600 dark:text-gray-400">TVA (<?= number_format($vente['total_tva'] / ($vente['total_ht'] ?: 1) * 100, 0) ?>%)</td>
+                                <td colspan="5" class="text-right font-medium text-gray-600 dark:text-gray-400">TVA (<?= number_format($vente['total_tva'] / ($vente['total_ht'] ?: 1) * 100, 0) ?>%)</td>
                                 <td class="text-right font-bold text-gray-900 dark:text-white"><?= format_money_converted($vente['total_tva'] ?? 0) ?></td>
                             </tr>
                             <tr class="bg-primary-50 dark:bg-primary-900/20">
-                                <td colspan="3" class="text-right font-bold text-lg text-primary-900 dark:text-primary-100 uppercase tracking-wider">Total TTC</td>
+                                <td colspan="5" class="text-right font-bold text-lg text-primary-900 dark:text-primary-100 uppercase tracking-wider">Total TTC</td>
                                 <td class="text-right font-bold text-xl text-primary-600 dark:text-primary-400"><?= format_money_converted($vente['total_ttc'] ?? 0) ?></td>
                             </tr>
                         </tfoot>
                     </table>
+                </div>
+
+                <?php
+                    $totalCaissesVidesRecues = 0;
+                    $totalDetteCaisses = 0;
+                    foreach ($vente['details'] as $detail) {
+                        $btlParCaisse = (int)($detail['bouteilles_par_caisses'] ?? 24);
+                        $caisses = intdiv((int)$detail['quantite'], $btlParCaisse);
+                        $caissesVidesRecues = (int)($detail['caisses_vides_recues'] ?? 0);
+                        $totalCaissesVidesRecues += $caissesVidesRecues;
+                        $totalDetteCaisses += max(0, $caisses - $caissesVidesRecues);
+                    }
+                ?>
+                <div class="p-4 border-t border-gray-200 dark:border-gray-700 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4">
+                        <p class="text-xs uppercase text-gray-500">Emballages reçus</p>
+                        <p class="text-2xl font-bold text-blue-600"><?= number_format($totalCaissesVidesRecues, 0, '.', ' ') ?> cs</p>
+                    </div>
+                    <div class="rounded-lg bg-red-50 dark:bg-red-900/20 p-4">
+                        <p class="text-xs uppercase text-gray-500">Emballages dus</p>
+                        <p class="text-2xl font-bold text-red-600"><?= number_format($totalDetteCaisses, 0, '.', ' ') ?> cs</p>
+                    </div>
                 </div>
                 
                 <?php if (!empty($vente['notes'])): ?>

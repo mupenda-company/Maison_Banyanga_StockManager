@@ -96,13 +96,22 @@ class VenteController extends Controller
         
         foreach ($data['details'] as $detail) {
             $produit = $this->produitModel->find($detail['produit_id']);
+            $quantiteCaisses = max(0, (int) ($detail['quantite_caisses'] ?? round(((int) ($detail['quantite'] ?? 0)) / max(1, (int) ($produit['bouteilles_par_caisses'] ?? 24)))));
+            $caissesVidesRecues = max(0, (int) ($detail['caisses_vides_recues'] ?? 0));
+
+            if ($caissesVidesRecues > $quantiteCaisses) {
+                return $this->error('Les emballages reçus ne peuvent pas dépasser le nombre de caisses vendues.', 422);
+            }
+
             $prixUnitaire = $detail['prix_unitaire'] ?? $produit['prix_vente_unitaire'];
-            $sousTotal = $detail['quantite'] * $prixUnitaire;
+            $sousTotal = $quantiteCaisses * $prixUnitaire * ($produit['bouteilles_par_caisses'] ?? 24);
             $totalHt += $sousTotal;
             
             $details[] = [
                 'produit_id' => $detail['produit_id'],
-                'quantite' => $detail['quantite'],
+                'quantite_caisses' => $quantiteCaisses,
+                'caisses_vides_recues' => $caissesVidesRecues,
+                'quantite' => $quantiteCaisses * (int) ($produit['bouteilles_par_caisses'] ?? 24),
                 'prix_unitaire' => $prixUnitaire,
                 'sous_total' => $sousTotal
             ];

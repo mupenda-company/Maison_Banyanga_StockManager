@@ -45,7 +45,7 @@ ob_start();
                         <label class="label mb-0">Produits</label>
                         <button 
                             type="button"
-                            @click="lignes.push({ produit_id: '', caisses: 0, prix_caisse: 0 })"
+                            @click="lignes.push({ produit_id: '', caisses: 0, caisses_vides_recues: 0, prix_caisse: 0 })"
                             class="btn-secondary btn-sm"
                         >
                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -63,6 +63,7 @@ ob_start();
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Stock (cs)</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Prix/Caisse</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Caisses</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Emballages reçus</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Sous-total</th>
                                     <th class="px-4 py-3"></th>
                                 </tr>
@@ -87,6 +88,12 @@ ob_start();
                                         <td class="px-4 py-2">
                                             <input type="number" x-model.number="ligne.caisses" class="input w-24" min="1" step="1" required @input="ligne.caisses = Math.round(ligne.caisses || 0); calculateTotals()">
                                         </td>
+                                        <td class="px-4 py-2">
+                                            <input type="number" x-model.number="ligne.caisses_vides_recues" class="input w-28" min="0" step="1" @input="ligne.caisses_vides_recues = Math.max(0, Math.round(ligne.caisses_vides_recues || 0)); if (ligne.caisses && ligne.caisses_vides_recues > ligne.caisses) ligne.caisses_vides_recues = ligne.caisses">
+                                            <p class="text-[10px] text-gray-500 mt-1" x-show="ligne.produit_id && ligne.caisses > 0">
+                                                Dette: <span x-text="Math.max(0, (Math.round(ligne.caisses || 0) - Math.round(ligne.caisses_vides_recues || 0))) + ' cs'"></span>
+                                            </p>
+                                        </td>
                                         <td class="px-4 py-2 text-sm font-medium">
                                             <span x-text="App.formatMoney((ligne.caisses * (ligne.prix_caisse || 0)), (window.DEVISE || 'CDF'))"></span>
                                         </td>
@@ -107,7 +114,7 @@ ob_start();
                             </tbody>
                             <tfoot class="bg-gray-50 dark:bg-gray-700">
                                 <tr>
-                                    <td colspan="4" class="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">
+                                    <td colspan="5" class="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">
                                         Total HT:
                                     </td>
                                     <td class="px-4 py-3 font-bold text-gray-900 dark:text-white">
@@ -116,7 +123,7 @@ ob_start();
                                     <td></td>
                                 </tr>
                                 <tr>
-                                    <td colspan="4" class="px-4 py-2 text-right font-medium text-gray-900 dark:text-white">
+                                    <td colspan="5" class="px-4 py-2 text-right font-medium text-gray-900 dark:text-white">
                                         TVA (<?= $tva ?>%):
                                     </td>
                                     <td class="px-4 py-2 text-gray-900 dark:text-white">
@@ -125,7 +132,7 @@ ob_start();
                                     <td></td>
                                 </tr>
                                 <tr class="bg-primary-50 dark:bg-primary-900/50">
-                                    <td colspan="4" class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">
+                                    <td colspan="5" class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">
                                         Total TTC:
                                     </td>
                                     <td class="px-4 py-3 font-bold text-primary-600 dark:text-primary-400 text-lg">
@@ -237,9 +244,13 @@ document.addEventListener('alpine:init', () => {
                     const baseDevise = window.BASE_DEVISE || 'CDF';
                     const prixCaisseDevise = (parseFloat(l.prix_caisse) || 0);
                     const prixCaisseBase = App.convertMoney(prixCaisseDevise, devise, baseDevise);
+                    const caisses = Math.max(0, Math.round(parseFloat(l.caisses) || 0));
+                    const caissesVidesRecues = Math.max(0, Math.min(caisses, Math.round(parseFloat(l.caisses_vides_recues) || 0)));
                     return {
                         produit_id: parseInt(l.produit_id),
-                        quantite: l.caisses * btlParCaisse,
+                        quantite: caisses * btlParCaisse,
+                        quantite_caisses: caisses,
+                        caisses_vides_recues: caissesVidesRecues,
                         prix_unitaire: prixCaisseBase / btlParCaisse
                     };
                 });

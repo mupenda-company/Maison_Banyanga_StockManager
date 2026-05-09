@@ -260,6 +260,7 @@ CREATE TABLE IF NOT EXISTS `vente_details` (
     `vente_id` INT UNSIGNED NOT NULL,
     `produit_id` INT UNSIGNED NOT NULL,
     `quantite_caisses` INT NOT NULL DEFAULT 0 COMMENT 'Quantité en caisses',
+    `caisses_vides_recues` INT NOT NULL DEFAULT 0 COMMENT 'Caisses vides reçues',
     `quantite` INT NOT NULL COMMENT 'Quantité en bouteilles',
     `prix_unitaire` DECIMAL(12,2) NOT NULL,
     `sous_total` DECIMAL(12,2) NOT NULL,

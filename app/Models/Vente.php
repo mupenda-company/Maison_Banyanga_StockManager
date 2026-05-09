@@ -161,6 +161,7 @@ class Vente extends Model
                 if ($quantiteCaisses <= 0) {
                     $quantiteCaisses = 1;
                 }
+                $caissesVidesRecues = max(0, min($quantiteCaisses, (int) ($detail['caisses_vides_recues'] ?? 0)));
                 $quantiteBouteilles = $quantiteCaisses * $btlParCaisse;
                 $prixCaisse = (float) ($detail['prix_caisse'] ?? ($produit['prix_vente_caisses'] ?? ($produit['prix_vente_unitaire'] * $btlParCaisse)));
                 if ($prixCaisse <= 0) {
@@ -182,6 +183,7 @@ class Vente extends Model
                     'vente_id' => $venteId,
                     'produit_id' => $detail['produit_id'],
                     'quantite_caisses' => $quantiteCaisses,
+                    'caisses_vides_recues' => $caissesVidesRecues,
                     'quantite' => $quantiteBouteilles,
                     'prix_unitaire' => $prixCaisse / $btlParCaisse,
                     'prix_caisse' => $prixCaisse,
@@ -198,16 +200,6 @@ class Vente extends Model
                     ]
                 );
                 
-                // Ajouter au stock (VIDE) - Car le client rend les caisses vides
-                $stockModel->updateOrCreate(
-                    $detail['produit_id'],
-                    $data['emplacement_id'],
-                    [
-                        'quantite_vide' => $quantiteBouteilles,
-                        'caisses_vide' => $quantiteCaisses
-                    ]
-                );
-                
                 // Enregistrer le mouvement PLEIN (Sortie)
                 $mouvementModel->create([
                     'produit_id' => $detail['produit_id'],
@@ -220,17 +212,29 @@ class Vente extends Model
                     'created_by' => $data['created_by']
                 ]);
 
-                // Enregistrer le mouvement VIDE (Entrée)
-                $mouvementModel->create([
-                    'produit_id' => $detail['produit_id'],
-                    'emplacement_id' => $data['emplacement_id'],
-                    'type_mouvement' => 'entree',
-                    'quantite' => $quantiteBouteilles,
-                    'reference_type' => 'vente',
-                    'reference_id' => $venteId,
-                    'motif' => 'Retour vide automatique Vente N° ' . $data['numero_facture'],
-                    'created_by' => $data['created_by']
-                ]);
+                if ($caissesVidesRecues > 0) {
+                    // Ajouter au stock (VIDE) uniquement pour les emballages réellement reçus
+                    $stockModel->updateOrCreate(
+                        $detail['produit_id'],
+                        $data['emplacement_id'],
+                        [
+                            'quantite_vide' => $caissesVidesRecues * $btlParCaisse,
+                            'caisses_vide' => $caissesVidesRecues
+                        ]
+                    );
+
+                    // Enregistrer le mouvement VIDE (Entrée)
+                    $mouvementModel->create([
+                        'produit_id' => $detail['produit_id'],
+                        'emplacement_id' => $data['emplacement_id'],
+                        'type_mouvement' => 'entree',
+                        'quantite' => $caissesVidesRecues * $btlParCaisse,
+                        'reference_type' => 'vente',
+                        'reference_id' => $venteId,
+                        'motif' => 'Retour vide Vente N° ' . $data['numero_facture'],
+                        'created_by' => $data['created_by']
+                    ]);
+                }
             }
 
             // DÉCLENCHER LES ALERTES IMMÉDIATEMENT
@@ -296,6 +300,7 @@ class Vente extends Model
                     $btlParCaisse = 24;
                 }
                 $quantiteCaisses = (int) ($detail['quantite_caisses'] ?? intdiv((int) $detail['quantite'], $btlParCaisse));
+                $caissesVidesRecues = (int) ($detail['caisses_vides_recues'] ?? 0);
 
                 $stockModel->updateOrCreate(
                     $detail['produit_id'],
@@ -303,8 +308,8 @@ class Vente extends Model
                     [
                         'quantite_pleine' => $detail['quantite'],
                         'caisses_pleine' => $quantiteCaisses,
-                        'quantite_vide' => -$detail['quantite'],
-                        'caisses_vide' => -$quantiteCaisses
+                        'quantite_vide' => -($caissesVidesRecues * $btlParCaisse),
+                        'caisses_vide' => -$caissesVidesRecues
                     ]
                 );
             }

@@ -73,6 +73,8 @@
             <?php foreach ($vente['details'] as $detail): 
                 $btlParCaisse = (int)($detail['bouteilles_par_caisses'] ?? 24);
                 $caisses = intdiv((int)$detail['quantite'], $btlParCaisse);
+                $caissesVidesRecues = (int)($detail['caisses_vides_recues'] ?? 0);
+                $detteCaisses = max(0, $caisses - $caissesVidesRecues);
                 $prixCaisse = $detail['prix_unitaire'] * $btlParCaisse;
             ?>
             <div class="mb-2">
@@ -80,6 +82,10 @@
                 <div class="ticket-row text-[11px]">
                     <span><?= number_format($caisses, 0, '.', ' ') ?> cs x <?= format_money_converted($prixCaisse) ?></span>
                     <span class="font-bold"><?= format_money_converted($detail['sous_total']) ?></span>
+                </div>
+                <div class="ticket-row text-[10px]">
+                    <span>Emballages reçus: <?= number_format($caissesVidesRecues, 0, '.', ' ') ?> cs</span>
+                    <span>Dette: <?= number_format($detteCaisses, 0, '.', ' ') ?> cs</span>
                 </div>
             </div>
             <?php endforeach; ?>
@@ -100,6 +106,29 @@
             <div class="ticket-row total-row border-t border-black pt-1">
                 <span>TOTAL TTC:</span>
                 <span><?= format_money_converted($vente['total_ttc'] ?? 0) ?></span>
+            </div>
+        </div>
+
+        <?php
+            $totalCaissesVidesRecues = 0;
+            $totalDetteCaisses = 0;
+            foreach ($vente['details'] as $detail) {
+                $btlParCaisse = (int)($detail['bouteilles_par_caisses'] ?? 24);
+                $caisses = intdiv((int)$detail['quantite'], $btlParCaisse);
+                $caissesVidesRecues = (int)($detail['caisses_vides_recues'] ?? 0);
+                $totalCaissesVidesRecues += $caissesVidesRecues;
+                $totalDetteCaisses += max(0, $caisses - $caissesVidesRecues);
+            }
+        ?>
+        <div class="divider"></div>
+        <div class="space-y-1 text-[11px]">
+            <div class="ticket-row">
+                <span>Emballages reçus:</span>
+                <span><?= number_format($totalCaissesVidesRecues, 0, '.', ' ') ?> cs</span>
+            </div>
+            <div class="ticket-row">
+                <span>Emballages dus:</span>
+                <span><?= number_format($totalDetteCaisses, 0, '.', ' ') ?> cs</span>
             </div>
         </div>
         

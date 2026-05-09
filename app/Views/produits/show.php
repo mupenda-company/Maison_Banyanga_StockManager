@@ -73,6 +73,7 @@ ob_start();
     
     <!-- Stock par emplacement -->
     <div class="space-y-6">
+        <?php $btlParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24); if ($btlParCaisse <= 0) $btlParCaisse = 24; ?>
         <div class="card">
             <div class="card-header">
                 <h3 class="font-semibold">Stock par emplacement</h3>
@@ -85,6 +86,14 @@ ob_start();
                 <?php else: ?>
                 <div class="divide-y divide-gray-200 dark:divide-gray-700">
                     <?php foreach ($stocks as $stock): ?>
+                    <?php
+                        $caissesPleines = isset($stock['caisses_pleine'])
+                            ? (int) round($stock['caisses_pleine'])
+                            : (int) round(($stock['quantite_pleine'] ?? 0) / $btlParCaisse);
+                        $caissesVides = isset($stock['caisses_vide'])
+                            ? (int) round($stock['caisses_vide'])
+                            : (int) round(($stock['quantite_vide'] ?? 0) / $btlParCaisse);
+                    ?>
                     <div class="p-4">
                         <div class="flex items-center justify-between mb-2">
                             <p class="font-medium text-gray-900 dark:text-white">
@@ -97,12 +106,12 @@ ob_start();
                         </div>
                         <div class="grid grid-cols-2 gap-4 text-sm">
                             <div>
-                                <span class="text-gray-500">Pleines:</span>
-                                <span class="font-medium text-green-600"><?= $stock['quantite_pleine'] ?></span>
+                                <span class="text-gray-500">Caisses pleines:</span>
+                                <span class="font-medium text-green-600"><?= $caissesPleines ?></span>
                             </div>
                             <div>
-                                <span class="text-gray-500">Vides:</span>
-                                <span class="font-medium text-gray-400"><?= $stock['quantite_vide'] ?></span>
+                                <span class="text-gray-500">Caisses vides:</span>
+                                <span class="font-medium text-gray-400"><?= $caissesVides ?></span>
                             </div>
                         </div>
                     </div>
@@ -117,9 +126,15 @@ ob_start();
             <div class="card-body text-center">
                 <p class="text-sm text-primary-600 dark:text-primary-400">Stock total</p>
                 <p class="text-3xl font-bold text-primary-700 dark:text-primary-300">
-                    <?= array_sum(array_column($stocks, 'quantite_pleine')) ?>
+                    <?= array_sum(array_map(static function ($stock) use ($btlParCaisse) {
+                        if (isset($stock['caisses_pleine'])) {
+                            return (int) round($stock['caisses_pleine']);
+                        }
+
+                        return (int) round(($stock['quantite_pleine'] ?? 0) / $btlParCaisse);
+                    }, $stocks)) ?>
                 </p>
-                <p class="text-sm text-primary-600 dark:text-primary-400">bouteilles pleines</p>
+                <p class="text-sm text-primary-600 dark:text-primary-400">caisses pleines</p>
             </div>
         </div>
     </div>
