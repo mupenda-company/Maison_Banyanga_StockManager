@@ -191,17 +191,62 @@ class Client extends Model
             $saleParams['date_fin'] = str_contains($dateFin, ':') ? $dateFin : ($dateFin . ' 23:59:59');
         }
 
-        $caseSql = "SELECT COALESCE(SUM(ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)), 0)
-                    FROM vente_details vd
-                    JOIN ventes v ON vd.vente_id = v.id
-                    JOIN produits p ON vd.produit_id = p.id
-                    WHERE {$saleWhere}";
-        $caissesAchetees = (int) $this->db->fetchColumn($caseSql, $saleParams);
+        $emballageStats = $this->getEmballageStats($clientId, $dateDebut, $dateFin);
+        $caissesAchetees = (int) ($emballageStats['total_caisses_vendues'] ?? 0);
+        $caissesRetournees = (int) (($emballageStats['total_caisses_vides_recues'] ?? 0) + ($emballageStats['total_caisses_retournees'] ?? 0));
+        $detteEmballages = (int) ($emballageStats['total_dette'] ?? 0);
 
         $caTotal = (float) $this->db->fetchColumn(
             "SELECT COALESCE(SUM(v.total_ttc), 0)
              FROM ventes v
              WHERE {$saleWhere}",
+            $saleParams
+        );
+
+        $tauxRistourne = (float) ($client['taux_ristourne'] ?? 5);
+        $montantRistourne = ($caTotal * $tauxRistourne) / 100;
+
+        return [
+            'client' => $client,
+            'caisses_achetees' => $caissesAchetees,
+            'ca_total' => $caTotal,
+            'caisses_retournees' => $caissesRetournees,
+            'dette_emballages' => $detteEmballages,
+            'taux_ristourne' => $tauxRistourne,
+            'montant_ristourne' => $montantRistourne,
+            'emballage_stats' => $emballageStats,
+        ];
+    }
+
+    /**
+     * Récupérer le détail des emballages d'un client par produit
+     */
+    public function getEmballageStats($clientId, $dateDebut = null, $dateFin = null)
+    {
+        $saleWhere = "v.client_id = :client_id AND v.statut = 'validee'";
+        $saleParams = ['client_id' => $clientId];
+        if (!empty($dateDebut)) {
+            $saleWhere .= " AND v.date_vente >= :date_debut";
+            $saleParams['date_debut'] = $dateDebut;
+        }
+        if (!empty($dateFin)) {
+            $saleWhere .= " AND v.date_vente <= :date_fin";
+            $saleParams['date_fin'] = str_contains($dateFin, ':') ? $dateFin : ($dateFin . ' 23:59:59');
+        }
+
+        $produits = $this->db->fetchAll(
+            "SELECT vd.produit_id,
+                    p.nom as produit_nom,
+                    p.code as produit_code,
+                    COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24) as bouteilles_par_caisses,
+                    COALESCE(SUM(COALESCE(vd.quantite_caisses, ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0))), 0) as caisses_vendues,
+                    COALESCE(SUM(COALESCE(vd.caisses_vides_recues, 0)), 0) as caisses_vides_recues
+             FROM vente_details vd
+             JOIN ventes v ON vd.vente_id = v.id
+             JOIN produits p ON vd.produit_id = p.id
+             WHERE {$saleWhere}
+             GROUP BY vd.produit_id, p.nom, p.code, p.bouteilles_par_caisses
+             ORDER BY p.nom",
             $saleParams
         );
 
@@ -216,24 +261,57 @@ class Client extends Model
             $returnParams['ret_date_fin'] = str_contains($dateFin, ':') ? $dateFin : ($dateFin . ' 23:59:59');
         }
 
-        $returnsSql = "SELECT COALESCE(SUM(ROUND(r.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)), 0)
-                       FROM retours_emballages r
-                       JOIN produits p ON r.produit_id = p.id
-                       WHERE {$returnWhere}";
-        $caissesRetournees = (int) $this->db->fetchColumn($returnsSql, $returnParams);
-        $detteEmballages = max(0, $caissesAchetees - $caissesRetournees);
+        $retours = $this->db->fetchAll(
+            "SELECT r.produit_id,
+                    COALESCE(SUM(ROUND(r.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)), 0) as caisses_retournees
+             FROM retours_emballages r
+             JOIN produits p ON r.produit_id = p.id
+             WHERE {$returnWhere}
+             GROUP BY r.produit_id",
+            $returnParams
+        );
 
-        $tauxRistourne = (float) ($client['taux_ristourne'] ?? 5);
-        $montantRistourne = ($caTotal * $tauxRistourne) / 100;
+        $retoursByProduit = [];
+        foreach ($retours as $retour) {
+            $retoursByProduit[(int) $retour['produit_id']] = (int) ($retour['caisses_retournees'] ?? 0);
+        }
+
+        $totalCaissesVendues = 0;
+        $totalCaissesVidesRecues = 0;
+        $totalCaissesRetournees = 0;
+        $totalDette = 0;
+        $resultats = [];
+
+        foreach ($produits as $produit) {
+            $produitId = (int) $produit['produit_id'];
+            $caissesVendues = (int) ($produit['caisses_vendues'] ?? 0);
+            $caissesVidesRecues = (int) ($produit['caisses_vides_recues'] ?? 0);
+            $caissesRetournees = (int) ($retoursByProduit[$produitId] ?? 0);
+            $dette = max(0, $caissesVendues - $caissesVidesRecues - $caissesRetournees);
+
+            $totalCaissesVendues += $caissesVendues;
+            $totalCaissesVidesRecues += $caissesVidesRecues;
+            $totalCaissesRetournees += $caissesRetournees;
+            $totalDette += $dette;
+
+            $resultats[] = [
+                'produit_id' => $produitId,
+                'produit_nom' => $produit['produit_nom'],
+                'produit_code' => $produit['produit_code'],
+                'bouteilles_par_caisses' => (int) $produit['bouteilles_par_caisses'],
+                'caisses_vendues' => $caissesVendues,
+                'caisses_vides_recues' => $caissesVidesRecues,
+                'caisses_retournees' => $caissesRetournees,
+                'dette_caisses' => $dette,
+            ];
+        }
 
         return [
-            'client' => $client,
-            'caisses_achetees' => $caissesAchetees,
-            'ca_total' => $caTotal,
-            'caisses_retournees' => $caissesRetournees,
-            'dette_emballages' => $detteEmballages,
-            'taux_ristourne' => $tauxRistourne,
-            'montant_ristourne' => $montantRistourne,
+            'produits' => $resultats,
+            'total_caisses_vendues' => $totalCaissesVendues,
+            'total_caisses_vides_recues' => $totalCaissesVidesRecues,
+            'total_caisses_retournees' => $totalCaissesRetournees,
+            'total_dette' => $totalDette,
         ];
     }
     
@@ -310,8 +388,8 @@ class Client extends Model
      */
     public function getDettesEmballages($clientId)
     {
-        $kpis = $this->getKpis($clientId);
+        $stats = $this->getEmballageStats($clientId);
 
-        return ['total' => (int) ($kpis['dette_emballages'] ?? 0)];
+        return ['total' => (int) ($stats['total_dette'] ?? 0)];
     }
 }

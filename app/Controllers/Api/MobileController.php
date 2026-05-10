@@ -392,6 +392,7 @@ class MobileController extends Controller {
                 $produitId = (int) ($item['produit_id'] ?? 0);
                 $quantite = (float) ($item['quantite'] ?? 0);
                 $quantiteCaisses = (int) ($item['quantite_caisses'] ?? 0);
+                $caissesVidesRecues = max(0, (int) ($item['caisses_vides_recues'] ?? 0));
 
                 if ($produitId <= 0 || $quantite <= 0) {
                     throw new Exception('Produit ou quantité invalide');
@@ -453,6 +454,10 @@ class MobileController extends Controller {
                     throw new Exception('Quantité de caisses invalide');
                 }
 
+                if ($caissesVidesRecues > $quantiteCaisses) {
+                    throw new Exception('Les emballages reçus ne peuvent pas dépasser les caisses vendues');
+                }
+
                 $prixCaisseInput = $item['prix_caisse'] ?? $item['prix'] ?? null;
                 if ($prixCaisseInput === null || $prixCaisseInput === '') {
                     $prixCaisseBase = (float) ($produit['prix_vente_caisses'] ?? 0);
@@ -471,6 +476,7 @@ class MobileController extends Controller {
                     'produit_id' => $produitId,
                     'quantite_caisses' => $quantiteCaisses,
                     'quantite' => $quantiteCaisses * $bouteillesParCaisse,
+                    'caisses_vides_recues' => $caissesVidesRecues,
                     'prix_unitaire' => $prixUnitaireBase,
                     'prix_caisse' => $prixCaisseBase,
                     'sous_total' => $sousTotal,
@@ -503,6 +509,7 @@ class MobileController extends Controller {
                     'vente_id' => $venteId,
                     'produit_id' => $detail['produit_id'],
                     'quantite_caisses' => $detail['quantite_caisses'],
+                    'caisses_vides_recues' => $detail['caisses_vides_recues'],
                     'quantite' => $detail['quantite'],
                     'prix_unitaire' => $detail['prix_unitaire'],
                     'prix_caisse' => $detail['prix_unitaire'] * (int) $detail['bouteilles_par_caisses'],
@@ -552,26 +559,30 @@ class MobileController extends Controller {
                     ]
                 );
 
-                // 4. Ajouter les vides automatiquement (comme sur le web)
-                $stockModel->updateOrCreate(
-                    $detail['produit_id'],
-                    (int) $emplacementVehiculeId,
-                    [
-                        'quantite_vide' => $detail['quantite'],
-                        'caisses_vide' => $detail['quantite_caisses']
-                    ]
-                );
+                // 4. Ajouter les vides uniquement si réellement reçus
+                if ($detail['caisses_vides_recues'] > 0) {
+                    $quantiteVides = $detail['caisses_vides_recues'] * $bouteillesParCaisse;
 
-                $mouvementModel->create([
-                    'produit_id' => $detail['produit_id'],
-                    'emplacement_id' => (int) $emplacementVehiculeId,
-                    'type_mouvement' => 'entree',
-                    'quantite' => $detail['quantite'],
-                    'reference_type' => 'vente',
-                    'reference_id' => $venteId,
-                    'motif' => 'Retour vide automatique Vente N° ' . $numeroFacture,
-                    'created_by' => (int) $data['user_id']
-                ]);
+                    $stockModel->updateOrCreate(
+                        $detail['produit_id'],
+                        (int) $emplacementVehiculeId,
+                        [
+                            'quantite_vide' => $quantiteVides,
+                            'caisses_vide' => $detail['caisses_vides_recues']
+                        ]
+                    );
+
+                    $mouvementModel->create([
+                        'produit_id' => $detail['produit_id'],
+                        'emplacement_id' => (int) $emplacementVehiculeId,
+                        'type_mouvement' => 'entree',
+                        'quantite' => $quantiteVides,
+                        'reference_type' => 'vente',
+                        'reference_id' => $venteId,
+                        'motif' => 'Retour vide Vente N° ' . $numeroFacture,
+                        'created_by' => (int) $data['user_id']
+                    ]);
+                }
             }
 
             $this->db->commit();

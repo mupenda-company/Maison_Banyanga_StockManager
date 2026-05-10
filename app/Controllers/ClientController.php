@@ -196,6 +196,7 @@ class ClientController extends Controller
             'client' => $client,
             'achats' => $ventesData['data'] ?? [],
             'kpis' => $kpis,
+            'emballage_stats' => $kpis['emballage_stats'] ?? [],
             'filters' => [
                 'date_debut' => $dateDebut,
                 'date_fin' => $dateFin,

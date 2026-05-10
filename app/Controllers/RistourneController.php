@@ -20,7 +20,7 @@ class RistourneController extends Controller
      */
     public function index()
     {
-        $this->requireAuth();
+        $this->requireRole([ROLE_ADMIN]);
         
         $filters = [
             'mois' => $_GET['mois'] ?? date('n'),

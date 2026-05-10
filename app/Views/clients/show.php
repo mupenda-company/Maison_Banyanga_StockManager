@@ -78,7 +78,7 @@ ob_start();
                     <p class="stat-value"><?= format_money_converted($kpis['ca_total'] ?? 0) ?></p>
                 </div>
                 <div class="stat-card">
-                    <p class="stat-label">Caisses retournées</p>
+                    <p class="stat-label">Emballages reçus</p>
                     <p class="stat-value"><?= number_format((int)($kpis['caisses_retournees'] ?? 0), 0, '.', ' ') ?></p>
                 </div>
                 <div class="stat-card">
@@ -96,6 +96,47 @@ ob_start();
                 Ce client a une dette d'emballages de <?= number_format((int) $dette_emballages, 0, '.', ' ') ?> caisse(s). Les emballages manquants doivent être retournés via le module de gestion des emballages.
             </div>
             <?php endif; ?>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="font-semibold">Détail des emballages par produit</h3>
+                </div>
+                <div class="card-body p-0">
+                    <?php if (empty($emballage_stats['produits'] ?? [])): ?>
+                        <div class="p-6 text-center text-gray-500">Aucune donnée d’emballage disponible</div>
+                    <?php else: ?>
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Produit</th>
+                                        <th class="text-right">Vendu</th>
+                                        <th class="text-right">Reçu</th>
+                                        <th class="text-right">Retourné</th>
+                                        <th class="text-right">Dette</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach (($emballage_stats['produits'] ?? []) as $ligne): ?>
+                                    <tr>
+                                        <td>
+                                            <div class="font-medium"><?= htmlspecialchars($ligne['produit_nom']) ?></div>
+                                            <div class="text-xs text-gray-500 font-mono"><?= htmlspecialchars($ligne['produit_code']) ?></div>
+                                        </td>
+                                        <td class="text-right"><?= number_format((int) $ligne['caisses_vendues'], 0, '.', ' ') ?> cs</td>
+                                        <td class="text-right"><?= number_format((int) $ligne['caisses_vides_recues'], 0, '.', ' ') ?> cs</td>
+                                        <td class="text-right"><?= number_format((int) $ligne['caisses_retournees'], 0, '.', ' ') ?> cs</td>
+                                        <td class="text-right font-bold <?= (int) $ligne['dette_caisses'] > 0 ? 'text-red-600' : 'text-green-600' ?>">
+                                            <?= number_format((int) $ligne['dette_caisses'], 0, '.', ' ') ?> cs
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
             
             <!-- Historique des achats -->
             <div class="card">

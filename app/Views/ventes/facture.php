@@ -7,23 +7,183 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @page {
-            size: 105mm 148mm; /* Format A6 */
-            margin: 0;
+            size: A4 portrait;
+            margin: 12mm;
         }
         body {
-            width: 100%;
             margin: 0;
-            padding: 5mm;
-            font-family: 'Courier New', Courier, monospace; /* Style ticket */
+            background: #f3f4f6;
+            color: #111827;
+            font-family: Arial, Helvetica, sans-serif;
             font-size: 12px;
-            line-height: 1.2;
+            line-height: 1.45;
         }
-        .ticket-header { text-align: center; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 5px; }
-        .ticket-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
-        .divider { border-top: 1px dashed #000; margin: 5px 0; }
-        .total-row { font-weight: bold; font-size: 14px; margin-top: 5px; }
+        .invoice-sheet {
+            width: 186mm;
+            min-height: 265mm;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 12mm;
+            box-sizing: border-box;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+        }
+        .invoice-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            padding-bottom: 14px;
+            border-bottom: 2px solid #111827;
+        }
+        .company-block {
+            flex: 1;
+        }
+        .invoice-meta {
+            width: 72mm;
+            text-align: right;
+        }
+        .section {
+            margin-top: 14px;
+        }
+        .section-title {
+            margin-bottom: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #6b7280;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .card {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 12px;
+            background: #f9fafb;
+        }
+        .table-wrap {
+            border: 1px solid #d1d5db;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        thead {
+            background: #111827;
+            color: #ffffff;
+        }
+        th, td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #e5e7eb;
+            vertical-align: top;
+        }
+        th {
+            font-size: 10.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            text-align: left;
+        }
+        .num {
+            text-align: right;
+            white-space: nowrap;
+        }
+        tbody tr:nth-child(even) {
+            background: #f9fafb;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .summary-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            background: #ffffff;
+            padding: 10px 12px;
+        }
+        .summary-label {
+            font-size: 10px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .summary-value {
+            margin-top: 3px;
+            font-size: 14px;
+            font-weight: 700;
+        }
+        .totals {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            align-items: start;
+        }
+        .total-box {
+            border: 1px solid #111827;
+            border-radius: 12px;
+            padding: 12px;
+        }
+        .total-line {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 6px;
+        }
+        .total-grand {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #111827;
+            font-size: 15px;
+            font-weight: 800;
+        }
+        .footer {
+            margin-top: 16px;
+            text-align: center;
+            color: #6b7280;
+            font-size: 10px;
+        }
         @media print {
+            body {
+                background: #ffffff;
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
+            }
+            .invoice-sheet {
+                width: auto;
+                min-height: auto;
+                margin: 0;
+                padding: 0;
+                box-shadow: none;
+            }
             .no-print { display: none !important; }
+        }
+        @media screen and (max-width: 900px) {
+            .invoice-sheet {
+                width: auto;
+                min-height: auto;
+                margin: 12px;
+                padding: 16px;
+            }
+            .invoice-header,
+            .info-grid,
+            .totals {
+                grid-template-columns: 1fr;
+                display: grid;
+            }
+            .invoice-header {
+                display: grid;
+            }
+            .invoice-meta {
+                width: auto;
+                text-align: left;
+            }
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -31,112 +191,174 @@
     <?php
         $companyLogo = !empty($params['logo']) ? asset('uploads/' . $params['logo']) : '';
         $companyContact = $params['contact'] ?? ($params['telephone'] ?? '');
+        $companyName = $params['nom_entreprise'] ?? APP_NAME;
+
+        $totalCaisses = 0;
+        $totalEmballagesRecus = 0;
+        $totalDetteEmballages = 0;
+        foreach ($vente['details'] as $detail) {
+            $btlParCaisse = (int) ($detail['bouteilles_par_caisses'] ?? 24);
+            $caisses = intdiv((int) $detail['quantite'], $btlParCaisse);
+            $caissesVidesRecues = (int) ($detail['caisses_vides_recues'] ?? 0);
+            $totalCaisses += $caisses;
+            $totalEmballagesRecus += $caissesVidesRecues;
+            $totalDetteEmballages += max(0, $caisses - $caissesVidesRecues);
+        }
+
+        $totalHt = (float) ($vente['total_ht'] ?? 0);
+        $totalTva = (float) ($vente['total_tva'] ?? 0);
+        $totalTtc = (float) ($vente['total_ttc'] ?? 0);
+        $tvaTaux = $totalHt > 0 ? round(($totalTva / $totalHt) * 100) : 0;
     ?>
-    <div class="max-w-[100mm] mx-auto">
+    <div class="invoice-sheet">
         <!-- En-tête -->
-        <div class="ticket-header">
-            <?php if ($companyLogo): ?>
-            <img src="<?= $companyLogo ?>" alt="Logo" class="h-14 mx-auto mb-2 object-contain">
-            <?php endif; ?>
-            <h1 class="text-lg font-bold uppercase"><?= htmlspecialchars($params['nom_entreprise'] ?? APP_NAME) ?></h1>
-            <?php if (!empty($params['adresse'])): ?><p class="text-[10px]"><?= htmlspecialchars($params['adresse']) ?></p><?php endif; ?>
-            <?php if (!empty($companyContact)): ?><p class="text-[10px]">Contact: <?= htmlspecialchars($companyContact) ?></p><?php endif; ?>
-            <?php if (!empty($params['email_contact'])): ?><p class="text-[10px]">Email: <?= htmlspecialchars($params['email_contact']) ?></p><?php endif; ?>
-            <?php if (!empty($params['rccm'])): ?><p class="text-[10px]">RCCM: <?= htmlspecialchars($params['rccm']) ?></p><?php endif; ?>
-            <?php if (!empty($params['id_nat'])): ?><p class="text-[10px]">ID NAT: <?= htmlspecialchars($params['id_nat']) ?></p><?php endif; ?>
-            <?php if (!empty($params['nif'])): ?><p class="text-[10px]">NIF: <?= htmlspecialchars($params['nif']) ?></p><?php endif; ?>
-            <?php if (!empty($params['numero_compte'])): ?><p class="text-[10px]">N° compte: <?= htmlspecialchars($params['numero_compte']) ?></p><?php endif; ?>
-            <div class="divider"></div>
-            <p class="font-bold">FACTURE: <?= htmlspecialchars($vente['numero_facture']) ?></p>
-            <p class="text-[10px]"><?= date('d/m/Y H:i', strtotime($vente['date_vente'])) ?></p>
+        <div class="invoice-header">
+            <div class="company-block">
+                <?php if ($companyLogo): ?>
+                    <img src="<?= $companyLogo ?>" alt="Logo" class="h-16 mb-3 object-contain">
+                <?php endif; ?>
+                <h1 class="text-2xl font-bold uppercase leading-tight"><?= htmlspecialchars($companyName) ?></h1>
+                <?php if (!empty($params['adresse'])): ?><p><?= htmlspecialchars($params['adresse']) ?></p><?php endif; ?>
+                <?php if (!empty($companyContact)): ?><p>Contact: <?= htmlspecialchars($companyContact) ?></p><?php endif; ?>
+                <?php if (!empty($params['email_contact'])): ?><p>Email: <?= htmlspecialchars($params['email_contact']) ?></p><?php endif; ?>
+                <?php if (!empty($params['rccm'])): ?><p>RCCM: <?= htmlspecialchars($params['rccm']) ?></p><?php endif; ?>
+                <?php if (!empty($params['id_nat'])): ?><p>ID NAT: <?= htmlspecialchars($params['id_nat']) ?></p><?php endif; ?>
+                <?php if (!empty($params['nif'])): ?><p>NIF: <?= htmlspecialchars($params['nif']) ?></p><?php endif; ?>
+                <?php if (!empty($params['numero_compte'])): ?><p>N° compte: <?= htmlspecialchars($params['numero_compte']) ?></p><?php endif; ?>
+            </div>
+
+            <div class="invoice-meta">
+                <div class="card" style="background:#111827;color:#fff;border-color:#111827;">
+                    <div class="summary-label" style="color:#cbd5e1;">Facture</div>
+                    <div class="summary-value" style="font-size:22px; margin-top:4px;"><?= htmlspecialchars($vente['numero_facture']) ?></div>
+                    <div style="margin-top:8px; font-size:11px; color:#e5e7eb;">
+                        <?= date('d/m/Y H:i', strtotime($vente['date_vente'])) ?>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <!-- Client -->
-        <div class="mb-3 text-[11px]">
-            <p><strong>Client:</strong> <?= htmlspecialchars($vente['client_nom']) ?></p>
-            <?php if (!empty($vente['client_telephone'])): ?><p><strong>Numéro:</strong> <?= htmlspecialchars($vente['client_telephone']) ?></p><?php endif; ?>
-            <?php if ($vente['zone_nom']): ?><p><strong>Zone:</strong> <?= htmlspecialchars($vente['zone_nom']) ?></p><?php endif; ?>
-            <?php if (!empty($ristourneInfo)): ?>
-                <p><strong>Produits cumulés (période):</strong> <?= number_format((int)($ristourneInfo['total_caisses'] ?? 0), 0, '.', ' ') ?> cs</p>
-                <p><strong>CA (période):</strong> <?= format_money_converted($ristourneInfo['ca_total'] ?? 0) ?></p>
-            <?php elseif (isset($totalCaissesClient)): ?>
-                <p><strong>Produits cumulés:</strong> <?= number_format((int)$totalCaissesClient, 0, '.', ' ') ?> cs</p>
-            <?php endif; ?>
-            <?php if (!empty($ristourneInfo)): ?>
-                <p><strong>Ristourne:</strong> <?= number_format((float)($ristourneInfo['taux_applique'] ?? 0), 2, '.', ' ') ?>% (<?= format_money_converted($ristourneInfo['montant_ristourne'] ?? 0) ?>)</p>
-            <?php endif; ?>
-        </div>
-        <div class="divider"></div>
-        
-        <!-- Détails Produits (Empilés) -->
-        <div class="mb-3">
-            <?php foreach ($vente['details'] as $detail): 
-                $btlParCaisse = (int)($detail['bouteilles_par_caisses'] ?? 24);
-                $caisses = intdiv((int)$detail['quantite'], $btlParCaisse);
-                $caissesVidesRecues = (int)($detail['caisses_vides_recues'] ?? 0);
-                $detteCaisses = max(0, $caisses - $caissesVidesRecues);
-                $prixCaisse = $detail['prix_unitaire'] * $btlParCaisse;
-            ?>
-            <div class="mb-2">
-                <p class="font-bold"><?= htmlspecialchars($detail['produit_nom']) ?></p>
-                <div class="ticket-row text-[11px]">
-                    <span><?= number_format($caisses, 0, '.', ' ') ?> cs x <?= format_money_converted($prixCaisse) ?></span>
-                    <span class="font-bold"><?= format_money_converted($detail['sous_total']) ?></span>
-                </div>
-                <div class="ticket-row text-[10px]">
-                    <span>Emballages reçus: <?= number_format($caissesVidesRecues, 0, '.', ' ') ?> cs</span>
-                    <span>Dette: <?= number_format($detteCaisses, 0, '.', ' ') ?> cs</span>
-                </div>
+        <div class="section info-grid">
+            <div class="card">
+                <div class="section-title">Client</div>
+                <p><strong>Nom:</strong> <?= htmlspecialchars($vente['client_nom']) ?></p>
+                <?php if (!empty($vente['client_telephone'])): ?><p><strong>Téléphone:</strong> <?= htmlspecialchars($vente['client_telephone']) ?></p><?php endif; ?>
+                <?php if (!empty($vente['client_numero'])): ?><p><strong>N° client:</strong> <?= htmlspecialchars($vente['client_numero']) ?></p><?php endif; ?>
+                <?php if (!empty($vente['zone_nom'])): ?><p><strong>Zone:</strong> <?= htmlspecialchars($vente['zone_nom']) ?></p><?php endif; ?>
             </div>
-            <?php endforeach; ?>
+
+            <div class="card">
+                <div class="section-title">Résumé</div>
+                <?php if (!empty($ristourneInfo)): ?>
+                    <p><strong>Produits cumulés (période):</strong> <?= number_format((int) ($ristourneInfo['total_caisses'] ?? 0), 0, '.', ' ') ?> cs</p>
+                    <p><strong>CA (période):</strong> <?= format_money_converted($ristourneInfo['ca_total'] ?? 0) ?></p>
+                    <p><strong>Ristourne:</strong> <?= number_format((float) ($ristourneInfo['taux_applique'] ?? 0), 2, '.', ' ') ?>% (<?= format_money_converted($ristourneInfo['montant_ristourne'] ?? 0) ?>)</p>
+                <?php elseif (isset($totalCaissesClient)): ?>
+                    <p><strong>Produits cumulés:</strong> <?= number_format((int) $totalCaissesClient, 0, '.', ' ') ?> cs</p>
+                <?php endif; ?>
+                <p><strong>Vendeur:</strong> <?= htmlspecialchars(trim(($vente['created_by_prenom'] ?? '') . ' ' . ($vente['created_by_nom'] ?? ''))) ?></p>
+            </div>
         </div>
         
-        <div class="divider"></div>
+        <div class="section">
+            <div class="section-title">Détails produits</div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Produit</th>
+                            <th class="num">Caisses</th>
+                            <th class="num">Emballages reçus</th>
+                            <th class="num">Dette</th>
+                            <th class="num">Prix caisse</th>
+                            <th class="num">Sous-total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($vente['details'] as $detail): 
+                            $btlParCaisse = (int) ($detail['bouteilles_par_caisses'] ?? 24);
+                            $caisses = intdiv((int) $detail['quantite'], $btlParCaisse);
+                            $caissesVidesRecues = (int) ($detail['caisses_vides_recues'] ?? 0);
+                            $detteCaisses = max(0, $caisses - $caissesVidesRecues);
+                            $prixCaisse = (float) $detail['prix_unitaire'] * $btlParCaisse;
+                        ?>
+                        <tr>
+                            <td>
+                                <div class="font-bold"><?= htmlspecialchars($detail['produit_nom']) ?></div>
+                                <?php if (!empty($detail['produit_code'])): ?>
+                                    <div style="font-size:10px; color:#6b7280; font-family: monospace;"><?= htmlspecialchars($detail['produit_code']) ?></div>
+                                <?php endif; ?>
+                            </td>
+                            <td class="num">
+                                <div class="font-medium"><?= number_format($caisses, 0, '.', ' ') ?> cs</div>
+                                <div style="font-size:10px; color:#6b7280;">= <?= number_format((int) $detail['quantite'], 0, '.', ' ') ?> btl</div>
+                            </td>
+                            <td class="num"><?= number_format($caissesVidesRecues, 0, '.', ' ') ?> cs</td>
+                            <td class="num" style="font-weight:700; color:<?= $detteCaisses > 0 ? '#dc2626' : '#16a34a' ?>;">
+                                <?= number_format($detteCaisses, 0, '.', ' ') ?> cs
+                            </td>
+                            <td class="num"><?= format_money_converted($prixCaisse) ?></td>
+                            <td class="num" style="font-weight:700; color:#2563eb;">
+                                <?= format_money_converted($detail['sous_total']) ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
         
         <!-- Totaux -->
-        <div class="space-y-1">
-            <div class="ticket-row text-[11px]">
-                <span>Total HT:</span>
-                <span><?= format_money_converted($vente['total_ht'] ?? 0) ?></span>
+        <div class="section totals">
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <div class="summary-label">Caisses vendues</div>
+                    <div class="summary-value"><?= number_format($totalCaisses, 0, '.', ' ') ?> cs</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Emballages reçus</div>
+                    <div class="summary-value"><?= number_format($totalEmballagesRecus, 0, '.', ' ') ?> cs</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Dette emballages</div>
+                    <div class="summary-value" style="color: <?= $totalDetteEmballages > 0 ? '#dc2626' : '#16a34a' ?>;">
+                        <?= number_format($totalDetteEmballages, 0, '.', ' ') ?> cs
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">TVA</div>
+                    <div class="summary-value"><?= number_format($tvaTaux, 0, '.', ' ') ?>%</div>
+                </div>
             </div>
-            <div class="ticket-row text-[11px]">
-                <span>TVA (<?= number_format($vente['total_tva'] / ($vente['total_ht'] ?: 1) * 100, 0) ?>%):</span>
-                <span><?= format_money_converted($vente['total_tva'] ?? 0) ?></span>
-            </div>
-            <div class="ticket-row total-row border-t border-black pt-1">
-                <span>TOTAL TTC:</span>
-                <span><?= format_money_converted($vente['total_ttc'] ?? 0) ?></span>
+
+            <div class="total-box">
+                <div class="total-line">
+                    <span>Total HT</span>
+                    <span><?= format_money_converted($totalHt) ?></span>
+                </div>
+                <div class="total-line">
+                    <span>TVA (<?= number_format($tvaTaux, 0, '.', ' ') ?>%)</span>
+                    <span><?= format_money_converted($totalTva) ?></span>
+                </div>
+                <div class="total-line">
+                    <span>Emballages reçus</span>
+                    <span><?= number_format($totalEmballagesRecus, 0, '.', ' ') ?> cs</span>
+                </div>
+                <div class="total-line">
+                    <span>Dette emballages</span>
+                    <span><?= number_format($totalDetteEmballages, 0, '.', ' ') ?> cs</span>
+                </div>
+                <div class="total-line total-grand">
+                    <span>TOTAL TTC</span>
+                    <span><?= format_money_converted($totalTtc) ?></span>
+                </div>
             </div>
         </div>
 
-        <?php
-            $totalCaissesVidesRecues = 0;
-            $totalDetteCaisses = 0;
-            foreach ($vente['details'] as $detail) {
-                $btlParCaisse = (int)($detail['bouteilles_par_caisses'] ?? 24);
-                $caisses = intdiv((int)$detail['quantite'], $btlParCaisse);
-                $caissesVidesRecues = (int)($detail['caisses_vides_recues'] ?? 0);
-                $totalCaissesVidesRecues += $caissesVidesRecues;
-                $totalDetteCaisses += max(0, $caisses - $caissesVidesRecues);
-            }
-        ?>
-        <div class="divider"></div>
-        <div class="space-y-1 text-[11px]">
-            <div class="ticket-row">
-                <span>Emballages reçus:</span>
-                <span><?= number_format($totalCaissesVidesRecues, 0, '.', ' ') ?> cs</span>
-            </div>
-            <div class="ticket-row">
-                <span>Emballages dus:</span>
-                <span><?= number_format($totalDetteCaisses, 0, '.', ' ') ?> cs</span>
-            </div>
-        </div>
-        
-        <div class="divider"></div>
-        
-        <div class="text-center text-[10px] mt-4">
+        <div class="footer">
             <p>Merci pour votre confiance !</p>
-            <p>Vendeur: <?= htmlspecialchars(($vente['created_by_prenom'] ?? '') . ' ' . ($vente['created_by_nom'] ?? '')) ?></p>
+            <p>Vendeur: <?= htmlspecialchars(trim(($vente['created_by_prenom'] ?? '') . ' ' . ($vente['created_by_nom'] ?? ''))) ?></p>
         </div>
         
         <!-- Boutons d'action -->

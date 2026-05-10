@@ -17,7 +17,7 @@ define('DB_CHARSET', 'utf8mb4');
 // define('DB_CHARSET', 'utf8mb4');
 
 // Configuration de l'application
-define('APP_NAME', 'Bralima Logistique');
+define('APP_NAME', 'SUNCITY-CE SARL');
 define('APP_VERSION', '1.0.0');
 // Détecter automatiquement l'URL de base
 $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
@@ -43,7 +43,8 @@ define('ROLE_VENDEUR', 'vendeur');
 define('DEFAULT_ALERT_THRESHOLD', 10);
 
 // Fuseau horaire
-date_default_timezone_set('Africa/Kinshasa');
+$timezone = getenv('APP_TIMEZONE') ?: ini_get('date.timezone') ?: date_default_timezone_get();
+date_default_timezone_set($timezone ?: 'UTC');
 
 // Démarrage de la session
 if (session_status() === PHP_SESSION_NONE) {
