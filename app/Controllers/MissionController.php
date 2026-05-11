@@ -8,6 +8,8 @@ class MissionController extends Controller
     private $missionModel;
     private $vehiculeModel;
     private $produitModel;
+    private $clientModel;
+    private $ristourneModel;
     private $zoneModel;
     private $emplacementModel;
     
@@ -17,6 +19,8 @@ class MissionController extends Controller
         $this->missionModel = new Mission();
         $this->vehiculeModel = new Vehicule();
         $this->produitModel = new Produit();
+        $this->clientModel = new Client();
+        $this->ristourneModel = new Ristourne();
         $this->zoneModel = new Zone();
         $this->emplacementModel = new Emplacement();
     }
@@ -30,24 +34,36 @@ class MissionController extends Controller
         
         $filters = [
             'statut' => $_GET['statut'] ?? null,
-            'vehicule_id' => $_GET['vehicule_id'] ?? null
+            'vehicule_id' => $_GET['vehicule_id'] ?? null,
+            'type_mission' => $_GET['type_mission'] ?? null
         ];
+
+        $typeMissionFilter = in_array($filters['type_mission'], ['vente', 'ristourne'], true) ? $filters['type_mission'] : null;
+        $typeMissionSql = $typeMissionFilter ? " AND COALESCE(m.type_mission, 'vente') = '" . $typeMissionFilter . "'" : '';
         
         $page = (int) ($_GET['page'] ?? 1);
         
         $missions = $this->db->fetchAll(
-            "SELECT m.*, v.immatriculation, u.nom as agent_nom, u.prenom as agent_prenom, z.nom as zone_nom,
-                    COALESCE((SELECT SUM(COALESCE(mc.caisses_deja_dans_vehicule, 0) + COALESCE(mc.quantite_caisses, FLOOR(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))))
-                              FROM mission_chargements mc
-                              JOIN produits p ON mc.produit_id = p.id
-                              WHERE mc.mission_id = m.id), 0) as total_caisses,
+            "SELECT m.*, v.immatriculation, u.nom as agent_nom, u.prenom as agent_prenom, z.nom as zone_nom, c.nom as client_nom,
+                    CASE
+                        WHEN COALESCE(m.type_mission, 'vente') = 'ristourne' THEN COALESCE(m.montant_ristourne_initial, 0)
+                        ELSE COALESCE((SELECT SUM(COALESCE(mc.caisses_deja_dans_vehicule, 0) + COALESCE(mc.quantite_caisses, FLOOR(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))))
+                                      FROM mission_chargements mc
+                                      JOIN produits p ON mc.produit_id = p.id
+                                      WHERE mc.mission_id = m.id), 0)
+                    END as total_caisses,
                     COALESCE((SELECT COUNT(DISTINCT v2.client_id)
                               FROM ventes v2
-                              WHERE v2.mission_id = m.id AND v2.statut = 'validee'), 0) as nb_clients
+                              WHERE v2.mission_id = m.id AND v2.statut = 'validee' AND COALESCE(m.type_mission, 'vente') = 'vente'), 0) as nb_clients,
+                    COALESCE(m.montant_ristourne_initial, 0) as montant_ristourne_initial,
+                    COALESCE(m.montant_livre, 0) as montant_livre,
+                    COALESCE(m.montant_restant_admin, 0) as montant_restant_admin
              FROM missions m
              JOIN vehicules v ON m.vehicule_id = v.id
              LEFT JOIN users u ON v.agent_responsable_id = u.id
              LEFT JOIN zones z ON m.zone_id = z.id
+             LEFT JOIN clients c ON m.client_id = c.id
+             WHERE 1=1{$typeMissionSql}
              ORDER BY m.date_depart DESC
              LIMIT 20 OFFSET " . (($page - 1) * 20)
         );
@@ -58,6 +74,37 @@ class MissionController extends Controller
             'missions' => $missions,
             'vehicules' => $vehicules,
             'filters' => $filters
+        ]);
+    }
+
+    /**
+     * Formulaire de création d'une mission de ristourne
+     */
+    public function createRestourne()
+    {
+        $this->requireRole([ROLE_ADMIN]);
+
+        $vehicules = $this->vehiculeModel->getDisponibles();
+        $produits = $this->produitModel->getWithStock();
+        $zones = $this->zoneModel->getActive();
+        $emplacementPrincipal = $this->emplacementModel->getPrincipal();
+        $clients = $this->clientModel->getAllWithZone();
+        $ristournes = $this->db->fetchAll(
+            "SELECT r.*, c.nom as client_nom, c.numero_client
+             FROM ristournes r
+             JOIN clients c ON r.client_id = c.id
+             WHERE r.statut = 'calculee'
+             ORDER BY r.id DESC"
+        );
+
+        $this->view('missions/ristourne-create', [
+            'vehicules' => $vehicules,
+            'produits' => $produits,
+            'zones' => $zones,
+            'clients' => $clients,
+            'ristournes' => $ristournes,
+            'emplacementPrincipal' => $emplacementPrincipal,
+            'numero_mission' => $this->missionModel->generateNumeroMission('RST')
         ]);
     }
     
@@ -186,6 +233,83 @@ class MissionController extends Controller
         
         return $this->error($result['message'], 400);
     }
+
+    /**
+     * Enregistrer une mission de ristourne
+     */
+    public function storeRestourne()
+    {
+        $this->requireRole([ROLE_ADMIN]);
+
+        $data = $this->getJsonInput();
+
+        $errors = $this->validate($data, [
+            'vehicule_id' => 'required|numeric',
+            'date_depart' => 'required',
+            'client_id' => 'required|numeric',
+            'ristourne_id' => 'required|numeric',
+            'produit_id' => 'required|numeric'
+        ]);
+
+        if (!empty($errors)) {
+            return $this->error('Erreurs de validation', 422, $errors);
+        }
+
+        $ristourne = $this->db->fetch(
+            "SELECT r.*, c.nom as client_nom, c.zone_id
+             FROM ristournes r
+             JOIN clients c ON r.client_id = c.id
+             WHERE r.id = :id AND r.client_id = :client_id",
+            [
+                'id' => (int) $data['ristourne_id'],
+                'client_id' => (int) $data['client_id']
+            ]
+        );
+
+        if (!$ristourne) {
+            return $this->error('Ristourne introuvable pour ce client', 404);
+        }
+
+        $vehicule = $this->vehiculeModel->getWithStock((int) ($data['vehicule_id'] ?? 0));
+        if (!$vehicule) {
+            return $this->error('Véhicule non trouvé', 404);
+        }
+
+        $emplacementPrincipal = $this->emplacementModel->getPrincipal();
+
+        $missionData = [
+            'numero_mission' => $this->missionModel->generateNumeroMission('RST'),
+            'vehicule_id' => $data['vehicule_id'],
+            'chauffeur_id' => $data['chauffeur_id'] ?? null,
+            'client_id' => $data['client_id'],
+            'ristourne_id' => $data['ristourne_id'],
+            'date_depart' => $data['date_depart'],
+            'zone_id' => $data['zone_id'] ?? ($ristourne['zone_id'] ?? null),
+            'notes' => $data['notes'] ?? '',
+            'statut' => 'en_cours',
+            'montant_ristourne_initial' => (float) ($data['montant_ristourne_initial'] ?? $ristourne['montant_ristourne'] ?? 0),
+            'created_by' => $_SESSION['user_id']
+        ];
+
+        $result = $this->missionModel->createWithRestourne(
+            $missionData,
+            [
+                'produit_id' => (int) $data['produit_id']
+            ],
+            $emplacementPrincipal['id']
+        );
+
+        if ($result['success']) {
+            return $this->success([
+                'id' => $result['id'],
+                'caisses_livrees' => $result['caisses_livrees'] ?? 0,
+                'montant_livre' => $result['montant_livre'] ?? 0,
+                'montant_restant_admin' => $result['montant_restant_admin'] ?? 0
+            ], 'Mission de ristourne créée avec succès');
+        }
+
+        return $this->error($result['message'], 400);
+    }
     
     /**
      * Afficher une mission
@@ -219,6 +343,23 @@ class MissionController extends Controller
         $data = $this->getJsonInput();
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
         $mission = $this->missionModel->getWithDetails($id);
+
+        if ($mission && ($mission['type_mission'] ?? 'vente') === 'ristourne') {
+            $result = $this->missionModel->terminer(
+                $id,
+                [],
+                [],
+                0,
+                $emplacementPrincipal['id'],
+                $data['justification_cloture'] ?? null
+            );
+
+            if ($result['success']) {
+                return $this->success(null, 'Mission de ristourne terminée avec succès');
+            }
+
+            return $this->error($result['message'], 400);
+        }
 
         if (empty($data) || (!isset($data['retours']) && !isset($data['vides_retournes']) && !isset($data['montant_encaisse']))) {
             return $this->error('Veuillez enregistrer les retours (pleins/vides) et le montant encaissé avant de clôturer la mission', 422);

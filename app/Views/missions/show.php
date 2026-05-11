@@ -1,5 +1,7 @@
 <?php 
 $pageTitle = 'Détail mission';
+$isRestourne = (($mission['type_mission'] ?? 'vente') === 'ristourne');
+$firstChargement = $mission['chargements'][0] ?? [];
 ob_start();
 ?>
 
@@ -17,16 +19,18 @@ ob_start();
     <div class="lg:col-span-2 space-y-6">
         <div class="card">
             <div class="card-header flex items-center justify-between">
-                <h2 class="text-lg font-semibold">Mission N° <?= htmlspecialchars($mission['numero_mission']) ?></h2>
+                <h2 class="text-lg font-semibold">
+                    <?= $isRestourne ? 'Mission de ristourne N° ' : 'Mission N° ' ?><?= htmlspecialchars($mission['numero_mission']) ?>
+                </h2>
                 <div class="flex gap-2">
                     <a href="<?= url('missions/' . $mission['id'] . ($mission['statut'] === 'terminee' ? '/facture' : '/print')) ?>" target="_blank" class="btn btn-sm btn-secondary">
                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
                         </svg>
-                        <?= $mission['statut'] === 'terminee' ? 'Facture de mission' : 'Bon de sortie' ?>
+                        <?= $isRestourne ? 'Bon de ristourne' : ($mission['statut'] === 'terminee' ? 'Facture de mission' : 'Bon de sortie') ?>
                     </a>
                     <?php if ($mission['statut'] === 'en_cours'): ?>
-                    <button onclick="terminerMission()" class="btn btn-sm btn-primary">Terminer</button>
+                    <button onclick="terminerMission()" class="btn btn-sm btn-primary"><?= $isRestourne ? 'Clôturer' : 'Terminer' ?></button>
                     <?php endif; ?>
                 </div>
             </div>
@@ -64,6 +68,32 @@ ob_start();
                             <?= htmlspecialchars($mission['zone_nom'] ?? 'N/A') ?>
                         </p>
                     </div>
+                    <?php if ($isRestourne): ?>
+                    <div>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Client</p>
+                        <p class="font-medium text-gray-900 dark:text-white">
+                            <?= htmlspecialchars($mission['client']['nom'] ?? $mission['ristourne']['client_nom'] ?? 'N/A') ?>
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Montant ristourne</p>
+                        <p class="font-medium text-gray-900 dark:text-white">
+                            <?= format_money_converted($mission['montant_ristourne_initial'] ?? 0) ?>
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Montant livré</p>
+                        <p class="font-medium text-gray-900 dark:text-white">
+                            <?= format_money_converted($mission['montant_livre'] ?? 0) ?>
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Reste administration</p>
+                        <p class="font-medium text-gray-900 dark:text-white">
+                            <?= format_money_converted($mission['montant_restant_admin'] ?? 0) ?>
+                        </p>
+                    </div>
+                    <?php endif; ?>
                     <div>
                         <p class="text-sm text-gray-500 dark:text-gray-400">Statut</p>
                         <?php if ($mission['statut'] === 'en_cours'): ?>
@@ -80,13 +110,20 @@ ob_start();
                     <p class="text-gray-900 dark:text-white"><?= htmlspecialchars($mission['notes']) ?></p>
                 </div>
                 <?php endif; ?>
+                <?php if ($isRestourne && !empty($mission['ristourne'])): ?>
+                <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">Ristourne liée</p>
+                    <p class="text-gray-900 dark:text-white font-medium"><?= htmlspecialchars($mission['ristourne']['client_nom'] ?? 'N/A') ?></p>
+                    <p class="text-sm text-gray-500">Période: <?= htmlspecialchars($mission['ristourne']['periode_debut'] ?? '') ?> → <?= htmlspecialchars($mission['ristourne']['periode_fin'] ?? '') ?></p>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
         
         <!-- Chargement -->
         <div class="card">
             <div class="card-header">
-                <h3 class="font-semibold">Chargement</h3>
+                <h3 class="font-semibold"><?= $isRestourne ? 'Produit livré' : 'Chargement' ?></h3>
             </div>
             <div class="card-body p-0">
                 <?php if (empty($mission['chargements'])): ?>
@@ -146,10 +183,25 @@ ob_start();
         <!-- Clients servis -->
         <div class="card">
             <div class="card-header">
-                <h3 class="font-semibold">Clients servis</h3>
+                <h3 class="font-semibold"><?= $isRestourne ? 'Résumé de ristourne' : 'Clients servis' ?></h3>
             </div>
             <div class="card-body p-0">
-                <?php if (empty($mission['clients'])): ?>
+                <?php if ($isRestourne): ?>
+                <div class="p-6">
+                    <div class="rounded-xl border bg-gray-50 dark:bg-gray-900/50 p-4">
+                        <div class="flex items-center justify-between gap-4">
+                            <div>
+                                <p class="font-medium text-gray-900 dark:text-white"><?= htmlspecialchars($mission['client']['nom'] ?? $mission['ristourne']['client_nom'] ?? 'Client') ?></p>
+                                <p class="text-sm text-gray-500">Produit livré: <?= htmlspecialchars($firstChargement['produit_nom'] ?? 'N/A') ?></p>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-semibold"><?= number_format((int) ($firstChargement['quantite_caisses'] ?? 0), 0, '.', ' ') ?> caisses</p>
+                                <p class="text-sm text-gray-500"><?= format_money_converted($mission['montant_livre'] ?? 0) ?></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <?php elseif (empty($mission['clients'])): ?>
                 <div class="p-6 text-center text-gray-500">Aucune vente enregistrée</div>
                 <?php else: ?>
                 <div class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -184,9 +236,9 @@ ob_start();
             <div class="card-body text-center">
                 <p class="text-sm text-gray-500 dark:text-gray-400">Total caisses</p>
                 <p class="text-3xl font-bold text-primary-600">
-                    <?= $mission['total_caisses'] ?? 0 ?>
+                    <?= $isRestourne ? (int) ($firstChargement['quantite_caisses'] ?? 0) : ($mission['total_caisses'] ?? 0) ?>
                 </p>
-                <p class="text-sm text-gray-500 mt-2"><?= count($mission['clients'] ?? []) ?> client(s) servis</p>
+                <p class="text-sm text-gray-500 mt-2"><?= $isRestourne ? 'Mission de ristourne' : count($mission['clients'] ?? []) . ' client(s) servis' ?></p>
             </div>
         </div>
         
@@ -194,10 +246,36 @@ ob_start();
         <?php if ($mission['statut'] === 'terminee'): ?>
         <div class="card">
             <div class="card-header">
-                <h3 class="font-semibold">Ventes réalisées</h3>
+                <h3 class="font-semibold"><?= $isRestourne ? 'Ristourne réalisée' : 'Ventes réalisées' ?></h3>
             </div>
             <div class="card-body">
                 <div class="space-y-4">
+                    <?php if ($isRestourne): ?>
+                    <div>
+                        <p class="text-sm text-gray-500">Produit livré</p>
+                        <p class="text-xl font-bold text-green-600">
+                            <?= htmlspecialchars($firstChargement['produit_nom'] ?? 'N/A') ?>
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Caisses livrées</p>
+                        <p class="text-xl font-bold text-primary-600">
+                            <?= number_format((int) ($firstChargement['quantite_caisses'] ?? 0), 0, '.', ' ') ?> caisses
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Montant livré</p>
+                        <p class="text-xl font-bold text-gray-400">
+                            <?= format_money_converted($mission['montant_livre'] ?? 0) ?>
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Reste administration</p>
+                        <p class="text-xl font-bold text-amber-600">
+                            <?= format_money_converted($mission['montant_restant_admin'] ?? 0) ?>
+                        </p>
+                    </div>
+                    <?php else: ?>
                     <div>
                         <p class="text-sm text-gray-500">Caisses vendues</p>
                         <p class="text-xl font-bold text-green-600">
@@ -216,6 +294,7 @@ ob_start();
                             <?= format_money_converted($mission['montant_attendu'] ?? 0) ?>
                         </p>
                     </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -243,6 +322,7 @@ ob_start();
             vides_retournes: {},
             montant_encaisse: 0,
             justification_cloture: '',
+            isRestourne: <?= $isRestourne ? 'true' : 'false' ?>,
             missionSummary: {
                 caissesVendues: <?= (int) ($mission['caisses_vendues_total'] ?? 0) ?>,
                 caissesVidesAttendues: <?= (int) ($mission['caisses_vides_attendues'] ?? 0) ?>,
@@ -265,6 +345,9 @@ ob_start();
             },
             
             getTotalAttendu() {
+                if (this.isRestourne) {
+                    return 0;
+                }
                 return parseFloat(this.missionSummary.montantAttendu || 0);
             },
 
@@ -301,10 +384,16 @@ ob_start();
             },
 
             hasDiscrepancy() {
+                if (this.isRestourne) {
+                    return false;
+                }
                 return Math.abs(this.getMontantEcart()) > 0.01 || this.getRetoursPleinEcart() !== 0 || this.getCaissesVidesEcart() !== 0;
             },
 
             getClosureMessage() {
+                if (this.isRestourne) {
+                    return 'Mission de ristourne : aucune saisie de vente n’est requise pour la clôture.';
+                }
                 return this.hasDiscrepancy()
                     ? 'Des écarts ont été détectés : la justification devient obligatoire.'
                     : 'Aucun écart détecté : la clôture peut être validée directement.';
@@ -328,12 +417,16 @@ ob_start();
                 if (!ok) return;
                 this.loading = true;
                 try {
-                    await App.api('/api/missions/<?= $mission['id'] ?>/terminer', 'POST', {
-                        retours: this.retours,
-                        vides_retournes: this.vides_retournes,
-                        montant_encaisse: App.convertMoney(this.montant_encaisse, window.DEVISE, window.BASE_DEVISE),
-                        justification_cloture: this.justification_cloture
-                    });
+                    const payload = this.isRestourne
+                        ? { justification_cloture: this.justification_cloture }
+                        : {
+                            retours: this.retours,
+                            vides_retournes: this.vides_retournes,
+                            montant_encaisse: App.convertMoney(this.montant_encaisse, window.DEVISE, window.BASE_DEVISE),
+                            justification_cloture: this.justification_cloture
+                        };
+
+                    await App.api('/api/missions/<?= $mission['id'] ?>/terminer', 'POST', payload);
                     App.notify('Mission clôturée avec succès');
                     location.reload();
                 } catch (e) {
@@ -388,7 +481,7 @@ ob_start();
                             </div>
 
                             <!-- Tableau des retours -->
-                            <div class="overflow-x-auto">
+                            <div class="overflow-x-auto" x-show="!isRestourne">
                                 <table class="table w-full text-sm">
                                     <thead>
                                         <tr>
@@ -418,7 +511,7 @@ ob_start();
                             </div>
 
                             <!-- Section Financière -->
-                            <div class="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-6" x-show="!isRestourne">
                                 <div>
                                     <label class="label">Montant encaissé réel (<span x-text="window.DEVISE"></span>)</label>
                                     <input type="number" x-model.number="montant_encaisse" class="input text-xl font-bold text-green-600" step="0.01" required>
@@ -466,12 +559,17 @@ ob_start();
                                     </div>
                                 </div>
                             </div>
+
+                            <div class="rounded-xl border p-4 bg-blue-50 border-blue-200" x-show="isRestourne">
+                                <p class="text-sm font-semibold text-blue-800">Clôture de mission de ristourne</p>
+                                <p class="text-sm text-blue-700 mt-1">La mission a déjà été préparée avec le produit et le montant livré. La clôture se limite à finaliser le statut de mission.</p>
+                            </div>
                         </div>
 
                         <div class="flex justify-end space-x-3 mt-8">
                             <button type="button" @click="isOpen = false" class="btn btn-secondary">Annuler</button>
                             <button type="submit" class="btn btn-primary" :disabled="loading">
-                                <span x-show="!loading">Valider le retour</span>
+                                <span x-show="!loading" x-text="isRestourne ? 'Clôturer la mission' : 'Valider le retour'"></span>
                                 <span x-show="loading">Traitement...</span>
                             </button>
                         </div>

@@ -7,20 +7,38 @@ ob_start();
 <div class="flex items-center justify-between mb-6">
     <div>
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Missions</h1>
-        <p class="text-gray-500 dark:text-gray-400">Gestion des missions de livraison</p>
+        <p class="text-gray-500 dark:text-gray-400">Gestion des missions de livraison et de ristourne</p>
     </div>
-    <a href="<?= url('missions/create') ?>" class="btn btn-primary">
-        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-        </svg>
-        Nouvelle mission
-    </a>
+    <div class="flex gap-2 flex-wrap justify-end">
+        <a href="<?= url('missions/create') ?>" class="btn btn-primary">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Nouvelle mission
+        </a>
+        <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === ROLE_ADMIN): ?>
+        <a href="<?= url('missions/ristourne/create') ?>" class="btn btn-secondary">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Mission de ristourne
+        </a>
+        <?php endif; ?>
+    </div>
 </div>
 
 <!-- Filtres -->
 <div class="card mb-6">
     <div class="card-body">
         <form method="GET" class="flex flex-wrap gap-4 items-end">
+            <div>
+                <label class="label">Type</label>
+                <select name="type_mission" class="input">
+                    <option value="">Tous</option>
+                    <option value="vente" <?= ($filters['type_mission'] ?? '') == 'vente' ? 'selected' : '' ?>>Vente</option>
+                    <option value="ristourne" <?= ($filters['type_mission'] ?? '') == 'ristourne' ? 'selected' : '' ?>>Ristourne</option>
+                </select>
+            </div>
             <div>
                 <label class="label">Statut</label>
                 <select name="statut" class="input">
@@ -66,12 +84,13 @@ ob_start();
             <table class="table">
                 <thead>
                     <tr>
+                        <th>Type</th>
                         <th>N° Mission</th>
                         <th>Date</th>
                         <th>Véhicule</th>
                         <th>Agent</th>
                         <th>Zone</th>
-                        <th>Chargement</th>
+                        <th>Résumé</th>
                         <th>Statut</th>
                         <th>Actions</th>
                     </tr>
@@ -79,6 +98,13 @@ ob_start();
                 <tbody>
                     <?php foreach ($missions as $mission): ?>
                     <tr>
+                        <td>
+                            <?php if (($mission['type_mission'] ?? 'vente') === 'ristourne'): ?>
+                                <span class="badge-info">Ristourne</span>
+                            <?php else: ?>
+                                <span class="badge-primary">Vente</span>
+                            <?php endif; ?>
+                        </td>
                         <td class="font-medium"><?= htmlspecialchars($mission['numero_mission']) ?></td>
                         <td>
                             <div><?= date('d/m/Y', strtotime($mission['date_depart'])) ?></div>
@@ -91,8 +117,14 @@ ob_start();
                         <td><?= htmlspecialchars($mission['agent_nom'] ?? 'N/A') ?></td>
                         <td><?= htmlspecialchars($mission['zone_nom'] ?? 'N/A') ?></td>
                         <td>
-                            <div class="font-medium"><?= number_format((int) ($mission['total_caisses'] ?? 0), 0, '.', ' ') ?> caisses</div>
-                            <div class="text-xs text-gray-500"><?= $mission['nb_clients'] ?? 0 ?> client(s)</div>
+                            <?php if (($mission['type_mission'] ?? 'vente') === 'ristourne'): ?>
+                                <div class="font-medium"><?= format_money_converted($mission['montant_ristourne_initial'] ?? 0) ?></div>
+                                <div class="text-xs text-gray-500"><?= number_format((int) ($mission['total_caisses'] ?? 0), 0, '.', ' ') ?> cs livrées</div>
+                                <div class="text-xs text-gray-500">Reste admin: <?= format_money_converted($mission['montant_restant_admin'] ?? 0) ?></div>
+                            <?php else: ?>
+                                <div class="font-medium"><?= number_format((int) ($mission['total_caisses'] ?? 0), 0, '.', ' ') ?> caisses</div>
+                                <div class="text-xs text-gray-500"><?= $mission['nb_clients'] ?? 0 ?> client(s)</div>
+                            <?php endif; ?>
                         </td>
                         <td>
                             <?php if ($mission['statut'] === 'en_cours'): ?>

@@ -17,7 +17,7 @@ class Vehicule extends Model
             "SELECT v.*, 
                     u.nom as agent_nom, u.prenom as agent_prenom,
                     e.nom as emplacement_nom,
-                    (SELECT COUNT(*) FROM missions m WHERE m.vehicule_id = v.id AND m.statut = 'en_cours') as en_mission,
+                    (SELECT COUNT(*) FROM missions m WHERE m.vehicule_id = v.id AND m.statut = 'en_cours' AND COALESCE(m.type_mission, 'vente') = 'vente') as en_mission,
                     (SELECT COALESCE(SUM(s.caisses_pleine), 0) FROM stocks s WHERE s.emplacement_id = v.emplacement_id) as stock_actuel
              FROM {$this->table} v
              LEFT JOIN users u ON v.agent_responsable_id = u.id
@@ -44,7 +44,7 @@ class Vehicule extends Model
              WHERE v.actif = 1 
              AND NOT EXISTS (
                  SELECT 1 FROM missions m 
-                 WHERE m.vehicule_id = v.id AND m.statut = 'en_cours'
+                 WHERE m.vehicule_id = v.id AND m.statut = 'en_cours' AND COALESCE(m.type_mission, 'vente') = 'vente'
              )
              ORDER BY v.immatriculation"
         );
@@ -59,7 +59,7 @@ class Vehicule extends Model
             "SELECT v.*, 
                     u.nom as agent_nom, u.prenom as agent_prenom,
                     e.nom as emplacement_nom,
-                    (SELECT COUNT(*) FROM missions m WHERE m.vehicule_id = v.id AND m.statut = 'en_cours') as en_mission
+                    (SELECT COUNT(*) FROM missions m WHERE m.vehicule_id = v.id AND m.statut = 'en_cours' AND COALESCE(m.type_mission, 'vente') = 'vente') as en_mission
              FROM {$this->table} v
              LEFT JOIN users u ON v.agent_responsable_id = u.id
              LEFT JOIN emplacements e ON v.emplacement_id = e.id

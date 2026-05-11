@@ -341,6 +341,13 @@
                         </svg>
                         Ristournes
                     </a>
+
+                    <a href="<?= url('missions/ristourne/create') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/missions/ristourne') !== false ? 'active' : '' ?>">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Mission de ristourne
+                    </a>
                     
                     <a href="<?= url('admin/users') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/admin/users') !== false ? 'active' : '' ?>">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
