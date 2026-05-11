@@ -100,7 +100,8 @@ document.addEventListener('alpine:init', () => {
                     produit_code: p.code,
                     bouteilles_par_caisses: parseInt(p.bouteilles_par_caisses) || 24,
                     caisses_pleine: parseInt(existing.caisses_pleine || 0) || 0,
-                    caisses_vide: parseInt(existing.caisses_vide || 0) || 0
+                    caisses_vide: parseInt(existing.caisses_vide || 0) || 0,
+                    has_existing_stock: !!existing.id
                 };
             });
             this.totalProduits = this.lignes.length;
@@ -118,9 +119,10 @@ document.addEventListener('alpine:init', () => {
                     .map((ligne) => ({
                         produit_id: parseInt(ligne.produit_id),
                         caisses_pleine: Math.max(0, Math.round(parseInt(ligne.caisses_pleine || 0) || 0)),
-                        caisses_vide: Math.max(0, Math.round(parseInt(ligne.caisses_vide || 0) || 0))
+                        caisses_vide: Math.max(0, Math.round(parseInt(ligne.caisses_vide || 0) || 0)),
+                        has_existing_stock: !!ligne.has_existing_stock
                     }))
-                    .filter((ligne) => ligne.produit_id && (ligne.caisses_pleine > 0 || ligne.caisses_vide > 0));
+                    .filter((ligne) => ligne.produit_id && (ligne.has_existing_stock || ligne.caisses_pleine > 0 || ligne.caisses_vide > 0));
 
                 if (lignes.length === 0) {
                     throw new Error('Saisissez au moins un produit avec une quantité');

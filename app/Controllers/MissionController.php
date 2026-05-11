@@ -207,6 +207,32 @@ class MissionController extends Controller
         if (empty($chargements)) {
             return $this->error('Ajoutez au moins un produit présent dans le véhicule ou une quantité à charger avant de lancer la mission.', 422);
         }
+
+        $capaciteVehicule = (int) ($vehicule['capacite'] ?? 0);
+        if ($capaciteVehicule > 0) {
+            $stockVehiculeActuel = 0;
+            foreach (($vehicule['stock'] ?? []) as $stock) {
+                $stockVehiculeActuel += (int) round((float) ($stock['caisses_pleine'] ?? 0));
+                $stockVehiculeActuel += (int) round((float) ($stock['caisses_vide'] ?? 0));
+            }
+
+            $totalMissionCaisses = 0;
+            foreach ($chargements as $chargement) {
+                $totalMissionCaisses += max(0, (int) ($chargement['quantite_caisses'] ?? 0));
+            }
+
+            if (($stockVehiculeActuel + $totalMissionCaisses) > $capaciteVehicule) {
+                return $this->error(
+                    'La mission dépasse la capacité du véhicule. Capacité: ' . $capaciteVehicule . ' caisses, stock actuel: ' . $stockVehiculeActuel . ' caisses, ajout demandé: ' . $totalMissionCaisses . ' caisses.',
+                    422,
+                    [
+                        'capacite_vehicule' => $capaciteVehicule,
+                        'stock_actuel' => $stockVehiculeActuel,
+                        'ajout_demande' => $totalMissionCaisses
+                    ]
+                );
+            }
+        }
         
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
         

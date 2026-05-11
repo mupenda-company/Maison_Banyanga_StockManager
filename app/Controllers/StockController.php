@@ -107,8 +107,13 @@ class StockController extends Controller
                 $produitId = (int) ($ligne['produit_id'] ?? 0);
                 $caissesPleines = (int) ($ligne['caisses_pleine'] ?? 0);
                 $caissesVides = (int) ($ligne['caisses_vide'] ?? 0);
+                $stockExistant = $this->stockModel->getStock($produitId, (int) $data['emplacement_id']);
 
-                if ($produitId <= 0 || ($caissesPleines <= 0 && $caissesVides <= 0)) {
+                if ($produitId <= 0) {
+                    continue;
+                }
+
+                if (!$stockExistant && $caissesPleines <= 0 && $caissesVides <= 0) {
                     continue;
                 }
 

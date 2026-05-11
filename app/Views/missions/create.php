@@ -91,6 +91,17 @@ ob_start();
                             quantite_caisses: parseInt(c.quantite_caisses || 0),
                             quantite: parseInt(c.quantite || 0)
                         }));
+
+                        const selectedVehicule = vehicules.find(v => String(v.id) === String(vehicule_id));
+                        const capaciteVehicule = parseInt(selectedVehicule?.capacite || 0);
+                        const stockVehiculeActuel = selectedVehicule
+                            ? Math.round(parseFloat(selectedVehicule.stock_caisses_pleine || 0)) + Math.round(parseFloat(selectedVehicule.stock_caisses_vide || 0))
+                            : 0;
+                        const totalMissionCaisses = chargementsValides.reduce((total, ligne) => total + Math.max(0, parseInt(ligne.quantite_caisses || 0)), 0);
+
+                        if (capaciteVehicule > 0 && (stockVehiculeActuel + totalMissionCaisses) > capaciteVehicule) {
+                            throw new Error(`La mission dépasse la capacité du véhicule. Capacité: ${capaciteVehicule} caisses, stock actuel: ${stockVehiculeActuel} caisses, ajout demandé: ${totalMissionCaisses} caisses.`);
+                        }
                         
                         if (chargementsValides.length === 0) {
                             throw new Error('Ajoutez au moins un produit présent dans le véhicule ou une quantité à charger');
@@ -239,11 +250,11 @@ ob_start();
                                             <div class="flex items-center space-x-2">
                                                 <input type="number" x-model.number="chargement.quantite_caisses" 
                                                        @input="const produit = getProduit(chargement.produit_id); if (produit) { chargement.quantite = Math.round(chargement.quantite_caisses || 0) * (parseInt(produit.bouteilles_par_caisses || 24)); } chargement.quantite_caisses = Math.max(0, Math.round(chargement.quantite_caisses || 0));"
-                                                       class="input w-24" min="0" step="1" :max="Math.round(parseFloat(chargement.auto_vehicle_stock ? (chargement.stock_depart_caisses || 0) : (getProduit(chargement.produit_id) ? getProduit(chargement.produit_id).stock_caisses_pleine : 0)))" placeholder="Caisses">
+                                                       class="input w-24" min="0" step="1" placeholder="Caisses">
                                                 <span class="text-xs text-gray-500">=</span>
                                                 <input type="number" x-model.number="chargement.quantite" 
                                                        @input="const produit = getProduit(chargement.produit_id); if (produit) { chargement.quantite = Math.max(0, Math.round(chargement.quantite || 0)); chargement.quantite_caisses = Math.round(chargement.quantite / (parseInt(produit.bouteilles_par_caisses || 24))); }"
-                                                       class="input w-24" min="0" step="1" :max="Math.round(parseFloat(chargement.auto_vehicle_stock ? (chargement.stock_depart_bouteilles || 0) : (getProduit(chargement.produit_id) ? getProduit(chargement.produit_id).stock_plein : 0)))" placeholder="Btl">
+                                                       class="input w-24" min="0" step="1" placeholder="Btl">
                                             </div>
                                         </td>
                                         <td class="px-4 py-2">

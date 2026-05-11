@@ -352,6 +352,7 @@ class Mission extends Model
             $missionId = $this->create($data);
             
             // Charger le véhicule et déduire de l'entrepôt
+            $stockModel = new Stock();
             $mouvementModel = new MouvementStock();
             
             foreach ($chargements as $chargement) {
