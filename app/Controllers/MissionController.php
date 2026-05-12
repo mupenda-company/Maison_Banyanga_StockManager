@@ -365,109 +365,48 @@ class MissionController extends Controller
     public function terminer($id)
     {
         $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
-        
+
         $data = $this->getJsonInput();
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
         $mission = $this->missionModel->getWithDetails($id);
 
-        if ($mission && ($mission['type_mission'] ?? 'vente') === 'ristourne') {
-            $result = $this->missionModel->terminer(
-                $id,
-                [],
-                [],
-                0,
-                $emplacementPrincipal['id'],
-                $data['justification_cloture'] ?? null
-            );
-
-            if ($result['success']) {
-                return $this->success(null, 'Mission de ristourne terminée avec succès');
-            }
-
-            return $this->error($result['message'], 400);
-        }
-
-        if (empty($data) || (!isset($data['retours']) && !isset($data['vides_retournes']) && !isset($data['montant_encaisse']))) {
-            return $this->error('Veuillez enregistrer les retours (pleins/vides) et le montant encaissé avant de clôturer la mission', 422);
-        }
-
         if (!$mission) {
             return $this->error('Mission non trouvée', 404);
         }
-        
-        // Préparer les retours de produits pleins (invendus)
+
         $retours = [];
-        if (isset($data['retours'])) {
+        if (isset($data['retours']) && is_array($data['retours'])) {
             foreach ($data['retours'] as $produitId => $quantite) {
                 $retours[$produitId] = (int) $quantite;
             }
         }
 
-        $retoursPleinsAttendues = 0;
-        if (!empty($mission['chargements']) && is_array($mission['chargements'])) {
-            foreach ($mission['chargements'] as $chargement) {
-                $totalReel = (int) ($chargement['caisses_total'] ?? (($chargement['caisses_deja_dans_vehicule'] ?? 0) + ($chargement['quantite_caisses'] ?? 0)));
-                $vendues = (int) ($chargement['caisses_vendues'] ?? floor(((int) ($chargement['quantite_vendue'] ?? 0)) / max((int) ($chargement['bouteilles_par_caisses'] ?? 24), 1)));
-                $retoursPleinsAttendues += max($totalReel - $vendues, 0);
-            }
-        }
-
-        $retoursPleinsRetournes = 0;
-        foreach ($retours as $quantite) {
-            $retoursPleinsRetournes += max((int) $quantite, 0);
-        }
-        
-        // Préparer les retours de caisses vides
         $vides_retournes = [];
-        if (isset($data['vides_retournes'])) {
+        if (isset($data['vides_retournes']) && is_array($data['vides_retournes'])) {
             foreach ($data['vides_retournes'] as $produitId => $nbCaisses) {
                 $vides_retournes[$produitId] = (int) $nbCaisses;
             }
         }
 
         $montant_attendu = (float) ($mission['montant_attendu'] ?? 0);
-        $montant_encaisse = isset($data['montant_encaisse']) ? floatval($data['montant_encaisse']) : 0;
+        $montant_encaisse = isset($data['montant_encaisse']) ? (float) $data['montant_encaisse'] : 0;
         if ($montant_encaisse <= 0 && $montant_attendu > 0) {
             $montant_encaisse = $montant_attendu;
         }
 
-        $caissesVidesAttendues = (int) ($mission['caisses_vides_attendues'] ?? 0);
-        $caissesVidesRetournees = 0;
-        foreach ($vides_retournes as $nbCaisses) {
-            $caissesVidesRetournees += (int) $nbCaisses;
-        }
-
-        $montantEcart = round($montant_encaisse - $montant_attendu, 2);
-        $retoursPleinsEcart = $retoursPleinsAttendues - $retoursPleinsRetournes;
-        $caissesEcart = $caissesVidesAttendues - $caissesVidesRetournees;
-        $hasDiscrepancy = abs($montantEcart) > 0.01 || $retoursPleinsEcart !== 0 || $caissesEcart !== 0;
-        $justificationCloture = trim((string) ($data['justification_cloture'] ?? ''));
-
-        if ($hasDiscrepancy && $justificationCloture === '') {
-            return $this->error(
-                'Une justification est obligatoire lorsqu’il y a un écart entre le montant attendu et le montant encaissé, les retours pleins attendus et retournés, ou les caisses vides attendues et retournées.',
-                422,
-                [
-                    'montant_ecart' => $montantEcart,
-                    'retours_pleins_ecart' => $retoursPleinsEcart,
-                    'caisses_vides_ecart' => $caissesEcart,
-                ]
-            );
-        }
-        
         $result = $this->missionModel->terminer(
-            $id, 
-            $retours, 
-            $vides_retournes, 
-            $montant_encaisse, 
+            $id,
+            $retours,
+            $vides_retournes,
+            $montant_encaisse,
             $emplacementPrincipal['id'],
-            $justificationCloture
+            $data['justification_cloture'] ?? null
         );
-        
+
         if ($result['success']) {
             return $this->success(null, 'Mission terminée et stock mis à jour avec succès');
         }
-        
+
         return $this->error($result['message'], 400);
     }
     

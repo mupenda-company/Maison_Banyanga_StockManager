@@ -403,25 +403,15 @@ ob_start();
                     return 'Mission de ristourne : aucune saisie de vente n’est requise pour la clôture.';
                 }
                 return this.hasDiscrepancy()
-                    ? 'Des écarts ont été détectés : la justification devient obligatoire.'
+                    ? 'Des écarts ont été détectés : vous pouvez tout de même clôturer la mission.'
                     : 'Aucun écart détecté : la clôture peut être validée directement.';
             },
 
             async submit() {
-                if (this.hasTooManyVidesRetournees()) {
-                    App.notify('Vous ne pouvez pas retourner plus de caisses vides que celles réellement reçues pour ce produit.', 'error');
-                    return;
-                }
-
-                if (this.hasDiscrepancy() && this.justification_cloture.trim() === '') {
-                    App.notify('La justification de clôture est obligatoire en cas d’écart.', 'error');
-                    return;
-                }
-
                 const ok = await App.confirm({
                     title: 'Clôturer la mission ?',
                     message: this.hasDiscrepancy()
-                        ? 'Des écarts ont été détectés. Confirmer la clôture avec justification ?'
+                        ? 'Des écarts ont été détectés. Confirmer la clôture ?'
                         : 'Confirmer la clôture de la mission ?',
                     confirmText: 'Clôturer',
                     cancelText: 'Annuler',
@@ -478,7 +468,7 @@ ob_start();
                         <div class="space-y-6">
                             <div class="rounded-xl border p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4" :class="hasDiscrepancy() ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'">
                                 <div>
-                                    <p class="text-sm font-semibold" :class="hasDiscrepancy() ? 'text-amber-800' : 'text-emerald-800'" x-text="hasDiscrepancy() ? 'Clôture avec justification obligatoire' : 'Clôture cohérente'"></p>
+                                    <p class="text-sm font-semibold" :class="hasDiscrepancy() ? 'text-amber-800' : 'text-emerald-800'" x-text="hasDiscrepancy() ? 'Clôture avec écarts détectés' : 'Clôture cohérente'"></p>
                                     <p class="text-xs mt-1" :class="hasDiscrepancy() ? 'text-amber-700' : 'text-emerald-700'" x-text="getClosureMessage()"></p>
                                 </div>
                                 <div class="grid grid-cols-2 gap-3 text-sm min-w-[260px]">
@@ -516,7 +506,7 @@ ob_start();
                                                 </td>
                                                 <td>
                                                     <div class="flex flex-col gap-1">
-                                                        <input type="number" x-model.number="vides_retournes[c.produit_id]" class="input py-1 w-24" min="0" :max="Math.max(parseInt(c.caisses_vides_recues || 0, 10) || 0, 0)">
+                                                        <input type="number" x-model.number="vides_retournes[c.produit_id]" class="input py-1 w-24" min="0">
                                                         <p class="text-[10px] text-gray-500">Reçues: <span x-text="Math.max(parseInt(c.caisses_vides_recues || 0, 10) || 0, 0) + ' cs'"></span></p>
                                                     </div>
                                                 </td>
@@ -534,9 +524,9 @@ ob_start();
                                     <p class="text-xs text-gray-500 mt-2">Saisir le montant réellement remis à la clôture.</p>
                                     <div class="mt-4">
                                         <label class="label">Justification de clôture</label>
-                                        <textarea x-model="justification_cloture" class="input" rows="4" placeholder="Obligatoire s'il existe un écart de caisse ou d'emballages."></textarea>
+                                        <textarea x-model="justification_cloture" class="input" rows="4" placeholder="Facultative, vous pouvez détailler les écarts si nécessaire."></textarea>
                                         <p class="text-xs mt-2" :class="hasDiscrepancy() ? 'text-red-500' : 'text-gray-500'">
-                                            <span x-show="hasDiscrepancy()">Une justification est requise pour valider la clôture.</span>
+                                            <span x-show="hasDiscrepancy()">Une justification peut être ajoutée si vous souhaitez préciser les écarts.</span>
                                             <span x-show="!hasDiscrepancy()">La justification reste facultative si tout est conforme.</span>
                                         </p>
                                     </div>

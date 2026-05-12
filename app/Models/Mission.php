@@ -647,19 +647,6 @@ class Mission extends Model
                     $quantiteBouteillesVides = $nbCaissesVides * $bouteillesParCaisse;
 
                     if ($emplacementVehicule > 0) {
-                        $stockVehicule = $stockModel->getStock($produitId, $emplacementVehicule);
-                        $caissesVidesDisponibles = (int) ($stockVehicule['caisses_vide'] ?? 0);
-                        $bouteillesVidesDisponibles = (int) ($stockVehicule['quantite_vide'] ?? 0);
-
-                        if ($caissesVidesDisponibles < $nbCaissesVides || $bouteillesVidesDisponibles < $quantiteBouteillesVides) {
-                            throw new Exception(
-                                'Stock de caisses vides insuffisant dans le véhicule pour ' . ($produit['nom'] ?? ('produit #' . $produitId)) .
-                                '. Disponible: ' . $caissesVidesDisponibles . ' cs, demandé: ' . $nbCaissesVides . ' cs.'
-                            );
-                        }
-                    }
-
-                    if ($emplacementVehicule > 0) {
                         $mouvementModel->create([
                             'produit_id' => $produitId,
                             'emplacement_id' => $emplacementVehicule,
