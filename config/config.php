@@ -17,7 +17,7 @@ define('DB_CHARSET', 'utf8mb4');
 // define('DB_CHARSET', 'utf8mb4');
 
 // Configuration de l'application
-define('APP_NAME', 'SUNCITY-CE SARL');
+define('APP_NAME', 'SUN CITY-CE SARL');
 define('APP_VERSION', '1.0.0');
 // Détecter automatiquement l'URL de base
 $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';

@@ -252,7 +252,6 @@
                 <div class="section-title">Résumé</div>
                 <?php if (!empty($ristourneInfo)): ?>
                     <p><strong>Produits cumulés (période):</strong> <?= number_format((int) ($ristourneInfo['total_caisses'] ?? 0), 0, '.', ' ') ?> cs</p>
-                    <p><strong>CA (période):</strong> <?= format_money_converted($ristourneInfo['ca_total'] ?? 0) ?></p>
                     <p><strong>Ristourne:</strong> <?= number_format((float) ($ristourneInfo['taux_applique'] ?? 0), 2, '.', ' ') ?>% (<?= format_money_converted($ristourneInfo['montant_ristourne'] ?? 0) ?>)</p>
                 <?php elseif (isset($totalCaissesClient)): ?>
                     <p><strong>Produits cumulés:</strong> <?= number_format((int) $totalCaissesClient, 0, '.', ' ') ?> cs</p>
