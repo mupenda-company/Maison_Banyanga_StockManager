@@ -383,6 +383,14 @@ ob_start();
                 return this.getCaissesVidesAttendues() - this.getTotalVidesRetournees();
             },
 
+            hasTooManyVidesRetournees() {
+                return (this.chargements || []).some((c) => {
+                    const maxVides = Math.max(parseInt(c.caisses_vides_recues || 0, 10) || 0, 0);
+                    const saisi = parseInt(this.vides_retournes[c.produit_id] || 0, 10) || 0;
+                    return saisi > maxVides;
+                });
+            },
+
             hasDiscrepancy() {
                 if (this.isRestourne) {
                     return false;
@@ -400,6 +408,11 @@ ob_start();
             },
 
             async submit() {
+                if (this.hasTooManyVidesRetournees()) {
+                    App.notify('Vous ne pouvez pas retourner plus de caisses vides que celles réellement reçues pour ce produit.', 'error');
+                    return;
+                }
+
                 if (this.hasDiscrepancy() && this.justification_cloture.trim() === '') {
                     App.notify('La justification de clôture est obligatoire en cas d’écart.', 'error');
                     return;
@@ -502,7 +515,10 @@ ob_start();
                                                     <input type="number" x-model.number="retours[c.produit_id]" class="input py-1 w-24" :max="Math.max((c.caisses_total || ((c.caisses_deja_dans_vehicule || 0) + (c.quantite_caisses || 0))) - (c.caisses_vendues || Math.floor((c.quantite_vendue || 0) / Math.max(parseInt(c.bouteilles_par_caisses || 24, 10) || 24, 1))), 0)" min="0">
                                                 </td>
                                                 <td>
-                                                    <input type="number" x-model.number="vides_retournes[c.produit_id]" class="input py-1 w-24" min="0">
+                                                    <div class="flex flex-col gap-1">
+                                                        <input type="number" x-model.number="vides_retournes[c.produit_id]" class="input py-1 w-24" min="0" :max="Math.max(parseInt(c.caisses_vides_recues || 0, 10) || 0, 0)">
+                                                        <p class="text-[10px] text-gray-500">Reçues: <span x-text="Math.max(parseInt(c.caisses_vides_recues || 0, 10) || 0, 0) + ' cs'"></span></p>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         </template>

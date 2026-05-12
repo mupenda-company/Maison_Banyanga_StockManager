@@ -154,6 +154,14 @@ class Vente extends Model
             
             foreach ($details as $detail) {
                 $detail['vente_id'] = $venteId;
+
+                if (!array_key_exists('caisses_vides_recues', $detail) || $detail['caisses_vides_recues'] === '' || $detail['caisses_vides_recues'] === null) {
+                    throw new Exception('Les emballages reçus doivent être renseignés pour chaque ligne de vente.');
+                }
+
+                if (!is_numeric($detail['caisses_vides_recues'])) {
+                    throw new Exception('Les emballages reçus doivent être un nombre valide.');
+                }
                 
                 $produit = $produitModel->find($detail['produit_id']);
                 $btlParCaisse = (int)($produit['bouteilles_par_caisses'] ?? 24);

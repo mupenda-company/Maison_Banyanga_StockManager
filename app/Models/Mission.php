@@ -255,11 +255,17 @@ class Mission extends Model
                             WHERE v.mission_id = ? AND v.statut = 'validee'
                         ), 0) as caisses_vendues,
                         COALESCE((
+                            SELECT SUM(COALESCE(vd.caisses_vides_recues, 0))
+                            FROM ventes v
+                            JOIN vente_details vd ON vd.vente_id = v.id
+                            WHERE v.mission_id = ? AND v.statut = 'validee'
+                        ), 0) as caisses_vides_recues,
+                        COALESCE((
                             SELECT SUM(v.total_ttc)
                             FROM ventes v
                             WHERE v.mission_id = ? AND v.statut = 'validee'
                         ), 0) as total",
-                [$id, $id, $id]
+                [$id, $id, $id, $id]
             ) ?: ['quantite_bouteilles' => 0, 'caisses_vendues' => 0, 'total' => 0];
 
             $mission['ventes_par_produit'] = $this->db->fetchAll(
@@ -268,6 +274,7 @@ class Mission extends Model
                         p.code as produit_code,
                         p.bouteilles_par_caisses,
                         COALESCE(SUM(COALESCE(vd.quantite_caisses, ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0))), 0) as caisses_vendues,
+                        COALESCE(SUM(COALESCE(vd.caisses_vides_recues, 0)), 0) as caisses_vides_recues,
                         COALESCE(SUM(vd.quantite), 0) as bouteilles_vendues,
                         COALESCE(SUM(vd.sous_total), 0) as montant
                  FROM ventes v
@@ -280,11 +287,17 @@ class Mission extends Model
                 [$id]
             );
 
+            $videsRecuesParProduit = [];
+            foreach ($mission['ventes_par_produit'] as $venteProduit) {
+                $videsRecuesParProduit[(int) ($venteProduit['produit_id'] ?? 0)] = (int) ($venteProduit['caisses_vides_recues'] ?? 0);
+            }
+
             $mission['montant_attendu'] = (float) ($mission['ventes']['total'] ?? 0);
             $mission['caisses_vendues_total'] = (int) ($mission['ventes']['caisses_vendues'] ?? 0);
+            $mission['caisses_vides_recues_total'] = (int) ($mission['ventes']['caisses_vides_recues'] ?? 0);
             $mission['caisses_vides_retournees'] = (int) ($mission['caisses_vides_retournees'] ?? 0);
             $mission['retours_vides_total'] = $mission['caisses_vides_retournees'];
-            $mission['caisses_vides_attendues'] = $mission['caisses_vendues_total'];
+            $mission['caisses_vides_attendues'] = $mission['caisses_vides_recues_total'];
             $mission['caisses_vides_ecart'] = $mission['caisses_vides_attendues'] - $mission['caisses_vides_retournees'];
             $mission['montant_ecart'] = round((float) ($mission['montant_encaisse'] ?? 0) - $mission['montant_attendu'], 2);
             $mission['justification_cloture'] = trim((string) ($mission['justification_cloture'] ?? ''));
@@ -302,6 +315,7 @@ class Mission extends Model
                 $stockDepartCaisses = (int) ($item['caisses_deja_dans_vehicule'] ?? 0);
                 $item['quantite_caisses'] = (int) ($item['quantite_caisses'] ?? intdiv((int) $item['quantite_chargee'], $btlParCaisse));
                 $item['caisses_vendues'] = (int) intdiv((int) ($item['quantite_vendue'] ?? 0), $btlParCaisse);
+                $item['caisses_vides_recues'] = (int) ($videsRecuesParProduit[(int) ($item['produit_id'] ?? 0)] ?? 0);
                 $item['caisses_total'] = $stockDepartCaisses + $item['quantite_caisses'];
                 $item['stock_depart_bouteilles'] = $stockDepartCaisses * $btlParCaisse;
                 $item['stock_total_bouteilles'] = $item['stock_depart_bouteilles'] + (int) ($item['quantite_chargee'] ?? 0);
@@ -631,6 +645,19 @@ class Mission extends Model
                     }
 
                     $quantiteBouteillesVides = $nbCaissesVides * $bouteillesParCaisse;
+
+                    if ($emplacementVehicule > 0) {
+                        $stockVehicule = $stockModel->getStock($produitId, $emplacementVehicule);
+                        $caissesVidesDisponibles = (int) ($stockVehicule['caisses_vide'] ?? 0);
+                        $bouteillesVidesDisponibles = (int) ($stockVehicule['quantite_vide'] ?? 0);
+
+                        if ($caissesVidesDisponibles < $nbCaissesVides || $bouteillesVidesDisponibles < $quantiteBouteillesVides) {
+                            throw new Exception(
+                                'Stock de caisses vides insuffisant dans le véhicule pour ' . ($produit['nom'] ?? ('produit #' . $produitId)) .
+                                '. Disponible: ' . $caissesVidesDisponibles . ' cs, demandé: ' . $nbCaissesVides . ' cs.'
+                            );
+                        }
+                    }
 
                     if ($emplacementVehicule > 0) {
                         $mouvementModel->create([

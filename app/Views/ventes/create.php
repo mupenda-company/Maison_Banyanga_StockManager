@@ -45,7 +45,7 @@ ob_start();
                         <label class="label mb-0">Produits</label>
                         <button 
                             type="button"
-                            @click="lignes.push({ produit_id: '', caisses: 0, caisses_vides_recues: 0, prix_caisse: 0 })"
+                            @click="lignes.push({ produit_id: '', caisses: 0, caisses_vides_recues: null, prix_caisse: 0 })"
                             class="btn-secondary btn-sm"
                         >
                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -89,10 +89,11 @@ ob_start();
                                             <input type="number" x-model.number="ligne.caisses" class="input w-24" min="1" step="1" required @input="ligne.caisses = Math.round(ligne.caisses || 0); calculateTotals()">
                                         </td>
                                         <td class="px-4 py-2">
-                                            <input type="number" x-model.number="ligne.caisses_vides_recues" class="input w-28" min="0" step="1" @input="ligne.caisses_vides_recues = Math.max(0, Math.round(ligne.caisses_vides_recues || 0)); if (ligne.caisses && ligne.caisses_vides_recues > ligne.caisses) ligne.caisses_vides_recues = ligne.caisses">
+                                            <input type="number" x-model.number="ligne.caisses_vides_recues" class="input w-28" min="0" step="1" required placeholder="0" @input="ligne.caisses_vides_recues = ligne.caisses_vides_recues === null || ligne.caisses_vides_recues === '' ? null : Math.max(0, Math.round(ligne.caisses_vides_recues || 0)); if (ligne.caisses && ligne.caisses_vides_recues !== null && ligne.caisses_vides_recues > ligne.caisses) ligne.caisses_vides_recues = ligne.caisses">
                                             <p class="text-[10px] text-gray-500 mt-1" x-show="ligne.produit_id && ligne.caisses > 0">
                                                 Dette: <span x-text="Math.max(0, (Math.round(ligne.caisses || 0) - Math.round(ligne.caisses_vides_recues || 0))) + ' cs'"></span>
                                             </p>
+                                            <p class="text-[10px] text-amber-600 mt-1">Indiquez explicitement <span class="font-medium">0</span> si aucun emballage vide n’a été reçu.</p>
                                         </td>
                                         <td class="px-4 py-2 text-sm font-medium">
                                             <span x-text="App.formatMoney((ligne.caisses * (ligne.prix_caisse || 0)), (window.DEVISE || 'CDF'))"></span>
@@ -171,7 +172,7 @@ document.addEventListener('alpine:init', () => {
         clientSearch: '',
         emplacement_id: '<?= $emplacements[0]['id'] ?? '' ?>',
         notes: '',
-        lignes: [{ produit_id: '', caisses: 0, prix_caisse: 0 }],
+        lignes: [{ produit_id: '', caisses: 0, caisses_vides_recues: null, prix_caisse: 0 }],
         clients: <?= json_encode($clients) ?>,
         produits: <?= json_encode($produits) ?>,
         tva: <?= $tva ?>,
@@ -185,6 +186,23 @@ document.addEventListener('alpine:init', () => {
             this.$watch('lignes', () => {
                 this.calculateTotals();
             }, { deep: true });
+        },
+
+        hasMissingEmballagesRecus() {
+            return (this.lignes || []).some((ligne) => {
+                if (!ligne.produit_id || (Math.round(ligne.caisses || 0) <= 0)) {
+                    return false;
+                }
+
+                return ligne.caisses_vides_recues === null
+                    || ligne.caisses_vides_recues === undefined
+                    || String(ligne.caisses_vides_recues).trim() === '';
+            });
+        },
+
+        allEmballagesRecusZero() {
+            const lignesValides = (this.lignes || []).filter((ligne) => ligne.produit_id && Math.round(ligne.caisses || 0) > 0);
+            return lignesValides.length > 0 && lignesValides.every((ligne) => Math.max(0, Math.round(ligne.caisses_vides_recues || 0)) === 0);
         },
 
         filteredClients() {
@@ -237,7 +255,20 @@ document.addEventListener('alpine:init', () => {
         async saveVente() {
             this.loading = true;
             try {
-                const details = this.lignes.filter(l => l.produit_id && l.caisses > 0).map(l => {
+                if (!this.client_id) throw new Error('Sélectionnez un client');
+
+                const detailsLignes = this.lignes.filter(l => l.produit_id && l.caisses > 0);
+                if (detailsLignes.length === 0) throw new Error('Ajoutez au moins un produit');
+
+                if (this.hasMissingEmballagesRecus()) {
+                    throw new Error('Veuillez renseigner les emballages reçus pour chaque ligne de vente. Indiquez 0 si aucun emballage vide n’a été récupéré.');
+                }
+
+                if (this.allEmballagesRecusZero() && !window.confirm('Aucun emballage vide n’a été déclaré pour cette vente. Confirmez-vous cette saisie ?')) {
+                    return;
+                }
+
+                const details = detailsLignes.map(l => {
                     const p = this.produits.find(p => p.id == l.produit_id);
                     const btlParCaisse = parseInt(p.bouteilles_par_caisses) || 24;
                     const devise = window.DEVISE || 'CDF';
@@ -254,9 +285,6 @@ document.addEventListener('alpine:init', () => {
                         prix_unitaire: prixCaisseBase / btlParCaisse
                     };
                 });
-                
-                if (details.length === 0) throw new Error('Ajoutez au moins un produit');
-                if (!this.client_id) throw new Error('Sélectionnez un client');
                 
                 await App.api('/api/ventes', 'POST', {
                     client_id: parseInt(this.client_id),

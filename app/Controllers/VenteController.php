@@ -94,13 +94,33 @@ class VenteController extends Controller
         $totalHt = 0;
         $details = [];
         
-        foreach ($data['details'] as $detail) {
+        foreach ($data['details'] as $index => $detail) {
+            if (!is_array($detail)) {
+                return $this->error('Chaque ligne de vente doit être un objet valide.', 422);
+            }
+
+            if (!array_key_exists('caisses_vides_recues', $detail) || $detail['caisses_vides_recues'] === '' || $detail['caisses_vides_recues'] === null) {
+                return $this->error('Veuillez renseigner les emballages reçus pour la ligne ' . ($index + 1) . '. Indiquez 0 si aucun emballage vide n’a été récupéré.', 422);
+            }
+
             $produit = $this->produitModel->find($detail['produit_id']);
+            if (!$produit) {
+                return $this->error('Produit introuvable pour la ligne ' . ($index + 1) . '.', 422);
+            }
+
             $quantiteCaisses = max(0, (int) ($detail['quantite_caisses'] ?? round(((int) ($detail['quantite'] ?? 0)) / max(1, (int) ($produit['bouteilles_par_caisses'] ?? 24)))));
+            if ($quantiteCaisses <= 0) {
+                return $this->error('La quantité de caisses doit être supérieure à 0 pour la ligne ' . ($index + 1) . '.', 422);
+            }
+
+            if (!is_numeric($detail['caisses_vides_recues'])) {
+                return $this->error('Les emballages reçus doivent être un nombre valide pour la ligne ' . ($index + 1) . '.', 422);
+            }
+
             $caissesVidesRecues = max(0, (int) ($detail['caisses_vides_recues'] ?? 0));
 
             if ($caissesVidesRecues > $quantiteCaisses) {
-                return $this->error('Les emballages reçus ne peuvent pas dépasser le nombre de caisses vendues.', 422);
+                return $this->error('Les emballages reçus ne peuvent pas dépasser le nombre de caisses vendues pour la ligne ' . ($index + 1) . '.', 422);
             }
 
             $prixUnitaire = $detail['prix_unitaire'] ?? $produit['prix_vente_unitaire'];
