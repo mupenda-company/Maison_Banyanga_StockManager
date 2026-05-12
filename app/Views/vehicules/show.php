@@ -18,7 +18,7 @@ ob_start();
         <div class="card">
             <div class="card-header flex items-center justify-between">
                 <h2 class="text-lg font-semibold"><?= htmlspecialchars($vehicule['immatriculation']) ?></h2>
-                <div class="flex gap-2">
+                <div class="flex gap-2 items-center">
                     <?php if ($vehicule['actif']): ?>
                     <?php if ($vehicule['en_mission']): ?>
                     <span class="badge-warning">En mission</span>
@@ -28,6 +28,9 @@ ob_start();
                     <?php else: ?>
                     <span class="badge-secondary">Inactif</span>
                     <?php endif; ?>
+                    <a href="<?= url('vehicules/' . $vehicule['id'] . '/print') ?>" class="btn-secondary btn-sm no-print">
+                        Imprimer
+                    </a>
                 </div>
             </div>
             <div class="card-body">

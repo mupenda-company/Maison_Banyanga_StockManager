@@ -120,6 +120,55 @@ class VehiculeController extends Controller
             'stats' => $stats ?: ['nb_missions' => 0, 'total_livre' => 0, 'total_ca' => 0]
         ]);
     }
+
+    /**
+     * Imprimer le détail d'un véhicule
+     */
+    public function print($id)
+    {
+        $this->requireAuth();
+
+        $vehicule = $this->vehiculeModel->getWithStock($id);
+
+        if (!$vehicule) {
+            return $this->error('Véhicule non trouvé', 404);
+        }
+
+        $missions = $this->db->fetchAll(
+            "SELECT m.*, z.nom as zone_nom
+             FROM missions m
+             LEFT JOIN zones z ON m.zone_id = z.id
+             WHERE m.vehicule_id = :vehicule_id
+             ORDER BY m.date_depart DESC
+             LIMIT 10",
+            ['vehicule_id' => $id]
+        );
+
+        $stats = $this->db->fetch(
+            "SELECT COUNT(DISTINCT m.id) as nb_missions, 
+                    COALESCE(SUM(COALESCE(vd.quantite_caisses, CASE WHEN p.bouteilles_par_caisses > 0 THEN FLOOR(vd.quantite / p.bouteilles_par_caisses) ELSE vd.quantite END)), 0) as total_livre,
+                    COALESCE(SUM(vd.quantite * vd.prix_unitaire), 0) as total_ca
+             FROM missions m
+             LEFT JOIN ventes v ON m.id = v.mission_id
+             LEFT JOIN vente_details vd ON v.id = vd.vente_id
+             LEFT JOIN produits p ON vd.produit_id = p.id
+             WHERE m.vehicule_id = :vehicule_id 
+             AND m.statut = 'terminee'
+             AND v.statut = 'validee'
+             AND MONTH(m.date_depart) = MONTH(CURRENT_DATE)
+             AND YEAR(m.date_depart) = YEAR(CURRENT_DATE)",
+            ['vehicule_id' => $id]
+        );
+
+        $params = (new Parametre())->getPersonnalisation();
+
+        $this->view('vehicules/print', [
+            'vehicule' => $vehicule,
+            'missions' => $missions,
+            'stats' => $stats ?: ['nb_missions' => 0, 'total_livre' => 0, 'total_ca' => 0],
+            'params' => $params
+        ]);
+    }
     
     /**
      * Créer un véhicule
