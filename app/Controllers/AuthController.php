@@ -19,7 +19,7 @@ class AuthController extends Controller
     public function login()
     {
         if (isset($_SESSION['user_id'])) {
-            redirect('dashboard');
+            redirect(($_SESSION['user_role'] ?? null) === ROLE_ADMIN ? 'dashboard' : 'ventes');
         }
         
         $this->view('auth/login');
@@ -50,9 +50,11 @@ class AuthController extends Controller
             $_SESSION['user_prenom'] = $user['prenom'];
             $_SESSION['user_role'] = $user['role'];
             $_SESSION['user_telephone'] = $user['telephone'];
+
+            $redirectTo = $user['role'] === ROLE_ADMIN ? 'dashboard' : 'ventes';
             
             return $this->success([
-                'redirect' => url('dashboard')
+                'redirect' => url($redirectTo)
             ], 'Connexion réussie');
         }
         

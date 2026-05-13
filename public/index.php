@@ -166,7 +166,9 @@ $routes = [
     // Admin
     'GET::/admin' => ['AdminController', 'index'],
     'GET::/admin/users' => ['AdminController', 'users'],
+    'GET::/admin/objectifs' => ['AdminController', 'objectifs'],
     'POST::/api/admin/users' => ['AdminController', 'storeUser'],
+    'POST::/api/admin/objectifs' => ['AdminController', 'storeObjectifs'],
     'PUT::/api/admin/users/(\d+)' => ['AdminController', 'updateUser'],
     'DELETE::/api/admin/users/(\d+)' => ['AdminController', 'deleteUser'],
     'POST::/api/admin/users/(\d+)/reset-password' => ['AdminController', 'resetPassword'],

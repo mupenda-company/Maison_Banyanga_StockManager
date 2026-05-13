@@ -131,6 +131,20 @@ ob_start();
             </p>
         </div>
     </div>
+
+    <div class="card mt-6">
+        <div class="card-header flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Objectifs mensuels</h2>
+            <a href="<?= url('admin/objectifs') ?>" class="btn btn-primary">
+                Gérer les objectifs
+            </a>
+        </div>
+        <div class="card-body">
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+                Définissez, pour chaque produit, combien de caisses doivent être vendues dans le mois.
+            </p>
+        </div>
+    </div>
 </div>
 
 <script>

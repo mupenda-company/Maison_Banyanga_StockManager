@@ -86,6 +86,23 @@ CREATE TABLE IF NOT EXISTS `produits` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
+-- Structure de la table `objectifs_produits`
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `objectifs_produits` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `produit_id` INT UNSIGNED NOT NULL,
+    `annee` YEAR NOT NULL,
+    `mois` TINYINT UNSIGNED NOT NULL,
+    `objectif_caisses` INT NOT NULL DEFAULT 0 COMMENT 'Objectif mensuel en caisses',
+    `created_by` INT UNSIGNED NULL,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY `uk_objectifs_produit_mois` (`produit_id`, `annee`, `mois`),
+    FOREIGN KEY (`produit_id`) REFERENCES `produits`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
 -- Structure de la table `emplacements`
 -- --------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `emplacements` (

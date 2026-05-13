@@ -92,6 +92,93 @@ ob_start();
     </div>
 </div>
 
+<?php
+    $objectifSummary = $objectifMois['summary'] ?? [
+        'objectif_total' => 0,
+        'vendu_total' => 0,
+        'reste_total' => 0,
+        'progression' => 0,
+        'nb_produits' => 0,
+    ];
+    $objectifRows = array_slice($objectifMois['rows'] ?? [], 0, 5);
+?>
+
+<div class="card mb-8">
+    <div class="card-header flex items-center justify-between gap-4">
+        <div>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Objectif du mois</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Suivi des caisses à vendre pour le mois en cours.</p>
+        </div>
+        <div class="text-right">
+            <p class="text-xs uppercase text-gray-500">Progression</p>
+            <p class="text-2xl font-bold text-primary-600"><?= number_format((float) ($objectifSummary['progression'] ?? 0), 1, ',', ' ') ?>%</p>
+        </div>
+    </div>
+    <div class="card-body space-y-5">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="stat-card">
+                <p class="stat-label">Objectif total</p>
+                <p class="stat-value text-blue-600"><?= number_format((int) ($objectifSummary['objectif_total'] ?? 0), 0, ',', ' ') ?> cs</p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-label">Vendu ce mois</p>
+                <p class="stat-value text-green-600"><?= number_format((int) ($objectifSummary['vendu_total'] ?? 0), 0, ',', ' ') ?> cs</p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-label">Reste à vendre</p>
+                <p class="stat-value text-orange-600"><?= number_format((int) ($objectifSummary['reste_total'] ?? 0), 0, ',', ' ') ?> cs</p>
+            </div>
+        </div>
+
+        <div>
+            <div class="w-full h-3 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                <div class="h-full rounded-full bg-primary-600" style="width: <?= min(100, (float) ($objectifSummary['progression'] ?? 0)) ?>%"></div>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">
+                <?= (int) ($objectifSummary['nb_produits'] ?? 0) ?> produit(s) suivis pour le mois en cours.
+            </p>
+        </div>
+
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Produit</th>
+                        <th class="text-right">Objectif</th>
+                        <th class="text-right">Vendu</th>
+                        <th class="text-right">Reste</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($objectifRows)): ?>
+                    <tr>
+                        <td colspan="4" class="text-center p-4 text-gray-500">Aucun objectif n’a encore été défini pour ce mois.</td>
+                    </tr>
+                    <?php else: ?>
+                        <?php foreach ($objectifRows as $objectif): ?>
+                        <tr>
+                            <td>
+                                <div class="font-medium text-gray-900 dark:text-white"><?= htmlspecialchars($objectif['nom']) ?></div>
+                                <div class="text-xs text-gray-500"><?= htmlspecialchars($objectif['code']) ?></div>
+                            </td>
+                            <td class="text-right font-semibold text-blue-600"><?= number_format((int) ($objectif['objectif_caisses'] ?? 0), 0, ',', ' ') ?> cs</td>
+                            <td class="text-right font-semibold text-green-600"><?= number_format((int) ($objectif['ventes_caisses'] ?? 0), 0, ',', ' ') ?> cs</td>
+                            <td class="text-right font-semibold text-orange-600"><?= number_format((int) ($objectif['reste_caisses'] ?? 0), 0, ',', ' ') ?> cs</td>
+                        </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === ROLE_ADMIN): ?>
+        <div class="flex justify-end">
+            <a href="<?= url('admin/objectifs') ?>" class="btn btn-secondary">Gérer les objectifs</a>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
 <div class="card mb-8">
     <div class="card-header flex items-center justify-between">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Clients du mois</h2>

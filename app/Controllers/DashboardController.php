@@ -8,6 +8,7 @@ class DashboardController extends Controller
     private $produitModel;
     private $stockModel;
     private $venteModel;
+    private $objectifProduitModel;
     private $alerteModel;
     private $missionModel;
     private $perteModel;
@@ -18,6 +19,7 @@ class DashboardController extends Controller
         $this->produitModel = new Produit();
         $this->stockModel = new Stock();
         $this->venteModel = new Vente();
+        $this->objectifProduitModel = new ObjectifProduit();
         $this->alerteModel = new Alerte();
         $this->missionModel = new Mission();
         $this->perteModel = new Perte();
@@ -29,6 +31,7 @@ class DashboardController extends Controller
     public function index()
     {
         $this->requireAuth();
+        $this->requireRole([ROLE_ADMIN]);
         
         // Vérifier et générer les alertes
         $this->alerteModel->checkStockAlerts();
@@ -87,6 +90,9 @@ class DashboardController extends Controller
         
         // Pertes du mois
         $pertesStats = $this->perteModel->getStats($firstDayMonth, date('Y-m-d'));
+
+        // Objectifs du mois
+        $objectifMois = $this->objectifProduitModel->getMonthlyOverview((int) date('Y'), (int) date('m'));
         
         $this->view('dashboard/index', [
             'statsToday' => $statsToday,
@@ -99,6 +105,7 @@ class DashboardController extends Controller
             'derniersMouvements' => $derniersMouvements,
             'ventesParProduit' => $ventesParProduit,
             'pertesStats' => $pertesStats,
+            'objectifMois' => $objectifMois,
             'clientsStats' => [
                 'clients_count' => $clientsCountMonth,
                 'last_client' => $lastClient['nom'] ?? 'Aucun client',
@@ -115,6 +122,7 @@ class DashboardController extends Controller
     public function apiStats()
     {
         $this->requireAuth();
+        $this->requireRole([ROLE_ADMIN]);
         
         $period = $_GET['period'] ?? 'today';
         
@@ -155,6 +163,7 @@ class DashboardController extends Controller
     public function apiAlertes()
     {
         $this->requireAuth();
+        $this->requireRole([ROLE_ADMIN]);
         
         // On ne récupère que les alertes non lues ET non résolues
         $alertes = $this->alerteModel->getNonLues(20);
@@ -172,6 +181,7 @@ class DashboardController extends Controller
     public function markAlertsRead()
     {
         $this->requireAuth();
+        $this->requireRole([ROLE_ADMIN]);
         
         $this->alerteModel->marquerToutesLues();
         

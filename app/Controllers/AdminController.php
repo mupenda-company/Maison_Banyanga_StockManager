@@ -7,12 +7,16 @@ class AdminController extends Controller
 {
     private $userModel;
     private $parametreModel;
+    private $produitModel;
+    private $objectifProduitModel;
     
     public function __construct()
     {
         parent::__construct();
         $this->userModel = new User();
         $this->parametreModel = new Parametre();
+        $this->produitModel = new Produit();
+        $this->objectifProduitModel = new ObjectifProduit();
     }
     
     /**
@@ -175,6 +179,90 @@ class AdminController extends Controller
         $this->view('admin/settings', [
             'params' => $params
         ]);
+    }
+
+    /**
+     * Objectifs mensuels par produit
+     */
+    public function objectifs()
+    {
+        $this->requireRole([ROLE_ADMIN]);
+
+        $periode = $_GET['periode'] ?? date('Y-m');
+        if (!preg_match('/^\d{4}-\d{2}$/', (string) $periode)) {
+            $periode = date('Y-m');
+        }
+
+        [$annee, $mois] = array_map('intval', explode('-', $periode));
+        $overview = $this->objectifProduitModel->getMonthlyOverview($annee, $mois);
+        $produits = $this->produitModel->getActive();
+
+        $objectifsParProduit = [];
+        foreach ($overview['rows'] as $row) {
+            $objectifsParProduit[(int) $row['produit_id']] = $row;
+        }
+
+        $this->view('admin/objectifs', [
+            'periode' => $periode,
+            'annee' => $annee,
+            'mois' => $mois,
+            'produits' => $produits,
+            'objectifsParProduit' => $objectifsParProduit,
+            'summary' => $overview['summary'],
+        ]);
+    }
+
+    /**
+     * Enregistrer les objectifs mensuels
+     */
+    public function storeObjectifs()
+    {
+        $this->requireRole([ROLE_ADMIN]);
+
+        $data = $this->getJsonInput();
+        if (empty($data)) {
+            $data = $_POST;
+        }
+
+        $periode = $data['periode'] ?? '';
+        if (!preg_match('/^\d{4}-\d{2}$/', (string) $periode)) {
+            return $this->error('La période doit être au format AAAA-MM.', 422);
+        }
+
+        [$annee, $mois] = array_map('intval', explode('-', $periode));
+        $objectifs = $data['objectifs'] ?? [];
+
+        if (!is_array($objectifs)) {
+            return $this->error('Les objectifs doivent être envoyés sous forme de liste.', 422);
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            foreach ($objectifs as $objectif) {
+                if (!is_array($objectif) || !isset($objectif['produit_id'])) {
+                    continue;
+                }
+
+                $this->objectifProduitModel->saveMonthlyObjective(
+                    $objectif['produit_id'],
+                    $annee,
+                    $mois,
+                    $objectif['objectif_caisses'] ?? 0,
+                    $_SESSION['user_id'] ?? null
+                );
+            }
+
+            $this->db->commit();
+
+            return $this->success(null, 'Objectifs enregistrés avec succès');
+        } catch (Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+
+            return $this->error('Impossible d’enregistrer les objectifs : ' . $e->getMessage(), 500);
+        }
     }
     
     /**

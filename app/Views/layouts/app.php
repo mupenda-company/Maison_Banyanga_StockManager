@@ -225,12 +225,12 @@
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
         <aside 
-            class="fixed inset-y-0 left-0 z-30 w-64 bg-white dark:bg-gray-800 shadow-lg transform transition-transform duration-300 lg:translate-x-0 lg:static lg:inset-auto"
+            class="fixed inset-y-0 left-0 z-30 w-64 bg-white dark:bg-gray-800 shadow-lg transform transition-transform duration-300 lg:translate-x-0 lg:static lg:inset-auto flex flex-col h-full overflow-hidden"
             :class="{ '-translate-x-full': !sidebarOpen }"
         >
             <!-- Logo -->
             <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 dark:border-gray-700">
-                <a href="<?= url('/') ?>" class="flex items-center space-x-2">
+                <a href="<?= (isset($_SESSION['user_role']) && $_SESSION['user_role'] === ROLE_ADMIN) ? url('/') : url('ventes') ?>" class="flex items-center space-x-2">
                     <?php 
                     $params = new Parametre();
                     $logo = $params->get('logo');
@@ -248,14 +248,16 @@
             </div>
             
             <!-- Navigation -->
-            <nav class="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+            <nav class="flex-1 min-h-0 px-4 py-4 space-y-1 overflow-y-auto overscroll-contain">
                 <!-- Dashboard -->
+                <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === ROLE_ADMIN): ?>
                 <a href="<?= url('/') ?>" class="sidebar-link <?= ($_SERVER['REQUEST_URI'] === '/' || strpos($_SERVER['REQUEST_URI'], '/dashboard') !== false) ? 'active' : '' ?>">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
                     </svg>
                     Tableau de bord
                 </a>
+                <?php endif; ?>
                 
                 <!-- Approvisionnements -->
                 <a href="<?= url('approvisionnements') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/approvisionnements') !== false ? 'active' : '' ?>">
@@ -340,6 +342,13 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-6m4 6V7m4 10v-3m2 3H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2z"/>
                         </svg>
                         Rapports
+                    </a>
+
+                    <a href="<?= url('admin/objectifs') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/admin/objectifs') !== false ? 'active' : '' ?>">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V5m0 12v-1m8-5a8 8 0 11-16 0 8 8 0 0116 0z"/>
+                        </svg>
+                        Objectifs mensuels
                     </a>
 
                     <a href="<?= url('ristournes') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/ristournes') !== false ? 'active' : '' ?>">
