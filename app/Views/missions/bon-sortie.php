@@ -101,8 +101,8 @@
                         }
 
                         $stockDepartCaisses = (int) ($chargement['caisses_deja_dans_vehicule'] ?? 0);
-                        $ajoutMissionCaisses = (int) ($chargement['quantite_caisses'] ?? 0);
-                        $totalReelCaisses = (int) ($chargement['caisses_total'] ?? ($stockDepartCaisses + $ajoutMissionCaisses));
+                        $totalReelCaisses = (int) ($chargement['caisses_total'] ?? max(0, (int) ($chargement['quantite_caisses'] ?? 0)));
+                        $ajoutMissionCaisses = $totalReelCaisses - $stockDepartCaisses;
                         $totalCaisses += $totalReelCaisses;
                     ?>
                     <tr>

@@ -188,7 +188,7 @@ ob_start();
                     </div>
                     <div class="p-4 rounded-lg border bg-gray-50 dark:bg-gray-900/50">
                         <p class="text-sm text-gray-500">Quantité totale à charger</p>
-                        <p class="font-semibold text-gray-900 dark:text-white" x-text="getQuantiteBouteilles() + ' bouteilles (' + getBouteillesParCaisse() + ' btl/caisse)'"></p>
+                        <p class="font-semibold text-gray-900 dark:text-white" x-text="getCaissesLivrables() + ' caisses'"></p>
                         <p class="text-sm text-gray-500 mt-1">Le reste non couvert par le produit reste côté administration.</p>
                     </div>
                 </div>

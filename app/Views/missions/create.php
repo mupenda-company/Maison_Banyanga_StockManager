@@ -18,7 +18,7 @@ ob_start();
                     zone_id: '',
                     date_depart: '<?= date('Y-m-d\TH:i') ?>',
                     notes: '',
-                    chargements: [{ produit_id: '', quantite: 0, quantite_caisses: 0, stock_depart_caisses: 0, stock_depart_bouteilles: 0, auto_vehicle_stock: false }],
+                    chargements: [{ produit_id: '', quantite_caisses: 0, stock_depart_caisses: 0, auto_vehicle_stock: false }],
                     vehicules: [],
                     produits: [],
                     zones: [],
@@ -28,7 +28,7 @@ ob_start();
                         return this.produits.find(p => String(p.id) === String(produitId)) || null;
                     },
                     newChargement() {
-                        return { produit_id: '', quantite: 0, quantite_caisses: 0, stock_depart_caisses: 0, stock_depart_bouteilles: 0, auto_vehicle_stock: false };
+                        return { produit_id: '', quantite_caisses: 0, stock_depart_caisses: 0, auto_vehicle_stock: false };
                     },
                     async loadVehiculeStock() {
                         if (!this.vehicule_id) {
@@ -48,10 +48,8 @@ ob_start();
                                     produit_id: String(item.produit_id),
                                     produit_nom: item.produit_nom || '',
                                     produit_code: item.produit_code || '',
-                                    quantite: 0,
-                                    quantite_caisses: 0,
+                                    quantite_caisses: parseFloat(item.caisses_pleine || 0),
                                     stock_depart_caisses: parseFloat(item.caisses_pleine || 0),
-                                    stock_depart_bouteilles: parseFloat(item.quantite_pleine || 0),
                                     auto_vehicle_stock: true
                                 }));
 
@@ -83,24 +81,18 @@ ob_start();
                     try {
                         const chargementsValides = chargements.filter(c => c.produit_id && (
                             parseInt(c.quantite_caisses || 0) > 0 ||
-                            parseInt(c.quantite || 0) > 0 ||
-                            parseFloat(c.stock_depart_caisses || 0) > 0 ||
-                            parseFloat(c.stock_depart_bouteilles || 0) > 0
+                            parseFloat(c.stock_depart_caisses || 0) > 0
                         )).map(c => ({
                             produit_id: parseInt(c.produit_id),
-                            quantite_caisses: parseInt(c.quantite_caisses || 0),
-                            quantite: parseInt(c.quantite || 0)
+                            quantite_caisses: parseInt(c.quantite_caisses || 0)
                         }));
 
                         const selectedVehicule = vehicules.find(v => String(v.id) === String(vehicule_id));
                         const capaciteVehicule = parseInt(selectedVehicule?.capacite || 0);
-                        const stockVehiculeActuel = selectedVehicule
-                            ? Math.round(parseFloat(selectedVehicule.stock_caisses_pleine || 0)) + Math.round(parseFloat(selectedVehicule.stock_caisses_vide || 0))
-                            : 0;
                         const totalMissionCaisses = chargementsValides.reduce((total, ligne) => total + Math.max(0, parseInt(ligne.quantite_caisses || 0)), 0);
 
-                        if (capaciteVehicule > 0 && (stockVehiculeActuel + totalMissionCaisses) > capaciteVehicule) {
-                            throw new Error(`La mission dépasse la capacité du véhicule. Capacité: ${capaciteVehicule} caisses, stock actuel: ${stockVehiculeActuel} caisses, ajout demandé: ${totalMissionCaisses} caisses.`);
+                        if (capaciteVehicule > 0 && totalMissionCaisses > capaciteVehicule) {
+                            throw new Error(`La mission dépasse la capacité du véhicule. Capacité: ${capaciteVehicule} caisses, stock final demandé: ${totalMissionCaisses} caisses.`);
                         }
                         
                         if (chargementsValides.length === 0) {
@@ -170,14 +162,6 @@ ob_start();
                                     <p class="text-xs uppercase text-gray-500">Caisses vides déjà dans le véhicule</p>
                                     <p class="text-lg font-bold text-gray-700" x-text="Math.round(parseFloat(v.stock_caisses_vide || 0)) + ' cs'"></p>
                                 </div>
-                                <div class="p-3 bg-white rounded-lg border">
-                                    <p class="text-xs uppercase text-gray-500">Bouteilles pleines</p>
-                                    <p class="text-lg font-bold text-primary-600" x-text="Math.round(parseFloat(v.stock_plein || 0)) + ' btl'"></p>
-                                </div>
-                                <div class="p-3 bg-white rounded-lg border">
-                                    <p class="text-xs uppercase text-gray-500">Bouteilles vides</p>
-                                    <p class="text-lg font-bold text-orange-600" x-text="Math.round(parseFloat(v.stock_vide || 0)) + ' btl'"></p>
-                                </div>
                             </div>
                         </template>
                     </div>
@@ -200,8 +184,8 @@ ob_start();
                             <thead class="bg-gray-50 dark:bg-gray-700">
                                 <tr>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Produit</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Stock véhicule</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Ajout mission</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Stock</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Caisses finales</th>
                                     <th class="px-4 py-3"></th>
                                 </tr>
                             </thead>
@@ -233,29 +217,18 @@ ob_start();
                                             <template x-if="chargement.auto_vehicle_stock">
                                                 <div class="flex flex-col">
                                                     <span class="font-bold text-green-700" x-text="Math.round(parseFloat(chargement.stock_depart_caisses || 0)) + ' cs'"></span>
-                                                    <span class="text-xs text-gray-400" x-text="'(' + Math.round(parseFloat(chargement.stock_depart_bouteilles || 0)) + ' btl)'"></span>
                                                 </div>
                                             </template>
                                             <template x-if="!chargement.auto_vehicle_stock">
-                                                <template x-if="getProduit(chargement.produit_id)">
-                                                    <div class="flex flex-col">
-                                                        <span class="font-bold text-primary-600" x-text="Math.round(parseFloat(getProduit(chargement.produit_id).stock_caisses_pleine || 0)) + ' cs'"></span>
-                                                        <span class="text-xs text-gray-400" x-text="'(' + Math.round(parseFloat(getProduit(chargement.produit_id).stock_plein || 0)) + ' btl)'"></span>
-                                                    </div>
-                                                </template>
-                                                <span class="text-gray-400" x-show="!getProduit(chargement.produit_id)">-</span>
+                                                <div class="flex flex-col">
+                                                    <span class="font-bold text-primary-600" x-text="Math.round(parseFloat(getProduit(chargement.produit_id).stock_caisses_pleine || 0)) + ' cs'"></span>
+                                                </div>
                                             </template>
                                         </td>
                                         <td class="px-4 py-2">
-                                            <div class="flex items-center space-x-2">
-                                                <input type="number" x-model.number="chargement.quantite_caisses" 
-                                                       @input="const produit = getProduit(chargement.produit_id); if (produit) { chargement.quantite = Math.round(chargement.quantite_caisses || 0) * (parseInt(produit.bouteilles_par_caisses || 24)); } chargement.quantite_caisses = Math.max(0, Math.round(chargement.quantite_caisses || 0));"
-                                                       class="input w-24" min="0" step="1" placeholder="Caisses">
-                                                <span class="text-xs text-gray-500">=</span>
-                                                <input type="number" x-model.number="chargement.quantite" 
-                                                       @input="const produit = getProduit(chargement.produit_id); if (produit) { chargement.quantite = Math.max(0, Math.round(chargement.quantite || 0)); chargement.quantite_caisses = Math.round(chargement.quantite / (parseInt(produit.bouteilles_par_caisses || 24))); }"
-                                                       class="input w-24" min="0" step="1" placeholder="Btl">
-                                            </div>
+                                            <input type="number" x-model.number="chargement.quantite_caisses"
+                                                   @input="chargement.quantite_caisses = Math.max(0, Math.round(chargement.quantite_caisses || 0));"
+                                                   class="input w-28" min="0" step="1" placeholder="Caisses finales">
                                         </td>
                                         <td class="px-4 py-2">
                                             <button type="button" @click="chargements.splice(index, 1)" class="text-red-500 hover:text-red-700" x-show="!chargement.auto_vehicle_stock && chargements.length > 1">

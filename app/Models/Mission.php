@@ -313,12 +313,13 @@ class Mission extends Model
 
                 $prixCaisse = $item['prix_vente_caisses'] ?: ($item['prix_vente_unitaire'] * $item['bouteilles_par_caisses']);
                 $stockDepartCaisses = (int) ($item['caisses_deja_dans_vehicule'] ?? 0);
-                $item['quantite_caisses'] = (int) ($item['quantite_caisses'] ?? intdiv((int) $item['quantite_chargee'], $btlParCaisse));
+                $item['quantite_caisses'] = max(0, (int) ($item['quantite_caisses'] ?? intdiv((int) $item['quantite_chargee'], $btlParCaisse)));
+                $item['delta_caisses'] = $item['quantite_caisses'] - $stockDepartCaisses;
                 $item['caisses_vendues'] = (int) intdiv((int) ($item['quantite_vendue'] ?? 0), $btlParCaisse);
                 $item['caisses_vides_recues'] = (int) ($videsRecuesParProduit[(int) ($item['produit_id'] ?? 0)] ?? 0);
-                $item['caisses_total'] = $stockDepartCaisses + $item['quantite_caisses'];
+                $item['caisses_total'] = $item['quantite_caisses'];
                 $item['stock_depart_bouteilles'] = $stockDepartCaisses * $btlParCaisse;
-                $item['stock_total_bouteilles'] = $item['stock_depart_bouteilles'] + (int) ($item['quantite_chargee'] ?? 0);
+                $item['stock_total_bouteilles'] = $item['caisses_total'] * $btlParCaisse;
                 $item['montant_vendu'] = $item['caisses_vendues'] * $prixCaisse;
                 $item['sous_total'] = $item['caisses_total'] * $prixCaisse;
                 $total += $item['sous_total'];
@@ -395,13 +396,10 @@ class Mission extends Model
                     }
                 }
 
-                $quantiteCaisses = (int) ($chargement['quantite_caisses'] ?? 0);
-                if ($quantiteCaisses <= 0) {
-                    $quantiteCaisses = (int) floor(((int) ($chargement['quantite_chargee'] ?? 0)) / $bouteillesParCaisse);
-                }
-
-                $quantiteBouteilles = $quantiteCaisses * $bouteillesParCaisse;
-                $chargement['quantite_caisses'] = $quantiteCaisses;
+                $quantiteCaissesFinale = max(0, (int) ($chargement['quantite_caisses'] ?? 0));
+                $deltaCaisses = $quantiteCaissesFinale - $caissesDejaDansVehicule;
+                $quantiteBouteilles = $deltaCaisses * $bouteillesParCaisse;
+                $chargement['quantite_caisses'] = $quantiteCaissesFinale;
                 $chargement['quantite_chargee'] = $quantiteBouteilles;
                 $chargement['caisses_deja_dans_vehicule'] = $caissesDejaDansVehicule;
                 $chargement['prix_caisse'] = (float) ($produit['prix_vente_caisses'] ?: (($produit['prix_vente_unitaire'] ?? 0) * $bouteillesParCaisse));
@@ -414,7 +412,7 @@ class Mission extends Model
                     $emplacementPrincipalId,
                     [
                         'quantite_pleine' => -$quantiteBouteilles,
-                        'caisses_pleine' => -$quantiteCaisses
+                        'caisses_pleine' => -$deltaCaisses
                     ]
                 );
                 
@@ -423,7 +421,7 @@ class Mission extends Model
                     $emplacementVehicule,
                     [
                         'quantite_pleine' => $quantiteBouteilles,
-                        'caisses_pleine' => $quantiteCaisses
+                        'caisses_pleine' => $deltaCaisses
                     ]
                 );
                 
@@ -445,6 +443,263 @@ class Mission extends Model
             $this->db->commit();
             return ['success' => true, 'id' => $missionId];
             
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Mettre à jour une mission avec remplacement complet des chargements
+     */
+    public function updateWithChargement($id, $data, $chargements, $emplacementPrincipalId)
+    {
+        try {
+            $this->db->beginTransaction();
+
+            $mission = $this->getWithDetails($id);
+            if (!$mission) {
+                throw new Exception('Mission non trouvée');
+            }
+
+            if (($mission['statut'] ?? '') !== 'en_cours') {
+                throw new Exception('Seules les missions en cours peuvent être modifiées');
+            }
+
+            $vehicule = (new Vehicule())->getWithStock((int) ($data['vehicule_id'] ?? 0));
+            if (!$vehicule) {
+                throw new Exception('Véhicule non trouvé');
+            }
+
+            $emplacementVehicule = (int) ($vehicule['emplacement_id'] ?? 0);
+            if ($emplacementVehicule <= 0) {
+                throw new Exception('Emplacement véhicule introuvable');
+            }
+
+            $stockModel = new Stock();
+            $mouvementModel = new MouvementStock();
+
+            // Annuler les transferts liés à l'ancienne mission
+            foreach (($mission['chargements'] ?? []) as $ancienChargement) {
+                $produitId = (int) ($ancienChargement['produit_id'] ?? 0);
+                if ($produitId <= 0) {
+                    continue;
+                }
+
+                $produit = (new Produit())->find($produitId);
+                $bouteillesParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+                if ($bouteillesParCaisse <= 0) {
+                    $bouteillesParCaisse = 24;
+                }
+
+                $caissesFinales = max(0, (int) ($ancienChargement['quantite_caisses'] ?? 0));
+                if ($caissesFinales === 0) {
+                    continue;
+                }
+
+                $deltaBouteilles = $caissesFinales * $bouteillesParCaisse;
+
+                $mouvementModel->create([
+                    'produit_id' => $produitId,
+                    'emplacement_id' => $emplacementPrincipalId,
+                    'type_mouvement' => 'transfert',
+                    'quantite' => $deltaBouteilles,
+                    'reference_type' => 'mission_modification',
+                    'reference_id' => $id,
+                    'motif' => 'Annulation modification mission ' . $mission['numero_mission'],
+                    'created_by' => $_SESSION['user_id'] ?? ($mission['created_by'] ?? null)
+                ]);
+
+                $mouvementModel->create([
+                    'produit_id' => $produitId,
+                    'emplacement_id' => $emplacementVehicule,
+                    'type_mouvement' => 'transfert',
+                    'quantite' => -$deltaBouteilles,
+                    'reference_type' => 'mission_modification',
+                    'reference_id' => $id,
+                    'motif' => 'Annulation modification mission ' . $mission['numero_mission'],
+                    'created_by' => $_SESSION['user_id'] ?? ($mission['created_by'] ?? null)
+                ]);
+
+                $stockModel->updateOrCreate(
+                    $produitId,
+                    $emplacementPrincipalId,
+                    [
+                        'quantite_pleine' => $deltaBouteilles,
+                        'caisses_pleine' => $caissesFinales
+                    ]
+                );
+
+                $stockModel->updateOrCreate(
+                    $produitId,
+                    $emplacementVehicule,
+                    [
+                        'quantite_pleine' => -$deltaBouteilles,
+                        'caisses_pleine' => -$caissesFinales
+                    ]
+                );
+            }
+
+            $missionData = [
+                'vehicule_id' => (int) ($data['vehicule_id'] ?? $mission['vehicule_id']),
+                'chauffeur_id' => array_key_exists('chauffeur_id', $data) ? $data['chauffeur_id'] : ($mission['chauffeur_id'] ?? null),
+                'date_depart' => $data['date_depart'] ?? ($mission['date_depart'] ?? null),
+                'zone_id' => array_key_exists('zone_id', $data) ? $data['zone_id'] : ($mission['zone_id'] ?? null),
+                'notes' => $data['notes'] ?? ($mission['notes'] ?? ''),
+            ];
+
+            if (array_key_exists('client_id', $data)) {
+                $missionData['client_id'] = $data['client_id'];
+            }
+
+            if (array_key_exists('ristourne_id', $data)) {
+                $missionData['ristourne_id'] = $data['ristourne_id'];
+            }
+
+            if (array_key_exists('montant_ristourne_initial', $data)) {
+                $missionData['montant_ristourne_initial'] = $data['montant_ristourne_initial'];
+            }
+
+            $this->update($id, $missionData);
+            $this->db->query("DELETE FROM mission_chargements WHERE mission_id = :mission_id", ['mission_id' => $id]);
+
+            $vehiculeMisAJour = (new Vehicule())->getWithStock((int) $missionData['vehicule_id']);
+            if (!$vehiculeMisAJour) {
+                throw new Exception('Véhicule de mise à jour introuvable');
+            }
+
+            $stockVehicule = [];
+            foreach (($vehiculeMisAJour['stock'] ?? []) as $stock) {
+                $stockVehicule[(int) ($stock['produit_id'] ?? 0)] = $stock;
+            }
+
+            $chargementsValides = [];
+            foreach ($chargements as $chargement) {
+                $produitId = (int) ($chargement['produit_id'] ?? 0);
+                if ($produitId <= 0) {
+                    continue;
+                }
+
+                $quantiteCaissesFinale = max(0, (int) ($chargement['quantite_caisses'] ?? 0));
+                $quantiteBouteillesSaisie = (int) ($chargement['quantite'] ?? 0);
+                $stockDepartCaisses = (int) ($chargement['stock_depart_caisses'] ?? 0);
+                $stockDepartBouteilles = (int) ($chargement['stock_depart_bouteilles'] ?? 0);
+
+                if ($quantiteCaissesFinale <= 0 && $quantiteBouteillesSaisie <= 0 && $stockDepartCaisses <= 0 && $stockDepartBouteilles <= 0) {
+                    continue;
+                }
+
+                if (!isset($chargementsValides[$produitId])) {
+                    $chargementsValides[$produitId] = [
+                        'produit_id' => $produitId,
+                        'quantite_caisses_finale' => 0,
+                        'quantite_chargee' => 0,
+                        'stock_depart_caisses' => 0,
+                    ];
+                }
+
+                $chargementsValides[$produitId]['quantite_caisses_finale'] += $quantiteCaissesFinale;
+                $chargementsValides[$produitId]['quantite_chargee'] += $quantiteBouteillesSaisie;
+                $chargementsValides[$produitId]['stock_depart_caisses'] = max(0, $stockDepartCaisses);
+            }
+
+            $chargementsValides = array_values($chargementsValides);
+            if (empty($chargementsValides)) {
+                throw new Exception('Ajoutez au moins un produit présent dans le véhicule ou une quantité à charger avant d’enregistrer la modification.');
+            }
+
+            $capaciteVehicule = (int) ($vehiculeMisAJour['capacite'] ?? 0);
+            if ($capaciteVehicule > 0) {
+                $stockVehiculeActuel = 0;
+                foreach (($vehiculeMisAJour['stock'] ?? []) as $stock) {
+                    $stockVehiculeActuel += (int) round((float) ($stock['caisses_pleine'] ?? 0));
+                    $stockVehiculeActuel += (int) round((float) ($stock['caisses_vide'] ?? 0));
+                }
+
+                $totalMissionCaisses = 0;
+                foreach ($chargementsValides as $chargement) {
+                    $totalMissionCaisses += max(0, (int) ($chargement['quantite_caisses_finale'] ?? 0));
+                }
+
+                if ($totalMissionCaisses > $capaciteVehicule) {
+                    throw new Exception(
+                        'La mission dépasse la capacité du véhicule. Capacité: ' . $capaciteVehicule . ' caisses, stock final demandé: ' . $totalMissionCaisses . ' caisses.'
+                    );
+                }
+            }
+
+            foreach ($chargementsValides as $chargement) {
+                $produit = (new Produit())->find((int) $chargement['produit_id']);
+                if (!$produit) {
+                    throw new Exception('Produit non trouvé pour la mission');
+                }
+
+                $bouteillesParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+                if ($bouteillesParCaisse <= 0) {
+                    $bouteillesParCaisse = 24;
+                }
+
+                $quantiteCaissesFinale = max(0, (int) ($chargement['quantite_caisses_finale'] ?? 0));
+                $quantiteChargee = (int) ($chargement['quantite_chargee'] ?? 0);
+                $stockDepartCaisses = max(0, (int) ($chargement['stock_depart_caisses'] ?? 0));
+                $deltaCaisses = $quantiteCaissesFinale - $stockDepartCaisses;
+                $quantiteBouteilles = $deltaCaisses * $bouteillesParCaisse;
+                $stockCourantVehicule = $stockVehicule[(int) $chargement['produit_id']] ?? null;
+                $caissesDejaDansVehicule = (int) ($stockCourantVehicule['caisses_pleine'] ?? 0);
+                if ($caissesDejaDansVehicule <= 0 && $stockCourantVehicule) {
+                    $caissesDejaDansVehicule = (int) floor(((int) ($stockCourantVehicule['quantite_pleine'] ?? 0)) / $bouteillesParCaisse);
+                }
+
+                $prixCaisse = (float) ($produit['prix_vente_caisses'] ?: (($produit['prix_vente_unitaire'] ?? 0) * $bouteillesParCaisse));
+
+                $this->db->insert('mission_chargements', [
+                    'mission_id' => $id,
+                    'produit_id' => (int) $chargement['produit_id'],
+                    'quantite_caisses' => $quantiteCaissesFinale,
+                    'caisses_deja_dans_vehicule' => $stockDepartCaisses,
+                    'quantite_chargee' => $quantiteBouteilles,
+                    'quantite_retournee' => 0,
+                    'quantite_vendue' => 0,
+                    'prix_caisse' => $prixCaisse
+                ]);
+
+                if ($deltaCaisses === 0) {
+                    continue;
+                }
+
+                $stockModel->updateOrCreate(
+                    (int) $chargement['produit_id'],
+                    $emplacementPrincipalId,
+                    [
+                        'quantite_pleine' => -$quantiteBouteilles,
+                        'caisses_pleine' => -$deltaCaisses
+                    ]
+                );
+
+                $stockModel->updateOrCreate(
+                    (int) $chargement['produit_id'],
+                    $emplacementVehicule,
+                    [
+                        'quantite_pleine' => $quantiteBouteilles,
+                        'caisses_pleine' => $deltaCaisses
+                    ]
+                );
+
+                $mouvementModel->create([
+                    'produit_id' => (int) $chargement['produit_id'],
+                    'emplacement_id' => $emplacementPrincipalId,
+                    'type_mouvement' => 'transfert',
+                    'quantite' => -$quantiteBouteilles,
+                    'reference_type' => 'mission',
+                    'reference_id' => $id,
+                    'motif' => 'Modification mission ' . $mission['numero_mission'],
+                    'created_by' => $_SESSION['user_id'] ?? ($mission['created_by'] ?? null)
+                ]);
+            }
+
+            $this->db->commit();
+            return ['success' => true, 'id' => $id];
+
         } catch (Exception $e) {
             $this->db->rollBack();
             return ['success' => false, 'message' => $e->getMessage()];

@@ -23,6 +23,14 @@ ob_start();
                     <?= $isRestourne ? 'Mission de ristourne N° ' : 'Mission N° ' ?><?= htmlspecialchars($mission['numero_mission']) ?>
                 </h2>
                 <div class="flex gap-2">
+                    <?php if ($mission['statut'] === 'en_cours'): ?>
+                    <a href="<?= url('missions/' . $mission['id'] . '/edit') ?>" class="btn btn-sm btn-secondary">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5h2M12 5v14m7-7H5"/>
+                        </svg>
+                        Modifier
+                    </a>
+                    <?php endif; ?>
                     <a href="<?= url('missions/' . $mission['id'] . ($mission['statut'] === 'terminee' ? '/facture' : '/print')) ?>" target="_blank" class="btn btn-sm btn-secondary">
                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
@@ -135,7 +143,7 @@ ob_start();
                             <tr>
                                 <th class="text-left">Produit</th>
                                 <th class="text-right">Stock départ</th>
-                                <th class="text-right">Ajout mission</th>
+                                <th class="text-right">Ajustement mission</th>
                                 <th class="text-right">Total réel</th>
                                 <th class="text-right">Prix caisse</th>
                                 <th class="text-right">Sous-total</th>
@@ -150,8 +158,8 @@ ob_start();
                                 }
                                 $prixCaisse = $item['prix_vente_caisses'] ?: ($item['prix_vente_unitaire'] * $btlParCaisse);
                                 $stockDepartCaisses = (int) ($item['caisses_deja_dans_vehicule'] ?? 0);
-                                $ajoutMissionCaisses = (int) ($item['quantite_caisses'] ?? 0);
-                                $totalReelCaisses = (int) ($item['caisses_total'] ?? ($stockDepartCaisses + $ajoutMissionCaisses));
+                                $totalReelCaisses = (int) ($item['caisses_total'] ?? max(0, (int) ($item['quantite_caisses'] ?? 0)));
+                                $ajustementMissionCaisses = $totalReelCaisses - $stockDepartCaisses;
                             ?>
                             <tr>
                                 <td>
@@ -159,7 +167,7 @@ ob_start();
                                     <div class="text-xs text-gray-500"><?= htmlspecialchars($item['produit_code']) ?></div>
                                 </td>
                                 <td class="text-right"><?= number_format($stockDepartCaisses, 0, '.', ' ') ?> cs</td>
-                                <td class="text-right"><?= number_format($ajoutMissionCaisses, 0, '.', ' ') ?> cs</td>
+                                <td class="text-right"><?= number_format($ajustementMissionCaisses, 0, '.', ' ') ?> cs</td>
                                 <td class="text-right font-semibold text-primary-600"><?= number_format($totalReelCaisses, 0, '.', ' ') ?> cs</td>
                                 <td class="text-right"><?= format_money_converted($prixCaisse) ?></td>
                                 <td class="text-right font-medium"><?= format_money_converted($item['sous_total'] ?? 0) ?></td>
@@ -170,7 +178,7 @@ ob_start();
                             <tr>
                                 <td colspan="3" class="text-right font-bold">Total caisses réelles</td>
                                 <td class="text-right font-bold text-primary-600">
-                                    <?= format_money_converted($mission['total_chargement'] ?? 0) ?>
+                                    <?= number_format((int) ($mission['total_caisses'] ?? 0), 0, '.', ' ') ?> cs
                                 </td>
                             </tr>
                         </tfoot>
@@ -357,7 +365,7 @@ ob_start();
 
             getTotalRetoursPleinsAttendues() {
                 return (this.chargements || []).reduce((total, c) => {
-                    const totalReel = parseInt(c.caisses_total || ((c.caisses_deja_dans_vehicule || 0) + (c.quantite_caisses || 0)), 10) || 0;
+                    const totalReel = parseInt(c.caisses_total || c.quantite_caisses || 0, 10) || 0;
                     const vendues = parseInt(c.caisses_vendues || Math.floor((c.quantite_vendue || 0) / Math.max(parseInt(c.bouteilles_par_caisses || 24, 10) || 24, 1)), 10) || 0;
                     return total + Math.max(totalReel - vendues, 0);
                 }, 0);
@@ -499,10 +507,10 @@ ob_start();
                                         <template x-for="(c, index) in chargements" :key="index + '-' + c.produit_id">
                                             <tr>
                                                 <td x-text="c.produit_nom"></td>
-                                                <td x-text="(c.caisses_total || ((c.caisses_deja_dans_vehicule || 0) + (c.quantite_caisses || 0))) + ' cs'" class="font-semibold text-primary-600"></td>
+                                                <td x-text="(c.caisses_total || c.quantite_caisses || 0) + ' cs'" class="font-semibold text-primary-600"></td>
                                                 <td x-text="(c.caisses_vendues || Math.floor((c.quantite_vendue || 0) / Math.max(parseInt(c.bouteilles_par_caisses || 24, 10) || 24, 1))) + ' cs'"></td>
                                                 <td>
-                                                    <input type="number" x-model.number="retours[c.produit_id]" class="input py-1 w-24" :max="Math.max((c.caisses_total || ((c.caisses_deja_dans_vehicule || 0) + (c.quantite_caisses || 0))) - (c.caisses_vendues || Math.floor((c.quantite_vendue || 0) / Math.max(parseInt(c.bouteilles_par_caisses || 24, 10) || 24, 1))), 0)" min="0">
+                                                    <input type="number" x-model.number="retours[c.produit_id]" class="input py-1 w-24" :max="Math.max((c.caisses_total || c.quantite_caisses || 0) - (c.caisses_vendues || Math.floor((c.quantite_vendue || 0) / Math.max(parseInt(c.bouteilles_par_caisses || 24, 10) || 24, 1))), 0)" min="0">
                                                 </td>
                                                 <td>
                                                     <div class="flex flex-col gap-1">

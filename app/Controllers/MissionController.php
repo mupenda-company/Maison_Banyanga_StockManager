@@ -47,9 +47,8 @@ class MissionController extends Controller
             "SELECT m.*, v.immatriculation, u.nom as agent_nom, u.prenom as agent_prenom, z.nom as zone_nom, c.nom as client_nom,
                     CASE
                         WHEN COALESCE(m.type_mission, 'vente') = 'ristourne' THEN COALESCE(m.montant_ristourne_initial, 0)
-                        ELSE COALESCE((SELECT SUM(COALESCE(mc.caisses_deja_dans_vehicule, 0) + COALESCE(mc.quantite_caisses, FLOOR(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))))
+                        ELSE COALESCE((SELECT SUM(COALESCE(mc.quantite_caisses, 0))
                                       FROM mission_chargements mc
-                                      JOIN produits p ON mc.produit_id = p.id
                                       WHERE mc.mission_id = m.id), 0)
                     END as total_caisses,
                     COALESCE((SELECT COUNT(DISTINCT v2.client_id)
@@ -210,25 +209,18 @@ class MissionController extends Controller
 
         $capaciteVehicule = (int) ($vehicule['capacite'] ?? 0);
         if ($capaciteVehicule > 0) {
-            $stockVehiculeActuel = 0;
-            foreach (($vehicule['stock'] ?? []) as $stock) {
-                $stockVehiculeActuel += (int) round((float) ($stock['caisses_pleine'] ?? 0));
-                $stockVehiculeActuel += (int) round((float) ($stock['caisses_vide'] ?? 0));
-            }
-
             $totalMissionCaisses = 0;
             foreach ($chargements as $chargement) {
                 $totalMissionCaisses += max(0, (int) ($chargement['quantite_caisses'] ?? 0));
             }
 
-            if (($stockVehiculeActuel + $totalMissionCaisses) > $capaciteVehicule) {
+            if ($totalMissionCaisses > $capaciteVehicule) {
                 return $this->error(
-                    'La mission dépasse la capacité du véhicule. Capacité: ' . $capaciteVehicule . ' caisses, stock actuel: ' . $stockVehiculeActuel . ' caisses, ajout demandé: ' . $totalMissionCaisses . ' caisses.',
+                    'La mission dépasse la capacité du véhicule. Capacité: ' . $capaciteVehicule . ' caisses, stock final demandé: ' . $totalMissionCaisses . ' caisses.',
                     422,
                     [
                         'capacite_vehicule' => $capaciteVehicule,
-                        'stock_actuel' => $stockVehiculeActuel,
-                        'ajout_demande' => $totalMissionCaisses
+                        'stock_final_demande' => $totalMissionCaisses
                     ]
                 );
             }
@@ -357,6 +349,117 @@ class MissionController extends Controller
         $this->view('missions/show', [
             'mission' => $mission
         ]);
+    }
+
+    /**
+     * Formulaire de modification d'une mission
+     */
+    public function edit($id)
+    {
+        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+
+        $mission = $this->missionModel->getWithDetails($id);
+        if (!$mission) {
+            return $this->error('Mission non trouvée', 404);
+        }
+
+        if (($mission['statut'] ?? '') !== 'en_cours') {
+            return $this->error('Seules les missions en cours peuvent être modifiées', 422);
+        }
+
+        $vehiculesDisponibles = $this->vehiculeModel->getDisponibles();
+        $vehiculeCourant = $this->vehiculeModel->getWithStock((int) ($mission['vehicule_id'] ?? 0));
+        if ($vehiculeCourant) {
+            $vehiculeCourant['stock_plein'] = 0;
+            $vehiculeCourant['stock_vide'] = 0;
+            $vehiculeCourant['stock_caisses_pleine'] = 0;
+            $vehiculeCourant['stock_caisses_vide'] = 0;
+            foreach (($vehiculeCourant['stock'] ?? []) as $stock) {
+                $vehiculeCourant['stock_plein'] += (int) round((float) ($stock['quantite_pleine'] ?? 0));
+                $vehiculeCourant['stock_vide'] += (int) round((float) ($stock['quantite_vide'] ?? 0));
+                $vehiculeCourant['stock_caisses_pleine'] += (int) round((float) ($stock['caisses_pleine'] ?? 0));
+                $vehiculeCourant['stock_caisses_vide'] += (int) round((float) ($stock['caisses_vide'] ?? 0));
+            }
+
+            $vehiculesParId = [];
+            foreach ($vehiculesDisponibles as $vehicule) {
+                $vehiculesParId[(int) ($vehicule['id'] ?? 0)] = $vehicule;
+            }
+            $vehiculesParId[(int) $vehiculeCourant['id']] = $vehiculeCourant;
+            $vehiculesDisponibles = array_values($vehiculesParId);
+
+            usort($vehiculesDisponibles, static function ($a, $b) {
+                return strcmp((string) ($a['immatriculation'] ?? ''), (string) ($b['immatriculation'] ?? ''));
+            });
+        }
+
+        $this->view('missions/edit', [
+            'mission' => $mission,
+            'vehicules' => $vehiculesDisponibles,
+            'produits' => $this->produitModel->getWithStock(),
+            'zones' => $this->zoneModel->getActive(),
+            'emplacementPrincipal' => $this->emplacementModel->getPrincipal(),
+        ]);
+    }
+
+    /**
+     * Mettre à jour une mission
+     */
+    public function update($id)
+    {
+        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+
+        $mission = $this->missionModel->getWithDetails($id);
+        if (!$mission) {
+            return $this->error('Mission non trouvée', 404);
+        }
+
+        $data = $this->getJsonInput();
+        $errors = $this->validate($data, [
+            'vehicule_id' => 'required|numeric',
+            'date_depart' => 'required',
+            'chargements' => 'required'
+        ]);
+
+        if (!empty($errors)) {
+            return $this->error('Erreurs de validation', 422, $errors);
+        }
+
+        $chargements = [];
+        if (isset($data['chargements']) && is_array($data['chargements'])) {
+            foreach ($data['chargements'] as $chargement) {
+                $produitId = (int) ($chargement['produit_id'] ?? 0);
+                if ($produitId <= 0) {
+                    continue;
+                }
+
+                $chargements[] = [
+                    'produit_id' => $produitId,
+                    'quantite_caisses' => (int) ($chargement['quantite_caisses'] ?? 0),
+                    'quantite' => (int) ($chargement['quantite'] ?? 0),
+                    'stock_depart_caisses' => (int) ($chargement['stock_depart_caisses'] ?? 0),
+                    'stock_depart_bouteilles' => (int) ($chargement['stock_depart_bouteilles'] ?? 0),
+                ];
+            }
+        }
+
+        if (empty($chargements)) {
+            return $this->error('Ajoutez au moins un produit présent dans le véhicule ou une quantité à charger avant d’enregistrer la modification.', 422);
+        }
+
+        $emplacementPrincipal = $this->emplacementModel->getPrincipal();
+        $result = $this->missionModel->updateWithChargement(
+            $id,
+            $data,
+            $chargements,
+            $emplacementPrincipal['id']
+        );
+
+        if ($result['success']) {
+            return $this->success(['id' => $id], 'Mission modifiée avec succès');
+        }
+
+        return $this->error($result['message'], 400);
     }
     
     /**

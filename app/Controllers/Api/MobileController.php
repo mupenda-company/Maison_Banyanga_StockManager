@@ -123,10 +123,10 @@ class MobileController extends Controller {
                        mc.quantite_caisses,
                        mc.quantite_chargee,
                        IFNULL(mc.quantite_vendue, 0) as quantite_vendue,
-                       (({$stockInitialCaissesExpr} + IFNULL(mc.quantite_caisses, FLOOR(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24)))) -
+                       (IFNULL(mc.quantite_caisses, 0) -
                         FLOOR(IFNULL(mc.quantite_vendue, 0) / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))) as stock_actuel_caisses,
-                       (($stockInitialBouteillesExpr) + IFNULL(mc.quantite_chargee, 0) - IFNULL(mc.quantite_vendue, 0)) as stock_actuel_bouteilles,
-                       (({$stockInitialCaissesExpr} + IFNULL(mc.quantite_caisses, FLOOR(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24)))) -
+                       (IFNULL(mc.quantite_caisses, 0) * COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24) - IFNULL(mc.quantite_vendue, 0)) as stock_actuel_bouteilles,
+                       (IFNULL(mc.quantite_caisses, 0) -
                         FLOOR(IFNULL(mc.quantite_vendue, 0) / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))) as stock_actuel
                 FROM mission_chargements mc
                 JOIN produits p ON mc.produit_id = p.id
@@ -182,8 +182,8 @@ class MobileController extends Controller {
 
         $chargementTotals = $this->db->fetch(
             "SELECT
-                    COALESCE(SUM(COALESCE(mc.caisses_deja_dans_vehicule, 0) + COALESCE(mc.quantite_caisses, FLOOR(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24)))), 0) as caisses_chargees,
-                    COALESCE(SUM((COALESCE(mc.caisses_deja_dans_vehicule, 0) + COALESCE(mc.quantite_caisses, FLOOR(mc.quantite_chargee / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24)))) - FLOOR(IFNULL(mc.quantite_vendue, 0) / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))), 0) as caisses_restantes
+                    COALESCE(SUM(COALESCE(mc.quantite_caisses, 0)), 0) as caisses_chargees,
+                    COALESCE(SUM(COALESCE(mc.quantite_caisses, 0) - FLOOR(IFNULL(mc.quantite_vendue, 0) / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))), 0) as caisses_restantes
              FROM mission_chargements mc
              JOIN produits p ON mc.produit_id = p.id
              WHERE mc.mission_id = :mission_id",
@@ -241,7 +241,7 @@ class MobileController extends Controller {
                 'bouteilles_vide' => (float) ($stockTotals['bouteilles_vide'] ?? 0),
                 'stock_actuel_bouteilles' => array_sum(array_map(static function ($row) {
                     return (int) ($row['stock_actuel_bouteilles'] ?? 0);
-                }, $this->db->fetchAll("SELECT mc.quantite_chargee - IFNULL(mc.quantite_vendue, 0) as stock_actuel_bouteilles FROM mission_chargements mc WHERE mc.mission_id = :mission_id", ['mission_id' => $missionId]))),
+                }, $this->db->fetchAll("SELECT (COALESCE(mc.quantite_caisses, 0) * COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24)) - IFNULL(mc.quantite_vendue, 0) as stock_actuel_bouteilles FROM mission_chargements mc JOIN produits p ON mc.produit_id = p.id WHERE mc.mission_id = :mission_id", ['mission_id' => $missionId]))),
             ]
         ]);
     }
@@ -436,9 +436,7 @@ class MobileController extends Controller {
                 if ($stockVehicule) {
                     $stockActuelMission = (float) ($stockVehicule['quantite_pleine'] ?? 0);
                 } else {
-                    $caissesDejaDansVehicule = (int) ($chargement['caisses_deja_dans_vehicule'] ?? 0);
-                    $stockActuelMission = ($caissesDejaDansVehicule * $bouteillesParCaisse)
-                        + (float) ($chargement['quantite_chargee'] ?? 0)
+                    $stockActuelMission = ((float) ($chargement['quantite_caisses'] ?? 0) * $bouteillesParCaisse)
                         - (float) ($chargement['quantite_vendue'] ?? 0);
                 }
 
