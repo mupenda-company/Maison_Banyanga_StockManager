@@ -100,7 +100,6 @@ ob_start();
         'progression' => 0,
         'nb_produits' => 0,
     ];
-    $objectifRows = array_slice($objectifMois['rows'] ?? [], 0, 5);
 ?>
 
 <div class="card mb-8">
@@ -137,38 +136,6 @@ ob_start();
             <p class="text-xs text-gray-500 mt-2">
                 <?= (int) ($objectifSummary['nb_produits'] ?? 0) ?> produit(s) suivis pour le mois en cours.
             </p>
-        </div>
-
-        <div class="table-container">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Produit</th>
-                        <th class="text-right">Objectif</th>
-                        <th class="text-right">Vendu</th>
-                        <th class="text-right">Reste</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($objectifRows)): ?>
-                    <tr>
-                        <td colspan="4" class="text-center p-4 text-gray-500">Aucun objectif n’a encore été défini pour ce mois.</td>
-                    </tr>
-                    <?php else: ?>
-                        <?php foreach ($objectifRows as $objectif): ?>
-                        <tr>
-                            <td>
-                                <div class="font-medium text-gray-900 dark:text-white"><?= htmlspecialchars($objectif['nom']) ?></div>
-                                <div class="text-xs text-gray-500"><?= htmlspecialchars($objectif['code']) ?></div>
-                            </td>
-                            <td class="text-right font-semibold text-blue-600"><?= number_format((int) ($objectif['objectif_caisses'] ?? 0), 0, ',', ' ') ?> cs</td>
-                            <td class="text-right font-semibold text-green-600"><?= number_format((int) ($objectif['ventes_caisses'] ?? 0), 0, ',', ' ') ?> cs</td>
-                            <td class="text-right font-semibold text-orange-600"><?= number_format((int) ($objectif['reste_caisses'] ?? 0), 0, ',', ' ') ?> cs</td>
-                        </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
         </div>
 
         <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === ROLE_ADMIN): ?>

@@ -238,8 +238,11 @@ class ProduitController extends Controller
         // Vérifier s'il y a des ventes ou approvisionnements liés
         $hasLinks = $this->db->fetchColumn(
             "SELECT (SELECT COUNT(*) FROM vente_details WHERE produit_id = :id) + 
-                    (SELECT COUNT(*) FROM approvisionnement_details WHERE produit_id = :id)",
-            ['id' => $id]
+                    (SELECT COUNT(*) FROM approvisionnement_details WHERE produit_id = :id_appro)",
+            [
+                'id' => $id,
+                'id_appro' => $id,
+            ]
         );
 
         if ($hasLinks > 0) {
