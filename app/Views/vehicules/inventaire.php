@@ -178,13 +178,15 @@ ob_start();
                         <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase">Vide</th>
                         <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase">Total</th>
                         <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase">Occupation</th>
+                        <?php if (!$printMode): ?>
                         <th class="px-4 py-3 text-center text-[10px] font-bold text-gray-500 uppercase">Actions</th>
+                        <?php endif; ?>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                     <?php if (empty($vehicules)): ?>
                     <tr>
-                        <td colspan="10" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colspan="<?= $printMode ? 9 : 10 ?>" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                             Aucun véhicule trouvé
                         </td>
                     </tr>
@@ -234,12 +236,14 @@ ob_start();
                             <td class="px-4 py-3 text-right font-bold <?= $occupation >= 90 ? 'text-red-600' : ($occupation >= 75 ? 'text-yellow-600' : 'text-green-600') ?>">
                                 <?= number_format($occupation, 1, ',', ' ') ?>%
                             </td>
+                            <?php if (!$printMode): ?>
                             <td class="px-4 py-3 text-center">
                                 <a href="<?= url('vehicules/' . (int) $vehicule['id']) ?>" class="text-primary-600 hover:text-primary-700 font-medium">Voir</a>
                             </td>
+                            <?php endif; ?>
                         </tr>
                         <tr class="bg-gray-50/70 dark:bg-gray-800/40">
-                            <td colspan="10" class="px-4 pb-4">
+                            <td colspan="<?= $printMode ? 9 : 10 ?>" class="px-4 pb-4">
                                 <details class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800" <?= $printMode ? 'open' : '' ?>>
                                     <summary class="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200">
                                         Détail du stock par produit

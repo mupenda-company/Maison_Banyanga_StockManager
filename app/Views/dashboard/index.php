@@ -280,9 +280,26 @@ ob_start();
                 <div class="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-3">
-                            <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0
-                                <?= $mvt['type_mouvement'] === 'entree' ? 'bg-green-100 text-green-600' : 
-                                   ($mvt['type_mouvement'] === 'sortie' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600') ?>">
+                            <?php
+                                $isSaleMovement = ($mvt['reference_type'] ?? null) === 'vente';
+                                if ($isSaleMovement && $mvt['type_mouvement'] === 'sortie') {
+                                    $movementLabel = 'plein';
+                                    $movementClass = 'bg-red-100 text-red-600';
+                                } elseif ($isSaleMovement && $mvt['type_mouvement'] === 'entree') {
+                                    $movementLabel = 'vide';
+                                    $movementClass = 'bg-green-100 text-green-600';
+                                } elseif ($mvt['type_mouvement'] === 'entree') {
+                                    $movementLabel = 'Entrée';
+                                    $movementClass = 'bg-green-100 text-green-600';
+                                } elseif ($mvt['type_mouvement'] === 'sortie') {
+                                    $movementLabel = 'Sortie';
+                                    $movementClass = 'bg-red-100 text-red-600';
+                                } else {
+                                    $movementLabel = 'Transfert';
+                                    $movementClass = 'bg-blue-100 text-blue-600';
+                                }
+                            ?>
+                            <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 <?= $movementClass ?>">
                                 <?php if ($mvt['type_mouvement'] === 'entree'): ?>
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
@@ -299,11 +316,16 @@ ob_start();
                             </div>
                             <div class="min-w-0">
                                 <p class="font-medium text-gray-900 dark:text-white truncate">
-                                    <?= htmlspecialchars($mvt['produit_nom']) ?>
+                                    <?= htmlspecialchars($movementLabel) ?> — <?= htmlspecialchars($mvt['produit_nom']) ?>
                                 </p>
                                 <p class="text-xs text-gray-500 dark:text-gray-400 truncate">
                                     <?= htmlspecialchars($mvt['emplacement_nom']) ?>
                                 </p>
+                                <?php if (!empty($mvt['motif'])): ?>
+                                <p class="text-[10px] text-gray-500 dark:text-gray-400 truncate mt-1">
+                                    <?= htmlspecialchars($mvt['motif']) ?>
+                                </p>
+                                <?php endif; ?>
                             </div>
                         </div>
                         <div class="text-right shrink-0">

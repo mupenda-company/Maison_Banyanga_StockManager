@@ -316,7 +316,7 @@
                     <div class="summary-value"><?= number_format($totalCaisses, 0, '.', ' ') ?> cs</div>
                 </div>
                 <div class="summary-card">
-                    <div class="summary-label">Emballages reçus</div>
+                    <div class="summary-label">Emballages vides reçus</div>
                     <div class="summary-value"><?= number_format($totalEmballagesRecus, 0, '.', ' ') ?> cs</div>
                 </div>
                 <div class="summary-card">

@@ -216,7 +216,7 @@ class Vente extends Model
                     'quantite' => -$quantiteBouteilles,
                     'reference_type' => 'vente',
                     'reference_id' => $venteId,
-                    'motif' => 'Vente N° ' . $data['numero_facture'] . ' (Plein)',
+                    'motif' => 'Vente N° ' . $data['numero_facture'] . ' - Sortie des caisses pleines',
                     'created_by' => $data['created_by']
                 ]);
 
@@ -239,7 +239,7 @@ class Vente extends Model
                         'quantite' => $caissesVidesRecues * $btlParCaisse,
                         'reference_type' => 'vente',
                         'reference_id' => $venteId,
-                        'motif' => 'Retour vide Vente N° ' . $data['numero_facture'],
+                        'motif' => 'Vente N° ' . $data['numero_facture'] . ' - Entrée des emballages vides',
                         'created_by' => $data['created_by']
                     ]);
                 }

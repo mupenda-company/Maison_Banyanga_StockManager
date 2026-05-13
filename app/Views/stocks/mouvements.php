@@ -156,12 +156,30 @@ ob_start();
                     <tr>
                         <td><?= date('d/m/Y H:i', strtotime($mvt['created_at'])) ?></td>
                         <td>
-                            <?php if ($mvt['type_mouvement'] === 'entree'): ?>
-                            <span class="badge-success">Entrée</span>
-                            <?php elseif ($mvt['type_mouvement'] === 'sortie'): ?>
-                            <span class="badge-danger">Sortie</span>
-                            <?php else: ?>
-                            <span class="badge-info">Transfert</span>
+                            <?php
+                                $isSaleMovement = ($mvt['reference_type'] ?? null) === 'vente';
+                                if ($isSaleMovement && $mvt['type_mouvement'] === 'sortie') {
+                                    $typeLabel = 'Sortie caisses pleines';
+                                    $typeClass = 'badge-danger';
+                                } elseif ($isSaleMovement && $mvt['type_mouvement'] === 'entree') {
+                                    $typeLabel = 'Entrée emballages vides';
+                                    $typeClass = 'badge-success';
+                                } elseif ($mvt['type_mouvement'] === 'entree') {
+                                    $typeLabel = 'Entrée';
+                                    $typeClass = 'badge-success';
+                                } elseif ($mvt['type_mouvement'] === 'sortie') {
+                                    $typeLabel = 'Sortie';
+                                    $typeClass = 'badge-danger';
+                                } else {
+                                    $typeLabel = 'Transfert';
+                                    $typeClass = 'badge-info';
+                                }
+                            ?>
+                            <span class="<?= $typeClass ?>"><?= htmlspecialchars($typeLabel) ?></span>
+                            <?php if (!empty($mvt['motif'])): ?>
+                            <div class="text-[10px] text-gray-500 mt-1 leading-tight">
+                                <?= htmlspecialchars($mvt['motif']) ?>
+                            </div>
                             <?php endif; ?>
                         </td>
                         <td>

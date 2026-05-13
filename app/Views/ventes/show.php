@@ -55,9 +55,9 @@ ob_start();
                         <thead>
                             <tr>
                                 <th>Produit</th>
-                                <th class="text-right">Quantité (Caisses)</th>
-                                <th class="text-right">Emballages reçus</th>
-                                <th class="text-right">Dette</th>
+                                <th class="text-right">Caisses pleines sorties</th>
+                                <th class="text-right">Emballages vides reçus</th>
+                                <th class="text-right">Emballages dus</th>
                                 <th class="text-right">Prix par Caisse</th>
                                 <th class="text-right">Sous-total</th>
                             </tr>
@@ -74,6 +74,7 @@ ob_start();
                                 <td>
                                     <div class="font-medium text-gray-900 dark:text-white"><?= htmlspecialchars($detail['produit_nom']) ?></div>
                                     <div class="text-[10px] text-gray-500 font-mono"><?= htmlspecialchars($detail['produit_code']) ?></div>
+                                    <div class="text-[10px] text-gray-500 mt-1">Sortie des caisses pleines et entrée des emballages vides</div>
                                 </td>
                                 <td class="text-right">
                                     <div class="font-bold text-gray-900 dark:text-white"><?= number_format($caisses, 0, '.', ' ') ?> cs</div>
@@ -124,7 +125,7 @@ ob_start();
                 ?>
                 <div class="p-4 border-t border-gray-200 dark:border-gray-700 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4">
-                        <p class="text-xs uppercase text-gray-500">Emballages reçus</p>
+                        <p class="text-xs uppercase text-gray-500">Emballages vides reçus</p>
                         <p class="text-2xl font-bold text-blue-600"><?= number_format($totalCaissesVidesRecues, 0, '.', ' ') ?> cs</p>
                     </div>
                     <div class="rounded-lg bg-red-50 dark:bg-red-900/20 p-4">
