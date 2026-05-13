@@ -290,6 +290,43 @@ class Vente extends Model
             ['d1' => $dateDebut, 'd2' => $dateFin]
         );
     }
+
+    /**
+     * Ventes validées par agent sur une période donnée
+     */
+    public function getVentesParAgent($dateDebut, $dateFin = null)
+    {
+        if ($dateFin === null) {
+            $dateFin = $dateDebut;
+        }
+
+        $dateDebut = str_contains((string) $dateDebut, ':')
+            ? (string) $dateDebut
+            : ((string) $dateDebut . ' 00:00:00');
+
+        $dateFin = str_contains((string) $dateFin, ':')
+            ? (string) $dateFin
+            : ((string) $dateFin . ' 23:59:59');
+
+        return $this->db->fetchAll(
+            "SELECT v.id, v.numero_facture, v.date_vente, v.total_ht, v.total_tva, v.total_ttc,
+                    v.statut, v.notes,
+                    v.created_by,
+                    u.nom as agent_nom, u.prenom as agent_prenom, u.role as agent_role,
+                    c.nom as client_nom, e.nom as emplacement_nom
+             FROM {$this->table} v
+             LEFT JOIN users u ON v.created_by = u.id
+             LEFT JOIN clients c ON v.client_id = c.id
+             LEFT JOIN emplacements e ON v.emplacement_id = e.id
+             WHERE v.statut = 'validee'
+               AND v.date_vente BETWEEN :date_debut AND :date_fin
+             ORDER BY COALESCE(u.prenom, ''), COALESCE(u.nom, ''), v.date_vente ASC",
+            [
+                'date_debut' => $dateDebut,
+                'date_fin' => $dateFin,
+            ]
+        );
+    }
     public function annuler($id)
     {
         try {

@@ -152,6 +152,7 @@ $routes = [
     
     // Rapports
     'GET::/rapports' => ['ReportController', 'index'],
+    'GET::/rapports/ventes-par-agent' => ['ReportController', 'ventesParAgent'],
     
     // Ristournes
     'GET::/ristournes' => ['RistourneController', 'index'],

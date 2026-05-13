@@ -103,7 +103,7 @@ class Produit extends Model
     public function getTopVentes($dateDebut, $dateFin, $limit = 5)
     {
         return $this->db->fetchAll(
-            "SELECT p.nom, p.code, SUM(vd.quantite) as total_bouteilles, SUM(ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)) as total_caisses, SUM(vd.total_ligne) as total_ca
+            "SELECT p.nom, p.code, SUM(vd.quantite) as total_bouteilles, SUM(ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)) as total_caisses, SUM(vd.sous_total) as total_ca
              FROM vente_details vd
              JOIN ventes v ON vd.vente_id = v.id
              JOIN produits p ON vd.produit_id = p.id

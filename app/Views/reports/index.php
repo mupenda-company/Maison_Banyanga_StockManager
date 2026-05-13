@@ -41,6 +41,18 @@ ob_start();
     </div>
 </div>
 
+<div class="card mb-8">
+    <div class="card-body flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Rapport journalier par agent</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Imprime les ventes de tous les agents pour une journée donnée.</p>
+        </div>
+        <a href="<?= url('rapports/ventes-par-agent?date_debut=' . $dateDebut . '&date_fin=' . $dateFin) ?>" class="btn btn-primary">
+            Ouvrir le rapport imprimable
+        </a>
+    </div>
+</div>
+
 <!-- KPI Emballages -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     <div class="stat-card">

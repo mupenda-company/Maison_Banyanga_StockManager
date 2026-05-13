@@ -45,4 +45,52 @@ class ReportController extends Controller
             'dateFin' => $dateFin
         ]);
     }
+
+    public function ventesParAgent()
+    {
+        $this->requireAuth();
+
+        $dateDebut = $_GET['date_debut'] ?? date('Y-m-d');
+        $dateFin = $_GET['date_fin'] ?? $dateDebut;
+
+        $ventes = $this->venteModel->getVentesParAgent($dateDebut, $dateFin);
+
+        $ventesParAgent = [];
+        $totalCa = 0;
+        $totalVentes = 0;
+
+        foreach ($ventes as $vente) {
+            $agentId = $vente['created_by'] ?? 0;
+            $agentNom = trim(($vente['agent_prenom'] ?? '') . ' ' . ($vente['agent_nom'] ?? ''));
+            if ($agentNom === '') {
+                $agentNom = 'Système';
+            }
+
+            if (!isset($ventesParAgent[$agentId])) {
+                $ventesParAgent[$agentId] = [
+                    'agent_id' => $agentId,
+                    'agent_nom' => $agentNom,
+                    'agent_role' => $vente['agent_role'] ?? '',
+                    'ventes' => [],
+                    'total_ca' => 0,
+                ];
+            }
+
+            $ventesParAgent[$agentId]['ventes'][] = $vente;
+            $ventesParAgent[$agentId]['total_ca'] += (float) ($vente['total_ttc'] ?? 0);
+            $totalCa += (float) ($vente['total_ttc'] ?? 0);
+            $totalVentes++;
+        }
+
+        $ventesParAgent = array_values($ventesParAgent);
+
+        $this->view('reports/ventes_par_agent', [
+            'dateDebut' => $dateDebut,
+            'dateFin' => $dateFin,
+            'ventesParAgent' => $ventesParAgent,
+            'totalCa' => $totalCa,
+            'totalVentes' => $totalVentes,
+            'nbAgents' => count($ventesParAgent),
+        ]);
+    }
 }

@@ -335,6 +335,13 @@
                 <div class="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
                     <p class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Administration</p>
 
+                    <a href="<?= url('rapports') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/rapports') !== false ? 'active' : '' ?>">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-6m4 6V7m4 10v-3m2 3H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2z"/>
+                        </svg>
+                        Rapports
+                    </a>
+
                     <a href="<?= url('ristournes') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/ristournes') !== false ? 'active' : '' ?>">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
