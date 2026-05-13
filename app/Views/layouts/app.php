@@ -305,11 +305,17 @@
                     </svg>
                     Véhicules
                 </a>
+                <a href="<?= url('vehicules/inventaire') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/vehicules/inventaire') !== false ? 'active' : '' ?>">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2m-6 0a2 2 0 002 2h4a2 2 0 002-2m-6 0a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    Inventaire véhicules
+                </a>
                 
                 <!-- Missions -->
                 <a href="<?= url('missions') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/missions') !== false ? 'active' : '' ?>">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m0 0a3 3 0 016 0v2m-6 0h6m-6 0H5a2 2 0 01-2-2V7a2 2 0 012-2h2m6 12h6m0 0a2 2 0 002-2v-5a2 2 0 00-2-2h-1m1 7v2m0-2h-1"/>
                     </svg>
                     Missions
                 </a>

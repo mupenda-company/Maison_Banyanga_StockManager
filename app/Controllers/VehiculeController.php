@@ -30,6 +30,85 @@ class VehiculeController extends Controller
             'agents' => $agents
         ]);
     }
+
+    /**
+     * Inventaire des véhicules
+     */
+    public function inventaire()
+    {
+        $this->requireAuth();
+
+        $printMode = isset($_GET['print']) && (string) $_GET['print'] === '1';
+        $canEditInventory = isset($_SESSION['user_role']) && in_array($_SESSION['user_role'], [ROLE_ADMIN, ROLE_MAGASINIER], true);
+
+        $vehiculesBase = $this->vehiculeModel->getWithAgent();
+        $vehicules = [];
+        $produits = (new Produit())->getActive();
+
+        $totaux = [
+            'vehicules' => 0,
+            'disponibles' => 0,
+            'en_mission' => 0,
+            'caisses_pleine' => 0,
+            'caisses_vide' => 0,
+            'capacite' => 0,
+            'occupation_moyenne' => 0,
+        ];
+
+        foreach ($vehiculesBase as $vehicule) {
+            $detail = $this->vehiculeModel->getWithStock((int) ($vehicule['id'] ?? 0));
+
+            if (!$detail) {
+                continue;
+            }
+
+            $stock = $detail['stock'] ?? [];
+            $caissesPleines = 0;
+            $caissesVides = 0;
+            foreach ($stock as $ligne) {
+                $caissesPleines += (float) ($ligne['caisses_pleine'] ?? 0);
+                $caissesVides += (float) ($ligne['caisses_vide'] ?? 0);
+            }
+
+            $detail['stock_caisses_pleine'] = (int) round($caissesPleines);
+            $detail['stock_caisses_vide'] = (int) round($caissesVides);
+            $detail['stock_total_caisses'] = $detail['stock_caisses_pleine'] + $detail['stock_caisses_vide'];
+            $detail['occupation_pourcentage'] = ((int) ($detail['capacite'] ?? 0)) > 0
+                ? round(($detail['stock_total_caisses'] / (int) $detail['capacite']) * 100, 1)
+                : 0;
+
+            $vehicules[] = $detail;
+
+            $totaux['vehicules']++;
+            if ((int) ($detail['en_mission'] ?? 0) > 0) {
+                $totaux['en_mission']++;
+            } else {
+                $totaux['disponibles']++;
+            }
+            $totaux['caisses_pleine'] += $detail['stock_caisses_pleine'];
+            $totaux['caisses_vide'] += $detail['stock_caisses_vide'];
+            $totaux['capacite'] += (int) ($detail['capacite'] ?? 0);
+        }
+
+        $totaux['occupation_moyenne'] = $totaux['capacite'] > 0
+            ? round((($totaux['caisses_pleine'] + $totaux['caisses_vide']) / $totaux['capacite']) * 100, 1)
+            : 0;
+
+        if ($this->isAjax()) {
+            return $this->success([
+                'vehicules' => $vehicules,
+                'totaux' => $totaux,
+            ]);
+        }
+
+        $this->view('vehicules/inventaire', [
+            'vehicules' => $vehicules,
+            'totaux' => $totaux,
+            'produits' => $produits,
+            'print_mode' => $printMode,
+            'can_edit_inventory' => $canEditInventory,
+        ]);
+    }
     
     /**
      * API liste des véhicules
