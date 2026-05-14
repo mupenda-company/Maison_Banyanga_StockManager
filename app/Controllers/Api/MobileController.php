@@ -253,6 +253,18 @@ class MobileController extends Controller {
             return $this->success([]);
         }
 
+        $date = trim((string) ($_GET['date'] ?? ''));
+        $params = ['mission_id' => (int) $missionId];
+        $dateClause = '';
+
+        if ($date !== '') {
+            $parsedDate = DateTime::createFromFormat('Y-m-d', $date);
+            if ($parsedDate instanceof DateTime) {
+                $dateClause = ' AND DATE(v.date_vente) = :date_vente_date ';
+                $params['date_vente_date'] = $parsedDate->format('Y-m-d');
+            }
+        }
+
         $rows = $this->db->fetchAll(
             "SELECT v.id, v.numero_facture, v.date_vente, v.total_ttc,
                     c.nom as client_nom,
@@ -262,11 +274,11 @@ class MobileController extends Controller {
              JOIN clients c ON v.client_id = c.id
              LEFT JOIN vente_details vd ON vd.vente_id = v.id
              LEFT JOIN produits p ON vd.produit_id = p.id
-             WHERE v.mission_id = :mission_id AND v.statut = 'validee'
+             WHERE v.mission_id = :mission_id AND v.statut = 'validee'" . $dateClause . "
              GROUP BY v.id, v.numero_facture, v.date_vente, v.total_ttc, c.nom, c.telephone
              ORDER BY v.date_vente DESC
              LIMIT 100",
-            ['mission_id' => (int) $missionId]
+            $params
         );
 
         return $this->success($rows);
@@ -487,10 +499,22 @@ class MobileController extends Controller {
 
             $numeroFacture = $venteModel->generateNumeroFacture('MOB-');
 
+            $dateVente = date('Y-m-d H:i:s');
+            $dateVenteInput = trim((string) ($data['date_vente'] ?? ''));
+            if ($dateVenteInput !== '') {
+                $parsedDateVente = DateTime::createFromFormat('Y-m-d H:i:s', $dateVenteInput)
+                    ?: DateTime::createFromFormat(DateTime::ATOM, $dateVenteInput)
+                    ?: DateTime::createFromFormat('Y-m-d\TH:i:sP', $dateVenteInput);
+
+                if ($parsedDateVente instanceof DateTime) {
+                    $dateVente = $parsedDateVente->format('Y-m-d H:i:s');
+                }
+            }
+
             $venteId = $venteModel->create([
                 'numero_facture' => $numeroFacture,
                 'client_id' => (int) $data['client_id'],
-                'date_vente' => date('Y-m-d H:i:s'),
+                'date_vente' => $dateVente,
                 'mission_id' => (int) $data['mission_id'],
                 'emplacement_id' => (int) $emplacementVehiculeId,
                 'total_ht' => $totalHt,
