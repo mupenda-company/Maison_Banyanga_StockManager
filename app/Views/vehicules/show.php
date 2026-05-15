@@ -154,11 +154,25 @@ ob_start();
         <!-- Résumé -->
         <div class="card">
             <div class="card-body text-center">
-                <p class="text-sm text-gray-500 dark:text-gray-400">Stock total</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Caisses pleines</p>
                 <p class="text-3xl font-bold text-primary-600">
                     <?= array_sum(array_column($vehicule['stock'] ?? [], 'caisses_pleine')) ?>
                 </p>
-                <p class="text-sm text-gray-500">caisses</p>
+                <p class="text-sm text-gray-500">restantes dans le véhicule</p>
+                <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
+                    <div class="rounded-lg border bg-gray-50 dark:bg-gray-800 p-3">
+                        <p class="text-xs uppercase tracking-wide text-gray-500">Caisses vides</p>
+                        <p class="text-xl font-bold text-orange-600">
+                            <?= array_sum(array_column($vehicule['stock'] ?? [], 'caisses_vide')) ?>
+                        </p>
+                    </div>
+                    <div class="rounded-lg border bg-gray-50 dark:bg-gray-800 p-3">
+                        <p class="text-xs uppercase tracking-wide text-gray-500">Total physique</p>
+                        <p class="text-xl font-bold text-primary-600">
+                            <?= array_sum(array_column($vehicule['stock'] ?? [], 'caisses_pleine')) + array_sum(array_column($vehicule['stock'] ?? [], 'caisses_vide')) ?>
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
         

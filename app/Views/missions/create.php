@@ -84,7 +84,8 @@ ob_start();
                             parseFloat(c.stock_depart_caisses || 0) > 0
                         )).map(c => ({
                             produit_id: parseInt(c.produit_id),
-                            quantite_caisses: parseInt(c.quantite_caisses || 0)
+                            quantite_caisses: parseInt(c.quantite_caisses || 0),
+                            stock_depart_caisses: parseInt(c.stock_depart_caisses || 0)
                         }));
 
                         const selectedVehicule = vehicules.find(v => String(v.id) === String(vehicule_id));

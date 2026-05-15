@@ -142,9 +142,9 @@ ob_start();
                         <thead>
                             <tr>
                                 <th class="text-left">Produit</th>
-                                <th class="text-right">Stock départ</th>
-                                <th class="text-right">Ajustement mission</th>
-                                <th class="text-right">Total réel</th>
+                                <th class="text-right">Stock initial</th>
+                                <th class="text-right">Variation mission</th>
+                                <th class="text-right">Stock final</th>
                                 <th class="text-right">Prix caisse</th>
                                 <th class="text-right">Sous-total</th>
                             </tr>
@@ -167,7 +167,7 @@ ob_start();
                                     <div class="text-xs text-gray-500"><?= htmlspecialchars($item['produit_code']) ?></div>
                                 </td>
                                 <td class="text-right"><?= number_format($stockDepartCaisses, 0, '.', ' ') ?> cs</td>
-                                <td class="text-right"><?= number_format($ajustementMissionCaisses, 0, '.', ' ') ?> cs</td>
+                                <td class="text-right<?= $ajustementMissionCaisses < 0 ? ' text-red-600 font-semibold' : '' ?>"><?= number_format($ajustementMissionCaisses, 0, '.', ' ') ?> cs</td>
                                 <td class="text-right font-semibold text-primary-600"><?= number_format($totalReelCaisses, 0, '.', ' ') ?> cs</td>
                                 <td class="text-right"><?= format_money_converted($prixCaisse) ?></td>
                                 <td class="text-right font-medium"><?= format_money_converted($item['sous_total'] ?? 0) ?></td>
@@ -176,7 +176,7 @@ ob_start();
                         </tbody>
                         <tfoot class="bg-gray-50 dark:bg-gray-700/50">
                             <tr>
-                                <td colspan="3" class="text-right font-bold">Total caisses réelles</td>
+                                <td colspan="3" class="text-right font-bold">Total stock final</td>
                                 <td class="text-right font-bold text-primary-600">
                                     <?= number_format((int) ($mission['total_caisses'] ?? 0), 0, '.', ' ') ?> cs
                                 </td>
@@ -242,7 +242,9 @@ ob_start();
         <!-- Résumé -->
         <div class="card">
             <div class="card-body text-center">
-                <p class="text-sm text-gray-500 dark:text-gray-400">Total caisses</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    <?= $isRestourne ? 'Caisses livrées' : 'Caisses pleines restantes' ?>
+                </p>
                 <p class="text-3xl font-bold text-primary-600">
                     <?= $isRestourne ? (int) ($firstChargement['quantite_caisses'] ?? 0) : ($mission['total_caisses'] ?? 0) ?>
                 </p>
@@ -326,101 +328,12 @@ ob_start();
         x-data="{
             isOpen: false,
             loading: false,
-            retours: {},
-            vides_retournes: {},
-            montant_encaisse: 0,
             justification_cloture: '',
             isRestourne: <?= $isRestourne ? 'true' : 'false' ?>,
-            missionSummary: {
-                caissesVendues: <?= (int) ($mission['caisses_vendues_total'] ?? 0) ?>,
-                caissesVidesAttendues: <?= (int) ($mission['caisses_vides_attendues'] ?? 0) ?>,
-                retoursVides: <?= (int) ($mission['retours_vides_total'] ?? 0) ?>,
-                montantAttendu: <?= json_encode((float) ($mission['montant_attendu'] ?? 0)) ?>,
-                montantEncaisse: <?= json_encode((float) ($mission['montant_encaisse'] ?? 0)) ?>,
-                montantEcart: <?= json_encode((float) ($mission['montant_ecart'] ?? 0)) ?>,
-                caissesVidesEcart: <?= json_encode((int) ($mission['caisses_vides_ecart'] ?? 0)) ?>
-            },
-            chargements: <?= htmlspecialchars(json_encode($mission['chargements'] ?? []), ENT_QUOTES, 'UTF-8') ?>,
-            
-            initData() {
-                if (this.chargements && Array.isArray(this.chargements)) {
-                    this.chargements.forEach(c => {
-                        this.retours[c.produit_id] = 0;
-                        this.vides_retournes[c.produit_id] = 0;
-                    });
-                }
-                this.montant_encaisse = this.getTotalAttendu();
-            },
-            
-            getTotalAttendu() {
-                if (this.isRestourne) {
-                    return 0;
-                }
-                return parseFloat(this.missionSummary.montantAttendu || 0);
-            },
-
-            getMontantEcart() {
-                return parseFloat(this.montant_encaisse || 0) - this.getTotalAttendu();
-            },
-
-            getTotalRetoursPleinsAttendues() {
-                return (this.chargements || []).reduce((total, c) => {
-                    const totalReel = parseInt(c.caisses_total || c.quantite_caisses || 0, 10) || 0;
-                    const vendues = parseInt(c.caisses_vendues || Math.floor((c.quantite_vendue || 0) / Math.max(parseInt(c.bouteilles_par_caisses || 24, 10) || 24, 1)), 10) || 0;
-                    return total + Math.max(totalReel - vendues, 0);
-                }, 0);
-            },
-
-            getTotalRetoursPleins() {
-                return Object.values(this.retours).reduce((total, value) => total + (parseInt(value, 10) || 0), 0);
-            },
-
-            getRetoursPleinEcart() {
-                return this.getTotalRetoursPleinsAttendues() - this.getTotalRetoursPleins();
-            },
-
-            getCaissesVidesAttendues() {
-                return parseInt(this.missionSummary.caissesVidesAttendues || 0, 10);
-            },
-
-            getTotalVidesRetournees() {
-                return Object.values(this.vides_retournes).reduce((total, value) => total + (parseInt(value, 10) || 0), 0);
-            },
-
-            getCaissesVidesEcart() {
-                return this.getCaissesVidesAttendues() - this.getTotalVidesRetournees();
-            },
-
-            hasTooManyVidesRetournees() {
-                return (this.chargements || []).some((c) => {
-                    const maxVides = Math.max(parseInt(c.caisses_vides_recues || 0, 10) || 0, 0);
-                    const saisi = parseInt(this.vides_retournes[c.produit_id] || 0, 10) || 0;
-                    return saisi > maxVides;
-                });
-            },
-
-            hasDiscrepancy() {
-                if (this.isRestourne) {
-                    return false;
-                }
-                return Math.abs(this.getMontantEcart()) > 0.01 || this.getRetoursPleinEcart() !== 0 || this.getCaissesVidesEcart() !== 0;
-            },
-
-            getClosureMessage() {
-                if (this.isRestourne) {
-                    return 'Mission de ristourne : aucune saisie de vente n’est requise pour la clôture.';
-                }
-                return this.hasDiscrepancy()
-                    ? 'Des écarts ont été détectés : vous pouvez tout de même clôturer la mission.'
-                    : 'Aucun écart détecté : la clôture peut être validée directement.';
-            },
-
             async submit() {
                 const ok = await App.confirm({
                     title: 'Clôturer la mission ?',
-                    message: this.hasDiscrepancy()
-                        ? 'Des écarts ont été détectés. Confirmer la clôture ?'
-                        : 'Confirmer la clôture de la mission ?',
+                    message: 'Confirmer la clôture automatique de la mission ?',
                     confirmText: 'Clôturer',
                     cancelText: 'Annuler',
                     type: 'warning'
@@ -428,14 +341,9 @@ ob_start();
                 if (!ok) return;
                 this.loading = true;
                 try {
-                    const payload = this.isRestourne
-                        ? { justification_cloture: this.justification_cloture }
-                        : {
-                            retours: this.retours,
-                            vides_retournes: this.vides_retournes,
-                            montant_encaisse: App.convertMoney(this.montant_encaisse, window.DEVISE, window.BASE_DEVISE),
-                            justification_cloture: this.justification_cloture
-                        };
+                    const payload = {
+                        justification_cloture: this.justification_cloture
+                    };
 
                     await App.api('/api/missions/<?= $mission['id'] ?>/terminer', 'POST', payload);
                     App.notify('Mission clôturée avec succès');
@@ -447,7 +355,6 @@ ob_start();
                 }
             }
         }"
-        x-init="initData()"
         x-show="isOpen"
         @open-modal-terminer.window="isOpen = true"
         class="fixed inset-0 z-50 overflow-y-auto"
@@ -463,127 +370,103 @@ ob_start();
                  x-transition:enter-end="opacity-100 translate-y-0">
                 <div class="card-header flex items-center justify-between border-b p-4 bg-gray-50 dark:bg-gray-900/60">
                     <div>
-                        <h3 class="text-lg font-semibold">Clôture de la mission N° <?= htmlspecialchars($mission['numero_mission']) ?></h3>
-                        <p class="text-xs text-gray-500 mt-1">Vérifiez les montants, les caisses vides et la justification avant validation.</p>
+                        <h3 class="text-lg font-semibold">Clôture automatique de la mission N° <?= htmlspecialchars($mission['numero_mission']) ?></h3>
+                        <p class="text-xs text-gray-500 mt-1">Les retours pleins et les caisses vides sont calculés automatiquement à partir des ventes validées.</p>
                     </div>
                     <button @click="isOpen = false" class="text-gray-400 hover:text-gray-500 rounded-full p-1 hover:bg-gray-100 dark:hover:bg-gray-800">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
-                
+
                 <div class="p-6">
                     <form @submit.prevent="submit()">
                         <div class="space-y-6">
-                            <div class="rounded-xl border p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4" :class="hasDiscrepancy() ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'">
-                                <div>
-                                    <p class="text-sm font-semibold" :class="hasDiscrepancy() ? 'text-amber-800' : 'text-emerald-800'" x-text="hasDiscrepancy() ? 'Clôture avec écarts détectés' : 'Clôture cohérente'"></p>
-                                    <p class="text-xs mt-1" :class="hasDiscrepancy() ? 'text-amber-700' : 'text-emerald-700'" x-text="getClosureMessage()"></p>
+                            <div class="rounded-xl border bg-blue-50 border-blue-200 p-4">
+                                <p class="text-sm font-semibold text-blue-800">Résumé automatique</p>
+                                <p class="text-xs text-blue-700 mt-1">Aucune saisie de retour n’est nécessaire. Le système complète la clôture à partir des ventes validées de la mission.</p>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="p-4 border rounded-lg bg-white dark:bg-gray-800">
+                                    <p class="text-[11px] uppercase text-gray-500">Total chargé</p>
+                                    <p class="text-lg font-bold text-primary-600"><?= (int) ($mission['total_caisses'] ?? 0) ?> cs</p>
                                 </div>
-                                <div class="grid grid-cols-2 gap-3 text-sm min-w-[260px]">
-                                    <div class="rounded-lg bg-white/90 dark:bg-gray-800/90 border px-3 py-2">
-                                        <p class="text-[11px] uppercase text-gray-500">Écart caisse</p>
-                                        <p class="font-semibold" :class="Math.abs(getMontantEcart()) > 0.01 ? 'text-red-600' : 'text-green-600'" x-text="App.formatMoney(getMontantEcart(), window.DEVISE)"></p>
-                                    </div>
-                                    <div class="rounded-lg bg-white/90 dark:bg-gray-800/90 border px-3 py-2">
-                                        <p class="text-[11px] uppercase text-gray-500">Écart vides</p>
-                                        <p class="font-semibold" :class="getCaissesVidesEcart() !== 0 ? 'text-red-600' : 'text-green-600'" x-text="getCaissesVidesEcart() + ' cs'"></p>
-                                    </div>
+                                <div class="p-4 border rounded-lg bg-white dark:bg-gray-800">
+                                    <p class="text-[11px] uppercase text-gray-500">Total vendu</p>
+                                    <p class="text-lg font-bold text-green-600"><?= (int) ($mission['caisses_vendues_total'] ?? 0) ?> cs</p>
+                                </div>
+                                <div class="p-4 border rounded-lg bg-white dark:bg-gray-800">
+                                    <p class="text-[11px] uppercase text-gray-500">Retours pleins automatiques</p>
+                                    <p class="text-lg font-bold text-orange-500"><?= max(0, (int) ($mission['total_caisses'] ?? 0) - (int) ($mission['caisses_vendues_total'] ?? 0)) ?> cs</p>
+                                </div>
+                                <div class="p-4 border rounded-lg bg-white dark:bg-gray-800">
+                                    <p class="text-[11px] uppercase text-gray-500">Caisses vides retournées</p>
+                                    <p class="text-lg font-bold text-purple-600"><?= (int) ($mission['caisses_vides_recues_total'] ?? 0) ?> cs</p>
+                                </div>
+                                <div class="p-4 border rounded-lg bg-white dark:bg-gray-800 md:col-span-2">
+                                    <p class="text-[11px] uppercase text-gray-500">Montant attendu</p>
+                                    <p class="text-lg font-bold text-primary-600"><?= number_format((float) ($mission['montant_attendu'] ?? 0), 2, ',', ' ') ?> <?= htmlspecialchars($mission['devise_base'] ?? 'CDF') ?></p>
                                 </div>
                             </div>
 
-                            <!-- Tableau des retours -->
-                            <div class="overflow-x-auto" x-show="!isRestourne">
-                                <table class="table w-full text-sm">
-                                    <thead>
-                                        <tr>
-                                            <th>Produit</th>
-                                            <th>Total réel</th>
-                                            <th>Total vendu</th>
-                                            <th>Retours plein</th>
-                                            <th>Retour vide</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <template x-for="(c, index) in chargements" :key="index + '-' + c.produit_id">
-                                            <tr>
-                                                <td x-text="c.produit_nom"></td>
-                                                <td x-text="(c.caisses_total || c.quantite_caisses || 0) + ' cs'" class="font-semibold text-primary-600"></td>
-                                                <td x-text="(c.caisses_vendues || Math.floor((c.quantite_vendue || 0) / Math.max(parseInt(c.bouteilles_par_caisses || 24, 10) || 24, 1))) + ' cs'"></td>
-                                                <td>
-                                                    <input type="number" x-model.number="retours[c.produit_id]" class="input py-1 w-24" :max="Math.max((c.caisses_total || c.quantite_caisses || 0) - (c.caisses_vendues || Math.floor((c.quantite_vendue || 0) / Math.max(parseInt(c.bouteilles_par_caisses || 24, 10) || 24, 1))), 0)" min="0">
-                                                </td>
-                                                <td>
-                                                    <div class="flex flex-col gap-1">
-                                                        <input type="number" x-model.number="vides_retournes[c.produit_id]" class="input py-1 w-24" min="0">
-                                                        <p class="text-[10px] text-gray-500">Reçues: <span x-text="Math.max(parseInt(c.caisses_vides_recues || 0, 10) || 0, 0) + ' cs'"></span></p>
-                                                    </div>
-                                                </td>
+                            <div class="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <div class="px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+                                    <p class="text-sm font-semibold text-gray-900 dark:text-white">Détail automatique par gamme</p>
+                                    <p class="text-xs text-gray-500 mt-1">Les quantités de retour sont calculées automatiquement à partir des ventes validées, sans saisie manuelle.</p>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full text-sm">
+                                        <thead class="bg-white dark:bg-gray-800">
+                                            <tr class="text-left text-[11px] uppercase tracking-wide text-gray-500">
+                                                <th class="px-4 py-3">Produit</th>
+                                                <th class="px-4 py-3 text-right">Parti avec</th>
+                                                <th class="px-4 py-3 text-right">Vendu</th>
+                                                <th class="px-4 py-3 text-right">À remettre plein</th>
+                                                <th class="px-4 py-3 text-right">À remettre vide</th>
                                             </tr>
-                                        </template>
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <!-- Section Financière -->
-                            <div class="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-6" x-show="!isRestourne">
-                                <div>
-                                    <label class="label">Montant encaissé réel (<span x-text="window.DEVISE"></span>)</label>
-                                    <input type="number" x-model.number="montant_encaisse" class="input text-xl font-bold text-green-600" step="0.01" required>
-                                    <p class="text-xs text-gray-500 mt-2">Saisir le montant réellement remis à la clôture.</p>
-                                    <div class="mt-4">
-                                        <label class="label">Justification de clôture</label>
-                                        <textarea x-model="justification_cloture" class="input" rows="4" placeholder="Facultative, vous pouvez détailler les écarts si nécessaire."></textarea>
-                                        <p class="text-xs mt-2" :class="hasDiscrepancy() ? 'text-red-500' : 'text-gray-500'">
-                                            <span x-show="hasDiscrepancy()">Une justification peut être ajoutée si vous souhaitez préciser les écarts.</span>
-                                            <span x-show="!hasDiscrepancy()">La justification reste facultative si tout est conforme.</span>
-                                        </p>
-                                    </div>
-                                </div>
-                                <div class="text-right">
-                                    <div class="mb-4 p-3 rounded-lg border bg-white dark:bg-gray-800 text-left">
-                                        <p class="text-xs uppercase text-gray-500">Résumé de clôture</p>
-                                        <p class="text-sm font-semibold mt-1" :class="hasDiscrepancy() ? 'text-red-700' : 'text-green-700'" x-text="getClosureMessage()"></p>
-                                    </div>
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
-                                        <div class="p-3 border rounded-lg bg-white dark:bg-gray-800">
-                                            <p class="text-[11px] uppercase text-gray-500">Montant attendu</p>
-                                            <p class="text-lg font-bold text-primary-600" x-text="App.formatMoneyConverted(getTotalAttendu(), window.BASE_DEVISE, window.DEVISE)"></p>
-                                        </div>
-                                        <div class="p-3 border rounded-lg bg-white dark:bg-gray-800">
-                                            <p class="text-[11px] uppercase text-gray-500">Montant encaissé</p>
-                                            <p class="text-lg font-bold text-green-600" x-text="App.formatMoneyConverted(App.convertMoney(montant_encaisse, window.DEVISE, window.BASE_DEVISE), window.BASE_DEVISE, window.DEVISE)"></p>
-                                        </div>
-                                        <div class="p-3 border rounded-lg bg-white dark:bg-gray-800">
-                                            <p class="text-[11px] uppercase text-gray-500">Écart caisse</p>
-                                            <p class="text-lg font-bold" :class="Math.abs(getMontantEcart()) > 0.01 ? 'text-red-600' : 'text-green-600'" x-text="App.formatMoney(getMontantEcart(), window.DEVISE)"></p>
-                                        </div>
-                                        <div class="p-3 border rounded-lg bg-white dark:bg-gray-800">
-                                            <p class="text-[11px] uppercase text-gray-500">Caisses vides retournées</p>
-                                            <p class="text-lg font-bold text-orange-500" x-text="getTotalVidesRetournees() + ' / ' + getCaissesVidesAttendues() + ' cs'"></p>
-                                            <p class="text-xs mt-1" :class="getCaissesVidesEcart() === 0 ? 'text-green-600' : 'text-red-600'">
-                                                Écart: <span x-text="getCaissesVidesEcart() + ' cs'"></span>
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div class="mt-4 p-3 rounded-lg" :class="hasDiscrepancy() ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'">
-                                        <p class="text-sm font-semibold" :class="hasDiscrepancy() ? 'text-red-700' : 'text-green-700'">
-                                            <span x-show="hasDiscrepancy()">Des écarts sont détectés : une justification est requise.</span>
-                                            <span x-show="!hasDiscrepancy()">Aucun écart détecté : la clôture est cohérente.</span>
-                                        </p>
-                                    </div>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
+                                            <?php foreach ($mission['chargements'] as $item): ?>
+                                            <?php
+                                                $partiAvec = (int) ($item['caisses_total'] ?? 0);
+                                                $venduAuto = (int) ($item['caisses_vendues_auto'] ?? $item['caisses_vendues'] ?? 0);
+                                                $aRemettrePlein = (int) ($item['caisses_a_remettre_pleines'] ?? max(0, $partiAvec - $venduAuto));
+                                                $aRemettreVide = (int) ($item['caisses_a_remettre_vides'] ?? 0);
+                                            ?>
+                                            <tr>
+                                                <td class="px-4 py-3">
+                                                    <div class="font-medium text-gray-900 dark:text-white"><?= htmlspecialchars($item['produit_nom']) ?></div>
+                                                    <div class="text-xs text-gray-500"><?= htmlspecialchars($item['produit_code']) ?></div>
+                                                </td>
+                                                <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-white"><?= number_format($partiAvec, 0, '.', ' ') ?> cs</td>
+                                                <td class="px-4 py-3 text-right font-medium text-green-600"><?= number_format($venduAuto, 0, '.', ' ') ?> cs</td>
+                                                <td class="px-4 py-3 text-right font-medium text-orange-600"><?= number_format($aRemettrePlein, 0, '.', ' ') ?> cs</td>
+                                                <td class="px-4 py-3 text-right font-medium text-purple-600"><?= number_format($aRemettreVide, 0, '.', ' ') ?> cs</td>
+                                            </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
 
-                            <div class="rounded-xl border p-4 bg-blue-50 border-blue-200" x-show="isRestourne">
+                            <div>
+                                <label class="label">Justification de clôture</label>
+                                <textarea x-model="justification_cloture" class="input" rows="4" placeholder="Facultatif"></textarea>
+                                <p class="text-xs text-gray-500 mt-2">À utiliser seulement si vous souhaitez ajouter une note interne.</p>
+                            </div>
+
+                            <?php if ($isRestourne): ?>
+                            <div class="rounded-xl border p-4 bg-blue-50 border-blue-200">
                                 <p class="text-sm font-semibold text-blue-800">Clôture de mission de ristourne</p>
                                 <p class="text-sm text-blue-700 mt-1">La mission a déjà été préparée avec le produit et le montant livré. La clôture se limite à finaliser le statut de mission.</p>
                             </div>
+                            <?php endif; ?>
                         </div>
 
                         <div class="flex justify-end space-x-3 mt-8">
                             <button type="button" @click="isOpen = false" class="btn btn-secondary">Annuler</button>
                             <button type="submit" class="btn btn-primary" :disabled="loading">
-                                <span x-show="!loading" x-text="isRestourne ? 'Clôturer la mission' : 'Valider le retour'"></span>
+                                <span x-show="!loading" x-text="isRestourne ? 'Clôturer la mission' : 'Clôturer automatiquement'"></span>
                                 <span x-show="loading">Traitement...</span>
                             </button>
                         </div>

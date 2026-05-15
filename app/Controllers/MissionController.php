@@ -33,13 +33,34 @@ class MissionController extends Controller
         $this->requireAuth();
         
         $filters = [
-            'statut' => $_GET['statut'] ?? null,
-            'vehicule_id' => $_GET['vehicule_id'] ?? null,
-            'type_mission' => $_GET['type_mission'] ?? null
+            'statut' => in_array($_GET['statut'] ?? '', ['en_cours', 'terminee'], true) ? $_GET['statut'] : null,
+            'vehicule_id' => (int) ($_GET['vehicule_id'] ?? 0),
+            'type_mission' => in_array($_GET['type_mission'] ?? '', ['vente', 'ristourne'], true) ? $_GET['type_mission'] : null,
+            'date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['date'] ?? '') ? $_GET['date'] : null,
         ];
 
-        $typeMissionFilter = in_array($filters['type_mission'], ['vente', 'ristourne'], true) ? $filters['type_mission'] : null;
-        $typeMissionSql = $typeMissionFilter ? " AND COALESCE(m.type_mission, 'vente') = '" . $typeMissionFilter . "'" : '';
+        $conditions = ["1=1"];
+        $params = [];
+
+        if ($filters['type_mission']) {
+            $conditions[] = "COALESCE(m.type_mission, 'vente') = :type_mission";
+            $params['type_mission'] = $filters['type_mission'];
+        }
+
+        if ($filters['statut']) {
+            $conditions[] = "m.statut = :statut";
+            $params['statut'] = $filters['statut'];
+        }
+
+        if ($filters['vehicule_id'] > 0) {
+            $conditions[] = "m.vehicule_id = :vehicule_id";
+            $params['vehicule_id'] = $filters['vehicule_id'];
+        }
+
+        if ($filters['date']) {
+            $conditions[] = "DATE(m.date_depart) = :date_depart";
+            $params['date_depart'] = $filters['date'];
+        }
         
         $page = (int) ($_GET['page'] ?? 1);
         
@@ -62,9 +83,10 @@ class MissionController extends Controller
              LEFT JOIN users u ON v.agent_responsable_id = u.id
              LEFT JOIN zones z ON m.zone_id = z.id
              LEFT JOIN clients c ON m.client_id = c.id
-             WHERE 1=1{$typeMissionSql}
+             WHERE " . implode(' AND ', $conditions) . "
              ORDER BY m.date_depart DESC
              LIMIT 20 OFFSET " . (($page - 1) * 20)
+            , $params
         );
         
         $vehicules = $this->vehiculeModel->getWithAgent();
@@ -180,6 +202,7 @@ class MissionController extends Controller
             $produitId = (int) ($chargement['produit_id'] ?? 0);
             $quantiteCaisses = (int) ($chargement['quantite_caisses'] ?? 0);
             $quantiteBouteilles = (int) ($chargement['quantite'] ?? 0);
+            $stockDepartCaisses = (int) ($chargement['stock_depart_caisses'] ?? 0);
 
             if ($produitId <= 0) {
                 continue;
@@ -193,12 +216,17 @@ class MissionController extends Controller
                 $chargements[$produitId] = [
                     'produit_id' => $produitId,
                     'quantite_caisses' => 0,
-                    'quantite_chargee' => 0
+                    'quantite_chargee' => 0,
+                    'stock_depart_caisses' => 0
                 ];
             }
 
             $chargements[$produitId]['quantite_caisses'] += $quantiteCaisses;
             $chargements[$produitId]['quantite_chargee'] += $quantiteBouteilles;
+            $chargements[$produitId]['stock_depart_caisses'] = max(
+                $chargements[$produitId]['stock_depart_caisses'],
+                $stockDepartCaisses
+            );
         }
 
         $chargements = array_values($chargements);

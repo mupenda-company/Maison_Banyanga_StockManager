@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Facture <?= htmlspecialchars($vente['numero_facture']) ?> - <?= htmlspecialchars($params['nom_entreprise']) ?></title>
+    <title><?= htmlspecialchars($vente['numero_facture']) ?> - <?= htmlspecialchars($params['nom_entreprise']) ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @page {
-            size: A4 portrait;
-            margin: 12mm;
+            size: 80mm auto;
+            margin: 3mm;
         }
         body {
             margin: 0;
@@ -16,174 +16,110 @@
             color: #111827;
             font-family: Arial, Helvetica, sans-serif;
             font-size: 12px;
-            line-height: 1.45;
+            line-height: 1.4;
         }
-        .invoice-sheet {
-            width: 186mm;
-            min-height: 265mm;
+        .ticket {
+            width: 74mm;
             margin: 0 auto;
             background: #ffffff;
-            padding: 12mm;
+            padding: 4mm;
             box-sizing: border-box;
-            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
         }
-        .invoice-header {
-            display: flex;
-            justify-content: space-between;
-            gap: 16px;
-            padding-bottom: 14px;
+        .ticket-header {
+            text-align: center;
             border-bottom: 2px solid #111827;
+            padding-bottom: 8px;
+            margin-bottom: 8px;
         }
-        .company-block {
-            flex: 1;
+        .company-name {
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 3px;
         }
-        .invoice-meta {
-            width: 72mm;
-            text-align: right;
+        .company-info {
+            font-size: 10px;
+            margin-bottom: 2px;
+        }
+        .invoice-number {
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 6px;
+        }
+        .invoice-date {
+            font-size: 10px;
         }
         .section {
-            margin-top: 14px;
+            margin-bottom: 10px;
         }
         .section-title {
-            margin-bottom: 8px;
             font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.08em;
+            font-weight: bold;
             text-transform: uppercase;
-            color: #6b7280;
+            margin-bottom: 4px;
+            border-bottom: 2px solid #111827;
+            padding-bottom: 2px;
         }
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-        .card {
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            padding: 12px;
-            background: #f9fafb;
-        }
-        .table-wrap {
-            border: 1px solid #d1d5db;
-            border-radius: 12px;
-            overflow: hidden;
+        .info-row {
+            font-size: 11px;
+            margin-bottom: 2px;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-        }
-        thead {
-            background: #111827;
-            color: #ffffff;
-        }
-        th, td {
-            padding: 8px 10px;
-            border-bottom: 1px solid #e5e7eb;
-            vertical-align: top;
+            font-size: 11px;
         }
         th {
-            font-size: 10.5px;
+            font-size: 9px;
             text-transform: uppercase;
-            letter-spacing: 0.04em;
             text-align: left;
+            border-bottom: 2px solid #111827;
+            padding: 3px 0;
+        }
+        td {
+            padding: 3px 0;
+            border-bottom: 1px solid #e5e7eb;
         }
         .num {
             text-align: right;
-            white-space: nowrap;
-        }
-        tbody tr:nth-child(even) {
-            background: #f9fafb;
-        }
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-        }
-        .summary-card {
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            background: #ffffff;
-            padding: 10px 12px;
-        }
-        .summary-label {
-            font-size: 10px;
-            color: #6b7280;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-        .summary-value {
-            margin-top: 3px;
-            font-size: 14px;
-            font-weight: 700;
         }
         .totals {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            align-items: start;
-        }
-        .total-box {
-            border: 1px solid #111827;
-            border-radius: 12px;
-            padding: 12px;
+            margin-top: 10px;
+            border-top: 2px solid #111827;
+            padding-top: 6px;
         }
         .total-line {
             display: flex;
             justify-content: space-between;
-            gap: 12px;
-            margin-bottom: 6px;
+            font-size: 11px;
+            margin-bottom: 3px;
         }
         .total-grand {
-            margin-top: 8px;
-            padding-top: 8px;
-            border-top: 1px solid #111827;
-            font-size: 15px;
-            font-weight: 800;
+            font-size: 14px;
+            font-weight: bold;
+            margin-top: 6px;
+            padding-top: 4px;
+            border-top: 2px solid #111827;
         }
         .footer {
-            margin-top: 16px;
+            margin-top: 10px;
             text-align: center;
-            color: #6b7280;
             font-size: 10px;
+            color: #6b7280;
+            border-top: 2px solid #111827;
+            padding-top: 6px;
         }
         @media print {
             body {
                 background: #ffffff;
-                print-color-adjust: exact;
-                -webkit-print-color-adjust: exact;
             }
-            .invoice-sheet {
+            .ticket {
                 width: auto;
-                min-height: auto;
                 margin: 0;
                 padding: 0;
                 box-shadow: none;
             }
             .no-print { display: none !important; }
-        }
-        @media screen and (max-width: 900px) {
-            .invoice-sheet {
-                width: auto;
-                min-height: auto;
-                margin: 12px;
-                padding: 16px;
-            }
-            .invoice-header,
-            .info-grid,
-            .totals {
-                grid-template-columns: 1fr;
-                display: grid;
-            }
-            .invoice-header {
-                display: grid;
-            }
-            .invoice-meta {
-                width: auto;
-                text-align: left;
-            }
-            .summary-grid {
-                grid-template-columns: 1fr;
-            }
         }
     </style>
 </head>
@@ -210,169 +146,108 @@
         $totalTtc = (float) ($vente['total_ttc'] ?? 0);
         $tvaTaux = $totalHt > 0 ? round(($totalTva / $totalHt) * 100) : 0;
     ?>
-    <div class="invoice-sheet">
+    <div class="ticket">
         <!-- En-tête -->
-        <div class="invoice-header">
-            <div class="company-block">
-                <?php if ($companyLogo): ?>
-                    <img src="<?= $companyLogo ?>" alt="Logo" class="h-16 mb-3 object-contain">
-                <?php endif; ?>
-                <h1 class="text-2xl font-bold uppercase leading-tight"><?= htmlspecialchars($companyName) ?></h1>
-                <?php if (!empty($params['adresse'])): ?><p><?= htmlspecialchars($params['adresse']) ?></p><?php endif; ?>
-                <?php if (!empty($companyContact)): ?><p>Contact: <?= htmlspecialchars($companyContact) ?></p><?php endif; ?>
-                <?php if (!empty($params['email_contact'])): ?><p>Email: <?= htmlspecialchars($params['email_contact']) ?></p><?php endif; ?>
-                <?php if (!empty($params['rccm'])): ?><p>RCCM: <?= htmlspecialchars($params['rccm']) ?></p><?php endif; ?>
-                <?php if (!empty($params['id_nat'])): ?><p>ID NAT: <?= htmlspecialchars($params['id_nat']) ?></p><?php endif; ?>
-                <?php if (!empty($params['nif'])): ?><p>NIF: <?= htmlspecialchars($params['nif']) ?></p><?php endif; ?>
-                <?php if (!empty($params['numero_compte'])): ?><p>N° compte: <?= htmlspecialchars($params['numero_compte']) ?></p><?php endif; ?>
-            </div>
-
-            <div class="invoice-meta">
-                <div class="card" style="background:#111827;color:#fff;border-color:#111827;">
-                    <div class="summary-label" style="color:#cbd5e1;">Facture</div>
-                    <div class="summary-value" style="font-size:22px; margin-top:4px;"><?= htmlspecialchars($vente['numero_facture']) ?></div>
-                    <div style="margin-top:8px; font-size:11px; color:#e5e7eb;">
-                        <?= date('d/m/Y H:i', strtotime($vente['date_vente'])) ?>
-                    </div>
-                </div>
-            </div>
+        <div class="ticket-header">
+            <?php if ($companyLogo): ?>
+                <img src="<?= $companyLogo ?>" alt="Logo" style="max-height: 30px; margin-bottom: 4px;">
+            <?php endif; ?>
+            <div class="company-name"><?= htmlspecialchars($companyName) ?></div>
+            <?php if (!empty($params['adresse'])): ?><div class="company-info"><?= htmlspecialchars($params['adresse']) ?></div><?php endif; ?>
+            <?php if (!empty($companyContact)): ?><div class="company-info">Tel: <?= htmlspecialchars($companyContact) ?></div><?php endif; ?>
+            <?php if (!empty($params['email_contact'])): ?><div class="company-info">Email: <?= htmlspecialchars($params['email_contact']) ?></div><?php endif; ?>
+            <?php if (!empty($params['rccm'])): ?><div class="company-info">RCCM: <?= htmlspecialchars($params['rccm']) ?></div><?php endif; ?>
+            <?php if (!empty($params['id_nat'])): ?><div class="company-info">ID NAT: <?= htmlspecialchars($params['id_nat']) ?></div><?php endif; ?>
+            <?php if (!empty($params['nif'])): ?><div class="company-info">NIF: <?= htmlspecialchars($params['nif']) ?></div><?php endif; ?>
+            <?php if (!empty($params['numero_compte'])): ?><div class="company-info">Compte: <?= htmlspecialchars($params['numero_compte']) ?></div><?php endif; ?>
+            <div class="invoice-number"><?= htmlspecialchars($vente['numero_facture']) ?></div>
+            <div class="invoice-date"><?= date('d/m/Y H:i', strtotime($vente['date_vente'])) ?></div>
         </div>
         
         <!-- Client -->
-        <div class="section info-grid">
-            <div class="card">
-                <div class="section-title">Client</div>
-                <p><strong>Nom:</strong> <?= htmlspecialchars($vente['client_nom']) ?></p>
-                <?php if (!empty($vente['client_telephone'])): ?><p><strong>Téléphone:</strong> <?= htmlspecialchars($vente['client_telephone']) ?></p><?php endif; ?>
-                <?php if (!empty($vente['client_numero'])): ?><p><strong>N° client:</strong> <?= htmlspecialchars($vente['client_numero']) ?></p><?php endif; ?>
-                <?php if (!empty($vente['zone_nom'])): ?><p><strong>Zone:</strong> <?= htmlspecialchars($vente['zone_nom']) ?></p><?php endif; ?>
-            </div>
-
-            <div class="card">
-                <div class="section-title">Résumé</div>
-                <?php if (!empty($ristourneInfo)): ?>
-                    <p><strong>Produits cumulés (période):</strong> <?= number_format((int) ($ristourneInfo['total_caisses'] ?? 0), 0, '.', ' ') ?> cs</p>
-                    <p><strong>Ristourne:</strong> <?= number_format((float) ($ristourneInfo['taux_applique'] ?? 0), 2, '.', ' ') ?>% (<?= format_money_converted($ristourneInfo['montant_ristourne'] ?? 0) ?>)</p>
-                <?php elseif (isset($totalCaissesClient)): ?>
-                    <p><strong>Produits cumulés:</strong> <?= number_format((int) $totalCaissesClient, 0, '.', ' ') ?> cs</p>
-                <?php endif; ?>
-                <p><strong>Vendeur:</strong> <?= htmlspecialchars(trim(($vente['created_by_prenom'] ?? '') . ' ' . ($vente['created_by_nom'] ?? ''))) ?></p>
-            </div>
+        <div class="section">
+            <div class="section-title">CLIENT</div>
+            <div class="info-row"><strong><?= htmlspecialchars($vente['client_nom']) ?></strong></div>
+            <?php if (!empty($vente['client_telephone'])): ?><div class="info-row">Tel: <?= htmlspecialchars($vente['client_telephone']) ?></div><?php endif; ?>
+            <?php if (!empty($vente['zone_nom'])): ?><div class="info-row">Zone: <?= htmlspecialchars($vente['zone_nom']) ?></div><?php endif; ?>
+            <?php if (!empty($vente['client_numero'])): ?><div class="info-row">N°: <?= htmlspecialchars($vente['client_numero']) ?></div><?php endif; ?>
+            <?php if (!empty($ristourneInfo)): ?>
+                <div class="info-row">Cumulé: <?= number_format((int) ($ristourneInfo['total_caisses'] ?? 0), 0, '.', ' ') ?> cs</div>
+                <div class="info-row">Ristourne: <?= number_format((float) ($ristourneInfo['taux_applique'] ?? 0), 2, '.', ' ') ?>% (<?= format_money_converted($ristourneInfo['montant_ristourne'] ?? 0) ?>)</div>
+            <?php elseif (isset($totalCaissesClient)): ?>
+                <div class="info-row">Cumulé: <?= number_format((int) $totalCaissesClient, 0, '.', ' ') ?> cs</div>
+            <?php endif; ?>
         </div>
         
+        <!-- Produits -->
         <div class="section">
-            <div class="section-title">Détails produits</div>
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Produit</th>
-                            <th class="num">Caisses</th>
-                            <th class="num">Emballages reçus</th>
-                            <th class="num">Dette</th>
-                            <th class="num">Prix caisse</th>
-                            <th class="num">Sous-total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($vente['details'] as $detail): 
-                            $btlParCaisse = (int) ($detail['bouteilles_par_caisses'] ?? 24);
-                            $caisses = intdiv((int) $detail['quantite'], $btlParCaisse);
-                            $caissesVidesRecues = (int) ($detail['caisses_vides_recues'] ?? 0);
-                            $detteCaisses = max(0, $caisses - $caissesVidesRecues);
-                            $prixCaisse = (float) $detail['prix_unitaire'] * $btlParCaisse;
-                        ?>
-                        <tr>
-                            <td>
-                                <div class="font-bold"><?= htmlspecialchars($detail['produit_nom']) ?></div>
-                                <?php if (!empty($detail['produit_code'])): ?>
-                                    <div style="font-size:10px; color:#6b7280; font-family: monospace;"><?= htmlspecialchars($detail['produit_code']) ?></div>
-                                <?php endif; ?>
-                            </td>
-                            <td class="num">
-                                <div class="font-medium"><?= number_format($caisses, 0, '.', ' ') ?> cs</div>
-                                <div style="font-size:10px; color:#6b7280;">= <?= number_format((int) $detail['quantite'], 0, '.', ' ') ?> btl</div>
-                            </td>
-                            <td class="num"><?= number_format($caissesVidesRecues, 0, '.', ' ') ?> cs</td>
-                            <td class="num" style="font-weight:700; color:<?= $detteCaisses > 0 ? '#dc2626' : '#16a34a' ?>;">
-                                <?= number_format($detteCaisses, 0, '.', ' ') ?> cs
-                            </td>
-                            <td class="num"><?= format_money_converted($prixCaisse) ?></td>
-                            <td class="num" style="font-weight:700; color:#2563eb;">
-                                <?= format_money_converted($detail['sous_total']) ?>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+            <div class="section-title">PRODUITS</div>
+            <?php foreach ($vente['details'] as $detail): 
+                $btlParCaisse = (int) ($detail['bouteilles_par_caisses'] ?? 24);
+                $caisses = intdiv((int) $detail['quantite'], $btlParCaisse);
+                $caissesVidesRecues = (int) ($detail['caisses_vides_recues'] ?? 0);
+                $detteCaisses = max(0, $caisses - $caissesVidesRecues);
+                $prixCaisse = (float) $detail['prix_unitaire'] * $btlParCaisse;
+            ?>
+            <div style="margin-bottom: 8px;">
+                <div style="font-weight: bold; font-size: 12px;"><?= htmlspecialchars($detail['produit_nom']) ?></div>
+                <div style="display: flex; justify-content: space-between; font-size: 11px; margin-top: 2px;">
+                    <span><?= number_format($caisses, 0, '.', ' ') ?> cs</span>
+                    <span><?= format_money_converted($prixCaisse) ?></span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 11px; margin-top: 2px;">
+                    <span>Vides: <?= number_format($caissesVidesRecues, 0, '.', ' ') ?> / Dette: <?= number_format($detteCaisses, 0, '.', ' ') ?> cs</span>
+                    <span><?= format_money_converted($detail['sous_total']) ?></span>
+                </div>
             </div>
+            <?php endforeach; ?>
         </div>
         
         <!-- Totaux -->
-        <div class="section totals">
-            <div class="summary-grid">
-                <div class="summary-card">
-                    <div class="summary-label">Caisses vendues</div>
-                    <div class="summary-value"><?= number_format($totalCaisses, 0, '.', ' ') ?> cs</div>
-                </div>
-                <div class="summary-card">
-                    <div class="summary-label">Emballages vides reçus</div>
-                    <div class="summary-value"><?= number_format($totalEmballagesRecus, 0, '.', ' ') ?> cs</div>
-                </div>
-                <div class="summary-card">
-                    <div class="summary-label">Dette emballages</div>
-                    <div class="summary-value" style="color: <?= $totalDetteEmballages > 0 ? '#dc2626' : '#16a34a' ?>;">
-                        <?= number_format($totalDetteEmballages, 0, '.', ' ') ?> cs
-                    </div>
-                </div>
-                <div class="summary-card">
-                    <div class="summary-label">TVA</div>
-                    <div class="summary-value"><?= number_format($tvaTaux, 0, '.', ' ') ?>%</div>
-                </div>
+        <div class="totals">
+            <div class="total-line">
+                <span>Total caisses achetées</span>
+                <span><?= number_format($totalCaisses, 0, '.', ' ') ?> cs</span>
             </div>
-
-            <div class="total-box">
-                <div class="total-line">
-                    <span>Total HT</span>
-                    <span><?= format_money_converted($totalHt) ?></span>
-                </div>
-                <div class="total-line">
-                    <span>TVA (<?= number_format($tvaTaux, 0, '.', ' ') ?>%)</span>
-                    <span><?= format_money_converted($totalTva) ?></span>
-                </div>
-                <div class="total-line">
-                    <span>Emballages reçus</span>
-                    <span><?= number_format($totalEmballagesRecus, 0, '.', ' ') ?> cs</span>
-                </div>
-                <div class="total-line">
-                    <span>Dette emballages</span>
-                    <span><?= number_format($totalDetteEmballages, 0, '.', ' ') ?> cs</span>
-                </div>
-                <div class="total-line total-grand">
-                    <span>TOTAL TTC</span>
-                    <span><?= format_money_converted($totalTtc) ?></span>
-                </div>
+            <div class="total-line">
+                <span>Emballages reçus</span>
+                <span><?= number_format($totalEmballagesRecus, 0, '.', ' ') ?> cs</span>
+            </div>
+            <div class="total-line">
+                <span>Dette emballages</span>
+                <span><?= number_format($totalDetteEmballages, 0, '.', ' ') ?> cs</span>
+            </div>
+            <div class="total-line">
+                <span>Total HT</span>
+                <span><?= format_money_converted($totalHt) ?></span>
+            </div>
+            <div class="total-line">
+                <span>TVA (<?= number_format($tvaTaux, 0, '.', ' ') ?>%)</span>
+                <span><?= format_money_converted($totalTva) ?></span>
+            </div>
+            <div class="total-line total-grand">
+                <span>TOTAL TTC</span>
+                <span><?= format_money_converted($totalTtc) ?></span>
             </div>
         </div>
 
         <div class="footer">
-            <p>Merci pour votre confiance !</p>
-            <p>Vendeur: <?= htmlspecialchars(trim(($vente['created_by_prenom'] ?? '') . ' ' . ($vente['created_by_nom'] ?? ''))) ?></p>
+            <div>Merci pour votre confiance !</div>
+            <div>Vendeur: <?= htmlspecialchars(trim(($vente['created_by_prenom'] ?? '') . ' ' . ($vente['created_by_nom'] ?? ''))) ?></div>
         </div>
         
         <!-- Boutons d'action -->
-        <div class="no-print mt-8 flex flex-col gap-2">
-            <button onclick="window.print()" class="w-full py-2 bg-blue-600 text-white rounded font-bold">
+        <div class="no-print" style="margin-top: 12px;">
+            <button onclick="window.print()" style="width: 100%; padding: 8px; background: #2563eb; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">
                 IMPRIMER
             </button>
-            <a href="<?= url('ventes/' . $vente['id']) ?>" class="w-full py-2 bg-gray-200 text-center text-gray-700 rounded">
+            <a href="<?= url('ventes/' . $vente['id']) ?>" style="display: block; width: 100%; padding: 8px; background: #e5e7eb; color: #374151; text-align: center; border-radius: 4px; text-decoration: none; margin-top: 4px;">
                 RETOUR
             </a>
         </div>
     </div>
 
     <script>
-        // Lancer l'impression automatiquement au chargement
         window.onload = function() {
             setTimeout(function() {
                 window.print();

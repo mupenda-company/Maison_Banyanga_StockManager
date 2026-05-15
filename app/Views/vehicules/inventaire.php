@@ -73,7 +73,7 @@ ob_start();
         <p class="text-xl font-bold text-blue-600"><?= number_format((int) ($totaux['capacite'] ?? 0), 0, ',', ' ') ?></p>
     </div>
     <div class="stat-card border-l-4 border-purple-500">
-        <p class="stat-label text-xs uppercase text-purple-600">Stock total</p>
+        <p class="stat-label text-xs uppercase text-purple-600">Total physique</p>
         <p class="text-xl font-bold text-purple-600">
             <?= number_format((int) ($totaux['caisses_pleine'] ?? 0) + (int) ($totaux['caisses_vide'] ?? 0), 0, ',', ' ') ?>
         </p>

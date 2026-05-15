@@ -201,6 +201,7 @@ class MobileController extends Controller {
         $caissesRestantes = round((float) ($chargementTotals['caisses_restantes'] ?? 0), 0);
         $caissesPleines = round((float) ($stockTotals['caisses_pleine'] ?? 0), 0);
         $caissesVides = round((float) ($stockTotals['caisses_vide'] ?? 0), 0);
+        $caissesTotales = $caissesPleines + $caissesVides;
 
         $stockCoherent = abs($caissesRestantes - $caissesPleines) < 0.0001;
 
@@ -237,6 +238,7 @@ class MobileController extends Controller {
             'stock' => [
                 'caisses_pleine' => $caissesPleines,
                 'caisses_vide' => $caissesVides,
+                'caisses_totales' => $caissesTotales,
                 'bouteilles_pleine' => (float) ($stockTotals['bouteilles_pleine'] ?? 0),
                 'bouteilles_vide' => (float) ($stockTotals['bouteilles_vide'] ?? 0),
                 'stock_actuel_bouteilles' => array_sum(array_map(static function ($row) {
