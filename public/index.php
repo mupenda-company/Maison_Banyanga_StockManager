@@ -134,6 +134,7 @@ $routes = [
     'GET::/api/mobile/vente/(\d+)/facture' => ['MobileController', 'getVenteFacture'],
     'GET::/api/mobile/clients' => ['ClientController', 'apiList'],
     'GET::/api/mobile/ventes' => ['MobileController', 'listVentes'],
+    'GET::/api/mobile/ventes-par-agent' => ['MobileController', 'ventesParAgent'],
     
     // Pertes
     'GET::/pertes' => ['PerteController', 'index'],

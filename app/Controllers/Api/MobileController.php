@@ -287,6 +287,50 @@ class MobileController extends Controller {
     }
 
     /**
+     * Ventes par agent pour l'historique
+     */
+    public function ventesParAgent()
+    {
+        $dateDebut = $_GET['date_debut'] ?? date('Y-m-d');
+        $dateFin = $_GET['date_fin'] ?? $dateDebut;
+        $agentId = $_GET['agent_id'] ?? null;
+
+        $params = [
+            'date_debut' => $dateDebut,
+            'date_fin' => $dateFin
+        ];
+
+        $agentClause = '';
+        if ($agentId !== null && $agentId !== '') {
+            $agentClause = ' AND v.created_by = :agent_id ';
+            $params['agent_id'] = (int) $agentId;
+        }
+
+        $rows = $this->db->fetchAll(
+            "SELECT v.id, v.numero_facture, v.date_vente, v.total_ttc, v.total_ht, v.total_tva,
+                    c.nom as client_nom,
+                    c.telephone as client_telephone,
+                    u.prenom as agent_prenom,
+                    u.nom as agent_nom,
+                    u.role as agent_role,
+                    COALESCE(SUM(COALESCE(vd.quantite_caisses, ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0))), 0) as caisses_vendues
+             FROM ventes v
+             JOIN clients c ON v.client_id = c.id
+             LEFT JOIN users u ON v.created_by = u.id
+             LEFT JOIN vente_details vd ON vd.vente_id = v.id
+             LEFT JOIN produits p ON vd.produit_id = p.id
+             WHERE v.statut = 'validee'
+             AND DATE(v.date_vente) BETWEEN :date_debut AND :date_fin" . $agentClause . "
+             GROUP BY v.id, v.numero_facture, v.date_vente, v.total_ttc, v.total_ht, v.total_tva, c.nom, c.telephone, u.prenom, u.nom, u.role
+             ORDER BY v.date_vente DESC
+             LIMIT 200",
+            $params
+        );
+
+        return $this->success($rows);
+    }
+
+    /**
      * Données facture (ticket) d'une vente pour le mobile
      */
     public function getVenteFacture($id)
