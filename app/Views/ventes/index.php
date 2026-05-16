@@ -9,12 +9,20 @@ ob_start();
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Ventes</h1>
         <p class="text-gray-500 dark:text-gray-400">Gestion des ventes et factures</p>
     </div>
-    <a href="<?= url('ventes/create') ?>" class="btn btn-primary">
-        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-        </svg>
-        Nouvelle vente
-    </a>
+    <div class="flex gap-2">
+        <a href="<?= url('ventes/par-vehicule') ?>" class="btn btn-secondary">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+            </svg>
+            Par véhicule
+        </a>
+        <a href="<?= url('ventes/create') ?>" class="btn btn-primary">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Nouvelle vente
+        </a>
+    </div>
 </div>
 
 <!-- Filters -->
@@ -28,6 +36,17 @@ ob_start();
                     <?php foreach ($clients as $client): ?>
                     <option value="<?= $client['id'] ?>" <?= ($filters['client_id'] ?? '') == $client['id'] ? 'selected' : '' ?>>
                         <?= htmlspecialchars($client['nom']) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="flex-1 min-w-[200px]">
+                <label class="label">Emplacement</label>
+                <select name="emplacement_id" class="input">
+                    <option value="">Tous les emplacements</option>
+                    <?php foreach ($emplacements as $emp): ?>
+                    <option value="<?= $emp['id'] ?>" <?= ($filters['emplacement_id'] ?? '') == $emp['id'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($emp['nom']) ?>
                     </option>
                     <?php endforeach; ?>
                 </select>

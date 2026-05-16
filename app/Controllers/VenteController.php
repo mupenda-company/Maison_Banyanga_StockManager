@@ -262,4 +262,171 @@ class VenteController extends Controller
             'dateFin' => $dateFin
         ]);
     }
+    
+    /**
+     * Historique des ventes par véhicule
+     */
+    public function parVehicule()
+    {
+        $this->requireAuth();
+        
+        $vehiculeId = $_GET['vehicule_id'] ?? null;
+        $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
+        $dateFin = $_GET['date_fin'] ?? date('Y-m-d');
+        
+        $vehicules = $this->db->fetchAll("SELECT id, immatriculation FROM vehicules ORDER BY immatriculation");
+        
+        $ventes = [];
+        $clients = [];
+        $produits = [];
+        
+        if ($vehiculeId) {
+            // Récupérer les ventes pour ce véhicule via les missions
+            $ventes = $this->db->fetchAll(
+                "SELECT v.id, v.numero_facture, v.date_vente, v.total_ttc, v.total_ht, v.total_tva,
+                        c.nom as client_nom, c.telephone as client_telephone, c.adresse as client_adresse,
+                        z.nom as zone_nom,
+                        m.numero_mission
+                 FROM ventes v
+                 JOIN clients c ON v.client_id = c.id
+                 LEFT JOIN zones z ON c.zone_id = z.id
+                 LEFT JOIN missions m ON v.mission_id = m.id
+                 WHERE m.vehicule_id = :vehicule_id
+                 AND DATE(v.date_vente) BETWEEN :date_debut AND :date_fin
+                 AND v.statut = 'validee'
+                 ORDER BY v.date_vente DESC",
+                [
+                    'vehicule_id' => (int) $vehiculeId,
+                    'date_debut' => $dateDebut,
+                    'date_fin' => $dateFin
+                ]
+            );
+            
+            // Récupérer les clients uniques avec leurs dettes d'emballage
+            $clients = $this->db->fetchAll(
+                "SELECT DISTINCT c.id, c.nom, c.telephone, c.adresse, z.nom as zone_nom,
+                        COALESCE(SUM(vd.quantite_caisses - vd.caisses_vides_recues), 0) as dette_caisses
+                 FROM ventes v
+                 JOIN clients c ON v.client_id = c.id
+                 LEFT JOIN zones z ON c.zone_id = z.id
+                 LEFT JOIN missions m ON v.mission_id = m.id
+                 LEFT JOIN vente_details vd ON v.id = vd.vente_id
+                 WHERE m.vehicule_id = :vehicule_id
+                 AND DATE(v.date_vente) BETWEEN :date_debut AND :date_fin
+                 AND v.statut = 'validee'
+                 GROUP BY c.id, c.nom, c.telephone, c.adresse, z.nom
+                 ORDER BY c.nom",
+                [
+                    'vehicule_id' => (int) $vehiculeId,
+                    'date_debut' => $dateDebut,
+                    'date_fin' => $dateFin
+                ]
+            );
+            
+            // Récupérer les produits vendus avec quantités
+            $produits = $this->db->fetchAll(
+                "SELECT p.id, p.nom, p.code,
+                        SUM(vd.quantite_caisses) as total_caisses,
+                        SUM(vd.quantite) as total_bouteilles,
+                        SUM(vd.sous_total) as total_montant
+                 FROM vente_details vd
+                 JOIN ventes v ON vd.vente_id = v.id
+                 JOIN produits p ON vd.produit_id = p.id
+                 LEFT JOIN missions m ON v.mission_id = m.id
+                 WHERE m.vehicule_id = :vehicule_id
+                 AND DATE(v.date_vente) BETWEEN :date_debut AND :date_fin
+                 AND v.statut = 'validee'
+                 GROUP BY p.id, p.nom, p.code
+                 ORDER BY total_caisses DESC",
+                [
+                    'vehicule_id' => (int) $vehiculeId,
+                    'date_debut' => $dateDebut,
+                    'date_fin' => $dateFin
+                ]
+            );
+        }
+        
+        $this->view('ventes/par_vehicule', [
+            'vehicules' => $vehicules,
+            'vehiculeId' => $vehiculeId,
+            'dateDebut' => $dateDebut,
+            'dateFin' => $dateFin,
+            'ventes' => $ventes,
+            'clients' => $clients,
+            'produits' => $produits
+        ]);
+    }
+    
+    /**
+     * Imprimer l'historique des ventes par véhicule
+     */
+    public function printParVehicule()
+    {
+        $this->requireAuth();
+        
+        $vehiculeId = $_GET['vehicule_id'] ?? null;
+        $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
+        $dateFin = $_GET['date_fin'] ?? date('Y-m-d');
+        
+        if (!$vehiculeId) {
+            return $this->error('Véhicule non spécifié', 400);
+        }
+        
+        // Récupérer les informations du véhicule
+        $vehicule = $this->db->fetch(
+            "SELECT id, immatriculation FROM vehicules WHERE id = :id",
+            ['id' => (int) $vehiculeId]
+        );
+        
+        if (!$vehicule) {
+            return $this->error('Véhicule non trouvé', 404);
+        }
+        
+        // Récupérer les ventes avec détails
+        $ventes = $this->db->fetchAll(
+            "SELECT v.id, v.numero_facture, v.date_vente, v.total_ttc,
+                    c.id as client_id, c.nom as client_nom, c.telephone as client_telephone, c.adresse as client_adresse,
+                    z.nom as zone_nom,
+                    m.numero_mission
+             FROM ventes v
+             JOIN clients c ON v.client_id = c.id
+             LEFT JOIN zones z ON c.zone_id = z.id
+             LEFT JOIN missions m ON v.mission_id = m.id
+             WHERE m.vehicule_id = :vehicule_id
+             AND DATE(v.date_vente) BETWEEN :date_debut AND :date_fin
+             AND v.statut = 'validee'
+             ORDER BY v.date_vente DESC",
+            [
+                'vehicule_id' => (int) $vehiculeId,
+                'date_debut' => $dateDebut,
+                'date_fin' => $dateFin
+            ]
+        );
+        
+        // Récupérer les détails de chaque vente
+        foreach ($ventes as &$vente) {
+            $vente['details'] = $this->db->fetchAll(
+                "SELECT p.nom as produit_nom, p.code as produit_code,
+                        vd.quantite_caisses, vd.caisses_vides_recues,
+                        (vd.quantite_caisses - vd.caisses_vides_recues) as dette_caisses,
+                        vd.quantite as bouteilles,
+                        vd.sous_total
+                 FROM vente_details vd
+                 JOIN produits p ON vd.produit_id = p.id
+                 WHERE vd.vente_id = :vente_id",
+                ['vente_id' => $vente['id']]
+            );
+        }
+        
+        // Récupérer les paramètres de personnalisation
+        $params = $this->parametreModel->getPersonnalisation();
+        
+        $this->view('ventes/print_par_vehicule', [
+            'vehicule' => $vehicule,
+            'dateDebut' => $dateDebut,
+            'dateFin' => $dateFin,
+            'ventes' => $ventes,
+            'params' => $params
+        ]);
+    }
 }

@@ -90,6 +90,8 @@ $routes = [
     'POST::/api/ventes/(\d+)/annuler' => ['VenteController', 'annuler'],
     'GET::/ventes/(\d+)/print' => ['VenteController', 'print'],
     'GET::/ventes/stats' => ['VenteController', 'stats'],
+    'GET::/ventes/par-vehicule' => ['VenteController', 'parVehicule'],
+    'GET::/ventes/par-vehicule/print' => ['VenteController', 'printParVehicule'],
     
     // Clients
     'GET::/clients' => ['ClientController', 'index'],
