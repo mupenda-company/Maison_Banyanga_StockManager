@@ -429,4 +429,271 @@ class VenteController extends Controller
             'params' => $params
         ]);
     }
+    
+    /**
+     * Exporter les ventes par véhicule en CSV
+     */
+    public function exportParVehicule()
+    {
+        $this->requireAuth();
+        
+        $vehiculeId = $_GET['vehicule_id'] ?? null;
+        $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
+        $dateFin = $_GET['date_fin'] ?? date('Y-m-d');
+        
+        if (!$vehiculeId) {
+            return $this->error('Véhicule non spécifié', 400);
+        }
+        
+        // Récupérer les informations du véhicule
+        $vehicule = $this->db->fetch(
+            "SELECT id, immatriculation FROM vehicules WHERE id = :id",
+            ['id' => (int) $vehiculeId]
+        );
+        
+        if (!$vehicule) {
+            return $this->error('Véhicule non trouvé', 404);
+        }
+        
+        // Récupérer les ventes avec détails
+        $ventes = $this->db->fetchAll(
+            "SELECT v.id, v.numero_facture, v.date_vente, v.total_ttc,
+                    c.id as client_id, c.nom as client_nom, c.telephone as client_telephone,
+                    z.nom as zone_nom,
+                    m.numero_mission
+             FROM ventes v
+             JOIN clients c ON v.client_id = c.id
+             LEFT JOIN zones z ON c.zone_id = z.id
+             LEFT JOIN missions m ON v.mission_id = m.id
+             WHERE m.vehicule_id = :vehicule_id
+             AND DATE(v.date_vente) BETWEEN :date_debut AND :date_fin
+             AND v.statut = 'validee'
+             ORDER BY v.date_vente DESC",
+            [
+                'vehicule_id' => (int) $vehiculeId,
+                'date_debut' => $dateDebut,
+                'date_fin' => $dateFin
+            ]
+        );
+        
+        // Récupérer les détails de chaque vente
+        foreach ($ventes as &$vente) {
+            $vente['details'] = $this->db->fetchAll(
+                "SELECT p.nom as produit_nom, p.code as produit_code,
+                        vd.quantite_caisses, vd.caisses_vides_recues,
+                        (vd.quantite_caisses - vd.caisses_vides_recues) as dette_caisses,
+                        vd.quantite as bouteilles,
+                        vd.sous_total
+                 FROM vente_details vd
+                 JOIN produits p ON vd.produit_id = p.id
+                 WHERE vd.vente_id = :vente_id",
+                ['vente_id' => $vente['id']]
+            );
+        }
+        
+        // Grouper par client avec détails par produit
+        $clientsData = [];
+        foreach ($ventes as $vente) {
+            $clientId = $vente['client_id'];
+            if (!isset($clientsData[$clientId])) {
+                $clientsData[$clientId] = [
+                    'numero' => $vente['client_id'],
+                    'zone' => $vente['zone_nom'],
+                    'telephone' => $vente['client_telephone'],
+                    'nom' => $vente['client_nom'],
+                    'produits' => [],
+                    'total_caisses' => 0,
+                    'chiffre_affaire' => 0,
+                    'restourne' => 0,
+                    'nombre_ventes' => 0
+                ];
+            }
+            
+            $clientsData[$clientId]['nombre_ventes']++;
+            
+            foreach ($vente['details'] as $detail) {
+                $produitNom = $detail['produit_nom'];
+                if (!isset($clientsData[$clientId]['produits'][$produitNom])) {
+                    $clientsData[$clientId]['produits'][$produitNom] = [
+                        'total_caisses' => 0,
+                        'nombre_ventes' => 0
+                    ];
+                }
+                $clientsData[$clientId]['produits'][$produitNom]['total_caisses'] += $detail['quantite_caisses'];
+                $clientsData[$clientId]['produits'][$produitNom]['nombre_ventes']++;
+                
+                $clientsData[$clientId]['total_caisses'] += $detail['quantite_caisses'];
+                $clientsData[$clientId]['chiffre_affaire'] += $detail['sous_total'];
+                $clientsData[$clientId]['restourne'] += $detail['caisses_vides_recues'];
+            }
+        }
+        
+        // Générer le CSV
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="ventes_vehicule_' . $vehicule['immatriculation'] . '_' . date('Y-m-d') . '.csv"');
+        
+        $output = fopen('php://output', 'w');
+        
+        // En-têtes CSV
+        fputcsv($output, ['Numéro', 'Zone', 'Téléphone', 'Nom Client', 'Produit', 'Total Caisses', 'Chiffre d\'Affaire', 'Restourne', 'Nombre Ventes']);
+        
+        foreach ($clientsData as $client) {
+            foreach ($client['produits'] as $produitNom => $produitData) {
+                fputcsv($output, [
+                    $client['numero'],
+                    $client['zone'],
+                    $client['telephone'],
+                    $client['nom'],
+                    $produitNom,
+                    $produitData['total_caisses'],
+                    number_format($client['chiffre_affaire'], 2),
+                    $client['restourne'],
+                    $produitData['nombre_ventes']
+                ]);
+            }
+        }
+        
+        fclose($output);
+        exit;
+    }
+    
+    /**
+     * Exporter toutes les ventes en CSV avec produits en colonnes
+     */
+    public function exportAll()
+    {
+        $this->requireAuth();
+        
+        $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
+        $dateFin = $_GET['date_fin'] ?? date('Y-m-d');
+        $clientId = $_GET['client_id'] ?? null;
+        $emplacementId = $_GET['emplacement_id'] ?? null;
+        
+        $params = [
+            'date_debut' => $dateDebut,
+            'date_fin' => $dateFin
+        ];
+        
+        $clientClause = '';
+        if ($clientId) {
+            $clientClause = ' AND v.client_id = :client_id ';
+            $params['client_id'] = (int) $clientId;
+        }
+        
+        $emplacementClause = '';
+        if ($emplacementId) {
+            $emplacementClause = ' AND v.emplacement_id = :emplacement_id ';
+            $params['emplacement_id'] = (int) $emplacementId;
+        }
+        
+        // Récupérer tous les produits
+        $produits = $this->db->fetchAll("SELECT id, nom FROM produits ORDER BY nom");
+        
+        // Récupérer TOUS les clients
+        $allClients = $this->db->fetchAll(
+            "SELECT c.id, c.nom, c.telephone, z.nom as zone_nom
+             FROM clients c
+             LEFT JOIN zones z ON c.zone_id = z.id
+             ORDER BY c.nom"
+        );
+        
+        // Récupérer les ventes groupées par client avec détails par produit
+        $salesByClient = [];
+        $ventes = $this->db->fetchAll(
+            "SELECT v.client_id, v.total_ttc
+             FROM ventes v
+             WHERE DATE(v.date_vente) BETWEEN :date_debut AND :date_fin
+             AND v.statut = 'validee'" . $clientClause . $emplacementClause,
+            $params
+        );
+        
+        // Calculer les totaux par client
+        foreach ($ventes as $vente) {
+            $cid = $vente['client_id'];
+            if (!isset($salesByClient[$cid])) {
+                $salesByClient[$cid] = [
+                    'total_ttc' => 0,
+                    'ristourne' => 0,
+                    'produits_qty' => []
+                ];
+            }
+            $salesByClient[$cid]['total_ttc'] += $vente['total_ttc'];
+        }
+        
+        // Calculer la ristourne pour chaque client ayant des ventes
+        foreach ($salesByClient as $cid => &$data) {
+            $client = $this->db->fetch(
+                "SELECT taux_ristourne FROM clients WHERE id = :id",
+                ['id' => $cid]
+            );
+            $taux = (float) ($client['taux_ristourne'] ?? 5);
+            $data['ristourne'] = ($data['total_ttc'] * $taux) / 100;
+        }
+        
+        // Récupérer les quantités par produit pour chaque client avec ventes
+        $detailsAll = $this->db->fetchAll(
+            "SELECT v.client_id, p.nom as produit_nom, 
+                    SUM(vd.quantite_caisses) as total_caisses,
+                    SUM(vd.caisses_vides_recues) as total_restourne
+             FROM vente_details vd
+             JOIN ventes v ON vd.vente_id = v.id
+             JOIN produits p ON vd.produit_id = p.id
+             WHERE DATE(v.date_vente) BETWEEN :date_debut AND :date_fin
+             AND v.statut = 'validee'" . $clientClause . $emplacementClause . "
+             GROUP BY v.client_id, p.nom",
+            $params
+        );
+        
+        foreach ($detailsAll as $detail) {
+            $cid = $detail['client_id'];
+            $salesByClient[$cid]['produits_qty'][$detail['produit_nom']] = $detail['total_caisses'];
+            $salesByClient[$cid]['total_restourne'] = ($salesByClient[$cid]['total_restourne'] ?? 0) + $detail['total_restourne'];
+        }
+        
+        // Générer le CSV
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="ventes_' . date('Y-m-d') . '.csv"');
+        
+        $output = fopen('php://output', 'w');
+        
+        // En-têtes CSV: Numéro, Zone, Téléphone, Nom Client, [produits...], Nombre de caisses, Total (CA), Ristourne
+        $headers = ['Numéro', 'Zone', 'Téléphone', 'Nom Client'];
+        foreach ($produits as $produit) {
+            $headers[] = $produit['nom'];
+        }
+        $headers[] = 'Nombre de caisses';
+        $headers[] = 'Total (Chiffre d\'affaire)';
+        $headers[] = 'Ristourne';
+        fputcsv($output, $headers);
+        
+        // Tous les clients, même ceux sans ventes
+        foreach ($allClients as $client) {
+            $cid = $client['id'];
+            $hasSales = isset($salesByClient[$cid]);
+            $clientData = $hasSales ? $salesByClient[$cid] : null;
+            
+            $row = [
+                $cid,
+                $client['zone_nom'] ?? '',
+                $client['telephone'] ?? '',
+                $client['nom']
+            ];
+            
+            $totalCaisses = 0;
+            foreach ($produits as $produit) {
+                $qty = $hasSales ? ($clientData['produits_qty'][$produit['nom']] ?? 0) : 0;
+                $row[] = $qty;
+                $totalCaisses += $qty;
+            }
+            
+            $row[] = $totalCaisses;
+            $row[] = $hasSales ? number_format($clientData['total_ttc'], 2) : '0.00';
+            $row[] = $hasSales ? number_format($clientData['ristourne'], 2) : '0.00';
+            
+            fputcsv($output, $row);
+        }
+        
+        fclose($output);
+        exit;
+    }
 }

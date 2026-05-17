@@ -92,6 +92,8 @@ $routes = [
     'GET::/ventes/stats' => ['VenteController', 'stats'],
     'GET::/ventes/par-vehicule' => ['VenteController', 'parVehicule'],
     'GET::/ventes/par-vehicule/print' => ['VenteController', 'printParVehicule'],
+    'GET::/ventes/par-vehicule/export' => ['VenteController', 'exportParVehicule'],
+    'GET::/ventes/export' => ['VenteController', 'exportAll'],
     
     // Clients
     'GET::/clients' => ['ClientController', 'index'],
