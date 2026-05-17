@@ -114,6 +114,7 @@ $routes = [
     'POST::/api/vehicules' => ['VehiculeController', 'store'],
     'PUT::/api/vehicules/(\d+)' => ['VehiculeController', 'update'],
     'DELETE::/api/vehicules/(\d+)' => ['VehiculeController', 'delete'],
+    'POST::/api/vehicules/transfert' => ['VehiculeController', 'transfertVehicule'],
     
     // Missions
     'GET::/missions' => ['MissionController', 'index'],

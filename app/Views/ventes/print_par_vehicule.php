@@ -12,278 +12,257 @@
         }
         body {
             font-family: Arial, sans-serif;
-            font-size: 12px;
-            line-height: 1.4;
-            color: #333;
-            padding: 20px;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #333;
-            padding-bottom: 10px;
-        }
-        .header h1 {
-            font-size: 18px;
-            margin-bottom: 5px;
-        }
-        .header p {
             font-size: 11px;
+            line-height: 1.5;
+            color: #333;
+        }
+        .page-header {
+            text-align: center;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 8px;
+        }
+        .page-header h1 {
+            font-size: 16px;
+            margin-bottom: 3px;
+        }
+        .page-header p {
+            font-size: 10px;
             color: #666;
         }
         .info-bar {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 15px;
-            padding: 10px;
+            margin-bottom: 12px;
+            padding: 8px 12px;
             background: #f5f5f5;
-            border-radius: 4px;
+            border: 1px solid #ccc;
         }
         .info-bar div {
-            font-size: 11px;
-        }
-        .section {
-            margin-bottom: 20px;
+            font-size: 10px;
         }
         .section-title {
-            font-size: 14px;
+            font-size: 12px;
             font-weight: bold;
-            margin-bottom: 10px;
-            padding: 5px;
+            margin-bottom: 8px;
+            margin-top: 15px;
+            padding: 4px 8px;
             background: #e0e0e0;
-            border-radius: 4px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 10px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 6px 8px;
-            text-align: left;
-            font-size: 11px;
-        }
-        th {
-            background: #f0f0f0;
-            font-weight: bold;
-        }
-        .client-section {
-            margin-bottom: 15px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            page-break-inside: avoid;
-        }
-        .client-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            padding-bottom: 5px;
-            border-bottom: 1px dashed #ccc;
-        }
-        .client-name {
-            font-weight: bold;
-            font-size: 13px;
-        }
-        .client-info {
-            font-size: 11px;
-            color: #666;
-        }
-        .debt-warning {
-            color: #d32f2f;
-            font-weight: bold;
-            font-size: 11px;
-        }
-        .no-debt {
-            color: #388e3c;
-            font-size: 11px;
         }
         .summary {
-            margin-top: 20px;
-            padding: 15px;
+            padding: 10px;
             background: #f9f9f9;
-            border: 2px solid #333;
-            border-radius: 4px;
+            border: 1px solid #999;
+            margin-bottom: 10px;
         }
         .summary-row {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 5px;
-            font-size: 12px;
+            margin-bottom: 3px;
+            font-size: 11px;
         }
         .summary-row.total {
             font-weight: bold;
-            font-size: 14px;
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid #333;
+            font-size: 12px;
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid #999;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 8px;
+        }
+        th, td {
+            border: 1px solid #999;
+            padding: 4px 6px;
+            text-align: left;
+            font-size: 10px;
+        }
+        th {
+            background: #e8e8e8;
+            font-weight: bold;
+            text-align: center;
+        }
+        td.num {
+            text-align: right;
+        }
+        tfoot td {
+            background: #e8e8e8;
+            font-weight: bold;
+        }
+        .client-row td {
+            background: #f0f0f0;
+            font-weight: bold;
+            font-size: 11px;
+        }
+        .debt-warn {
+            color: #c62828;
+            font-weight: bold;
+        }
+        .no-debt {
+            color: #2e7d32;
         }
         @media print {
             body {
                 padding: 0;
+                font-size: 10px;
             }
             .no-print {
-                display: none;
+                display: none !important;
+            }
+            .page-header {
+                position: running(header);
+            }
+            @page {
+                size: A4 landscape;
+                margin: 15mm 10mm;
+            }
+            table {
+                page-break-inside: auto;
+            }
+            tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+            thead {
+                display: table-header-group;
+            }
+            tfoot {
+                display: table-footer-group;
             }
         }
     </style>
 </head>
 <body>
-    <div class="header">
+    <div class="page-header">
         <h1><?= htmlspecialchars($params['nom_entreprise'] ?? 'Bralima Logistique') ?></h1>
-        <p><?= htmlspecialchars($params['adresse'] ?? '') ?> | <?= htmlspecialchars($params['telephone'] ?? '') ?></p>
-        <p><?= htmlspecialchars($params['email'] ?? '') ?></p>
+        <p><?= htmlspecialchars($params['adresse'] ?? '') ?> | <?= htmlspecialchars($params['telephone'] ?? '') ?> | <?= htmlspecialchars($params['email'] ?? '') ?></p>
     </div>
 
     <div class="info-bar">
         <div><strong>Véhicule:</strong> <?= htmlspecialchars($vehicule['immatriculation']) ?></div>
         <div><strong>Période:</strong> Du <?= date('d/m/Y', strtotime($dateDebut)) ?> au <?= date('d/m/Y', strtotime($dateFin)) ?></div>
-        <div><strong>Date d'impression:</strong> <?= date('d/m/Y H:i') ?></div>
+        <div><strong>Impression:</strong> <?= date('d/m/Y H:i') ?></div>
     </div>
 
-    <div class="section">
-        <div class="section-title">Résumé</div>
-        <?php
-        $totalVentes = count($ventes);
-        $totalTTC = array_sum(array_column($ventes, 'total_ttc'));
-        $totalCaissesVendues = 0;
-        $totalCaissesRecues = 0;
-        $totalDette = 0;
-        
-        foreach ($ventes as $vente) {
-            foreach ($vente['details'] as $detail) {
-                $totalCaissesVendues += $detail['quantite_caisses'];
-                $totalCaissesRecues += $detail['caisses_vides_recues'];
-                $totalDette += $detail['dette_caisses'];
-            }
+    <?php
+    $totalVentes = count($ventes);
+    $totalTTC = array_sum(array_column($ventes, 'total_ttc'));
+    $totalCaissesVendues = 0;
+    $totalCaissesRecues = 0;
+    $totalDette = 0;
+    
+    // Grouper les ventes par client
+    $clientsData = [];
+    foreach ($ventes as $vente) {
+        $clientId = $vente['client_id'];
+        if (!isset($clientsData[$clientId])) {
+            $clientsData[$clientId] = [
+                'nom' => $vente['client_nom'],
+                'telephone' => $vente['client_telephone'],
+                'adresse' => $vente['client_adresse'],
+                'zone' => $vente['zone_nom'],
+                'ventes' => [],
+                'total_caisses_vendues' => 0,
+                'total_caisses_recues' => 0,
+                'total_dette' => 0,
+                'total_ttc' => 0
+            ];
         }
-        ?>
-        <div class="summary">
-            <div class="summary-row">
-                <span>Nombre de ventes:</span>
-                <span><?= $totalVentes ?></span>
-            </div>
-            <div class="summary-row">
-                <span>Total TTC:</span>
-                <span><?= format_money_converted($totalTTC) ?></span>
-            </div>
-            <div class="summary-row">
-                <span>Total caisses vendues:</span>
-                <span><?= number_format($totalCaissesVendues, 1) ?></span>
-            </div>
-            <div class="summary-row">
-                <span>Total caisses reçues:</span>
-                <span><?= number_format($totalCaissesRecues, 1) ?></span>
-            </div>
-            <div class="summary-row total">
-                <span>Dette totale emballages:</span>
-                <span class="<?= $totalDette > 0 ? 'debt-warning' : 'no-debt' ?>"><?= number_format($totalDette, 1) ?> caisses</span>
-            </div>
-        </div>
+        $clientsData[$clientId]['ventes'][] = $vente;
+        $clientsData[$clientId]['total_ttc'] += $vente['total_ttc'];
+        
+        foreach ($vente['details'] as $detail) {
+            $clientsData[$clientId]['total_caisses_vendues'] += $detail['quantite_caisses'];
+            $clientsData[$clientId]['total_caisses_recues'] += $detail['caisses_vides_recues'];
+            $clientsData[$clientId]['total_dette'] += $detail['dette_caisses'];
+            $totalCaissesVendues += $detail['quantite_caisses'];
+            $totalCaissesRecues += $detail['caisses_vides_recues'];
+            $totalDette += $detail['dette_caisses'];
+        }
+    }
+    ?>
+
+    <div class="section-title">Résumé général</div>
+    <div class="summary">
+        <div class="summary-row"><span>Nombre de ventes:</span><span><?= $totalVentes ?></span></div>
+        <div class="summary-row"><span>Total TTC:</span><span><?= format_money_converted($totalTTC) ?></span></div>
+        <div class="summary-row"><span>Total caisses vendues:</span><span><?= number_format($totalCaissesVendues, 1) ?></span></div>
+        <div class="summary-row"><span>Total caisses reçues:</span><span><?= number_format($totalCaissesRecues, 1) ?></span></div>
+        <div class="summary-row total"><span>Dette totale emballages:</span><span class="<?= $totalDette > 0 ? 'debt-warn' : 'no-debt' ?>"><?= number_format($totalDette, 1) ?> caisses</span></div>
     </div>
 
-    <div class="section">
-        <div class="section-title">Détail par client</div>
-        
-        <?php
-        // Grouper les ventes par client
-        $clientsData = [];
-        foreach ($ventes as $vente) {
-            $clientId = $vente['client_id'];
-            if (!isset($clientsData[$clientId])) {
-                $clientsData[$clientId] = [
-                    'nom' => $vente['client_nom'],
-                    'telephone' => $vente['client_telephone'],
-                    'adresse' => $vente['client_adresse'],
-                    'zone' => $vente['zone_nom'],
-                    'ventes' => [],
-                    'total_caisses_vendues' => 0,
-                    'total_caisses_recues' => 0,
-                    'total_dette' => 0,
-                    'total_ttc' => 0
-                ];
-            }
-            $clientsData[$clientId]['ventes'][] = $vente;
-            $clientsData[$clientId]['total_ttc'] += $vente['total_ttc'];
-            
-            foreach ($vente['details'] as $detail) {
-                $clientsData[$clientId]['total_caisses_vendues'] += $detail['quantite_caisses'];
-                $clientsData[$clientId]['total_caisses_recues'] += $detail['caisses_vides_recues'];
-                $clientsData[$clientId]['total_dette'] += $detail['dette_caisses'];
-            }
-        }
-        
-        foreach ($clientsData as $clientId => $clientData):
-        ?>
-        <div class="client-section">
-            <div class="client-header">
-                <div>
-                    <div class="client-name"><?= htmlspecialchars($clientData['nom']) ?></div>
-                    <div class="client-info">
-                        Tél: <?= htmlspecialchars($clientData['telephone'] ?? 'N/A') ?> | 
-                        Zone: <?= htmlspecialchars($clientData['zone'] ?? 'N/A') ?>
-                    </div>
-                </div>
-                <div>
-                    <?php if ($clientData['total_dette'] > 0): ?>
-                    <span class="debt-warning">Dette: <?= number_format($clientData['total_dette'], 1) ?> caisses</span>
-                    <?php else: ?>
-                    <span class="no-debt">Aucune dette</span>
-                    <?php endif; ?>
-                </div>
-            </div>
-            
-            <table>
-                <thead>
+    <div class="section-title">Détail des ventes par client</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Client</th>
+                <th>Tél</th>
+                <th>Zone</th>
+                <th>N° Facture</th>
+                <th>Date</th>
+                <th>Produit</th>
+                <th>Caisses</th>
+                <th>Reçues</th>
+                <th>Dette</th>
+                <th>Montant</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php $rowNum = 0; ?>
+            <?php foreach ($clientsData as $clientId => $clientData): ?>
+                <?php $firstVente = true; ?>
+                <?php foreach ($clientData['ventes'] as $vente): ?>
+                    <?php $firstDetail = true; ?>
+                    <?php foreach ($vente['details'] as $detail): ?>
                     <tr>
-                        <th>N° Facture</th>
-                        <th>Date</th>
-                        <th>Produit</th>
-                        <th>Caisses</th>
-                        <th>Reçues</th>
-                        <th>Dette</th>
-                        <th>Montant</th>
+                        <?php if ($firstVente && $firstDetail): ?>
+                        <td rowspan="<?= count(array_merge(...array_map(function($v) { return $v['details']; }, $clientData['ventes']))) ?>"><?= htmlspecialchars($clientData['nom']) ?></td>
+                        <td rowspan="<?= count(array_merge(...array_map(function($v) { return $v['details']; }, $clientData['ventes']))) ?>"><?= htmlspecialchars($clientData['telephone'] ?? 'N/A') ?></td>
+                        <td rowspan="<?= count(array_merge(...array_map(function($v) { return $v['details']; }, $clientData['ventes']))) ?>"><?= htmlspecialchars($clientData['zone'] ?? 'N/A') ?></td>
+                        <?php $firstVente = false; ?>
+                        <?php endif; ?>
+                        <?php if ($firstDetail): ?>
+                        <td rowspan="<?= count($vente['details']) ?>"><?= htmlspecialchars($vente['numero_facture']) ?></td>
+                        <td rowspan="<?= count($vente['details']) ?>"><?= date('d/m/Y', strtotime($vente['date_vente'])) ?></td>
+                        <?php $firstDetail = false; ?>
+                        <?php endif; ?>
+                        <td><?= htmlspecialchars($detail['produit_nom']) ?></td>
+                        <td class="num"><?= number_format($detail['quantite_caisses'], 1) ?></td>
+                        <td class="num"><?= number_format($detail['caisses_vides_recues'], 1) ?></td>
+                        <td class="num <?= $detail['dette_caisses'] > 0 ? 'debt-warn' : 'no-debt' ?>"><?= number_format($detail['dette_caisses'], 1) ?></td>
+                        <td class="num"><?= format_money_converted($detail['sous_total']) ?></td>
                     </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($clientData['ventes'] as $vente): ?>
-                        <?php foreach ($vente['details'] as $detail): ?>
-                        <tr>
-                            <td><?= htmlspecialchars($vente['numero_facture']) ?></td>
-                            <td><?= date('d/m/Y', strtotime($vente['date_vente'])) ?></td>
-                            <td><?= htmlspecialchars($detail['produit_nom']) ?></td>
-                            <td><?= number_format($detail['quantite_caisses'], 1) ?></td>
-                            <td><?= number_format($detail['caisses_vides_recues'], 1) ?></td>
-                            <td class="<?= $detail['dette_caisses'] > 0 ? 'debt-warning' : 'no-debt' ?>">
-                                <?= number_format($detail['dette_caisses'], 1) ?>
-                            </td>
-                            <td><?= format_money_converted($detail['sous_total']) ?></td>
-                        </tr>
-                        <?php endforeach; ?>
                     <?php endforeach; ?>
-                </tbody>
-                <tfoot>
-                    <tr style="background: #f0f0f0; font-weight: bold;">
-                        <td colspan="3">Total client</td>
-                        <td><?= number_format($clientData['total_caisses_vendues'], 1) ?></td>
-                        <td><?= number_format($clientData['total_caisses_recues'], 1) ?></td>
-                        <td class="<?= $clientData['total_dette'] > 0 ? 'debt-warning' : 'no-debt' ?>">
-                            <?= number_format($clientData['total_dette'], 1) ?>
-                        </td>
-                        <td><?= format_money_converted($clientData['total_ttc']) ?></td>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
-        <?php endforeach; ?>
-    </div>
+                <?php endforeach; ?>
+                <!-- Ligne total client -->
+                <tr class="client-row">
+                    <td colspan="3">Total <?= htmlspecialchars($clientData['nom']) ?></td>
+                    <td colspan="3"></td>
+                    <td class="num"><?= number_format($clientData['total_caisses_vendues'], 1) ?></td>
+                    <td class="num"><?= number_format($clientData['total_caisses_recues'], 1) ?></td>
+                    <td class="num <?= $clientData['total_dette'] > 0 ? 'debt-warn' : 'no-debt' ?>"><?= number_format($clientData['total_dette'], 1) ?></td>
+                    <td class="num"><?= format_money_converted($clientData['total_ttc']) ?></td>
+                </tr>
+            <?php endforeach; ?>
+        </tbody>
+        <tfoot>
+            <tr style="background: #ccc; font-weight: bold; font-size: 11px;">
+                <td colspan="6">TOTAL GÉNÉRAL</td>
+                <td class="num"><?= number_format($totalCaissesVendues, 1) ?></td>
+                <td class="num"><?= number_format($totalCaissesRecues, 1) ?></td>
+                <td class="num <?= $totalDette > 0 ? 'debt-warn' : 'no-debt' ?>"><?= number_format($totalDette, 1) ?></td>
+                <td class="num"><?= format_money_converted($totalTTC) ?></td>
+            </tr>
+        </tfoot>
+    </table>
 
-    <div class="no-print" style="margin-top: 30px; text-align: center;">
-        <button onclick="window.print()" style="padding: 10px 20px; font-size: 14px; cursor: pointer;">
+    <div class="no-print" style="margin-top: 20px; text-align: center;">
+        <button onclick="window.print()" style="padding: 8px 16px; font-size: 13px; cursor: pointer;">
             Imprimer
         </button>
-        <button onclick="window.close()" style="padding: 10px 20px; font-size: 14px; cursor: pointer; margin-left: 10px;">
+        <button onclick="window.close()" style="padding: 8px 16px; font-size: 13px; cursor: pointer; margin-left: 8px;">
             Fermer
         </button>
     </div>

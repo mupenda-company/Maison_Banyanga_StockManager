@@ -1,29 +1,8 @@
 <?php 
 $pageTitle = 'Inventaire des véhicules';
-$printMode = isset($print_mode) ? (bool) $print_mode : false;
 $printUrl = url('vehicules/inventaire') . '?print=1';
-$customStyle = $printMode ? "@media print {
-    @page { size: landscape; margin: 8mm; }
-    html, body { height: auto !important; }
-    .no-print, button, .btn, .sidebar, .fixed, .notifications-container { display: none !important; }
-    details { display: block !important; }
-    details summary { display: none !important; }
-    .table-container { overflow: visible !important; }
-    table { table-layout: fixed !important; width: 100% !important; }
-    thead { display: table-header-group !important; }
-    tr { break-inside: avoid; page-break-inside: avoid; }
-    th, td { padding: 4px 6px !important; font-size: 9pt !important; white-space: normal !important; overflow-wrap: anywhere !important; word-break: break-word !important; }
-}" : null;
 ob_start();
 ?>
-
-<?php if ($printMode): ?>
-    <?php $nomEntreprise = (new Parametre())->get('nom_entreprise', APP_NAME); ?>
-    <div class="print-header print-only">
-        <h1><?= htmlspecialchars($nomEntreprise) ?></h1>
-        <p><?= htmlspecialchars($pageTitle) ?> — <?= date('d/m/Y H:i') ?></p>
-    </div>
-<?php endif; ?>
 
 <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 no-print">
     <div>
@@ -31,6 +10,14 @@ ob_start();
         <p class="text-sm text-gray-500 dark:text-gray-400">Consultez, corrigez et initialisez le stock présent dans chaque véhicule.</p>
     </div>
     <div class="flex items-center gap-2 no-print">
+        <?php if (isset($can_edit_inventory) && $can_edit_inventory): ?>
+        <button type="button" onclick="document.getElementById('modal-transfert').style.display='flex'" class="btn btn-warning btn-sm">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+            </svg>
+            Transférer
+        </button>
+        <?php endif; ?>
         <a href="<?= url('vehicules') ?>" class="btn btn-secondary btn-sm">
             Retour aux véhicules
         </a>
@@ -178,15 +165,13 @@ ob_start();
                         <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase">Vide</th>
                         <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase">Total</th>
                         <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase">Occupation</th>
-                        <?php if (!$printMode): ?>
                         <th class="px-4 py-3 text-center text-[10px] font-bold text-gray-500 uppercase">Actions</th>
-                        <?php endif; ?>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                     <?php if (empty($vehicules)): ?>
                     <tr>
-                        <td colspan="<?= $printMode ? 9 : 10 ?>" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colspan="10" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                             Aucun véhicule trouvé
                         </td>
                     </tr>
@@ -236,15 +221,13 @@ ob_start();
                             <td class="px-4 py-3 text-right font-bold <?= $occupation >= 90 ? 'text-red-600' : ($occupation >= 75 ? 'text-yellow-600' : 'text-green-600') ?>">
                                 <?= number_format($occupation, 1, ',', ' ') ?>%
                             </td>
-                            <?php if (!$printMode): ?>
                             <td class="px-4 py-3 text-center">
                                 <a href="<?= url('vehicules/' . (int) $vehicule['id']) ?>" class="text-primary-600 hover:text-primary-700 font-medium">Voir</a>
                             </td>
-                            <?php endif; ?>
                         </tr>
                         <tr class="bg-gray-50/70 dark:bg-gray-800/40">
-                            <td colspan="<?= $printMode ? 9 : 10 ?>" class="px-4 pb-4">
-                                <details class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800" <?= $printMode ? 'open' : '' ?>>
+                            <td colspan="10" class="px-4 pb-4">
+                                <details class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                                     <summary class="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200">
                                         Détail du stock par produit
                                     </summary>
@@ -410,14 +393,211 @@ document.addEventListener('alpine:init', () => {
         }
     }));
 });
-</script>
 
-<?php if ($printMode): ?>
-<script>
-window.addEventListener('load', () => {
-    setTimeout(() => window.print(), 250);
+document.addEventListener('alpine:init', () => {
+    Alpine.data('transfertForm', () => ({
+        isOpen: true,
+        loading: false,
+        vehicules: <?= json_encode($vehicules, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+        produits: <?= json_encode($produits, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+        stockEntrepot: <?= json_encode($stock_entrepot ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+        form: {
+            source_type: 'entrepot',
+            vehicule_source_id: '',
+            vehicule_dest_id: '',
+            produit_id: '',
+            caisses_pleine: 0,
+            caisses_vide: 0,
+            motif: ''
+        },
+
+        vehiculesEnMission() {
+            return this.vehicules.filter(v => (v.en_mission ?? 0) > 0);
+        },
+
+        sourceStock() {
+            if (this.form.source_type === 'entrepot') {
+                return this.stockEntrepot;
+            }
+            const v = this.vehicules.find(v => String(v.id) === String(this.form.vehicule_source_id));
+            if (!v || !v.stock) return [];
+            return v.stock;
+        },
+
+        selectedProduitStock() {
+            const stock = this.sourceStock();
+            const ligne = stock.find(s => String(s.produit_id) === String(this.form.produit_id));
+            return ligne || null;
+        },
+
+        maxCaissesPleine() {
+            const s = this.selectedProduitStock();
+            return s ? Math.max(0, Math.round(parseFloat(s.caisses_pleine || 0))) : 0;
+        },
+
+        maxCaissesVide() {
+            const s = this.selectedProduitStock();
+            return s ? Math.max(0, Math.round(parseFloat(s.caisses_vide || 0))) : 0;
+        },
+
+        destLabel() {
+            const v = this.vehicules.find(v => String(v.id) === String(this.form.vehicule_dest_id));
+            return v ? v.immatriculation : '';
+        },
+
+        sourceLabel() {
+            if (this.form.source_type === 'entrepot') return 'Entrepôt';
+            const v = this.vehicules.find(v => String(v.id) === String(this.form.vehicule_source_id));
+            return v ? v.immatriculation : '';
+        },
+
+        async save() {
+            if (this.form.source_type === 'vehicule' && !this.form.vehicule_source_id) {
+                App.notify('Veuillez sélectionner le véhicule source', 'error');
+                return;
+            }
+            if (!this.form.vehicule_dest_id || !this.form.produit_id) {
+                App.notify('Veuillez remplir tous les champs obligatoires', 'error');
+                return;
+            }
+            if (this.form.caisses_pleine <= 0 && this.form.caisses_vide <= 0) {
+                App.notify('La quantité à transférer doit être supérieure à 0', 'error');
+                return;
+            }
+            if (this.form.source_type === 'vehicule' && this.form.vehicule_source_id === this.form.vehicule_dest_id) {
+                App.notify('Les véhicules source et destination doivent être différents', 'error');
+                return;
+            }
+
+            this.loading = true;
+            try {
+                const payload = {
+                    source_type: this.form.source_type,
+                    vehicule_dest_id: parseInt(this.form.vehicule_dest_id),
+                    produit_id: parseInt(this.form.produit_id),
+                    caisses_pleine: parseInt(this.form.caisses_pleine) || 0,
+                    caisses_vide: parseInt(this.form.caisses_vide) || 0,
+                    motif: this.form.motif
+                };
+                if (this.form.source_type === 'vehicule') {
+                    payload.vehicule_source_id = parseInt(this.form.vehicule_source_id);
+                }
+                const result = await App.api('/api/vehicules/transfert', 'POST', payload);
+                App.notify(result.message || 'Transfert effectué', 'success');
+                this.isOpen = false;
+                window.location.reload();
+            } catch (e) {
+                App.notify(e.message || 'Erreur lors du transfert', 'error');
+            } finally {
+                this.loading = false;
+            }
+        }
+    }));
 });
 </script>
+
+<!-- Modal Transfert entre véhicules -->
+<?php if (isset($can_edit_inventory) && $can_edit_inventory): ?>
+<div id="modal-transfert" x-data="transfertForm" x-init="$watch('isOpen', v => { if(!v) $el.style.display='none'; else $el.style.display='flex'; })" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-black/50" @click="isOpen = false"></div>
+        <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6 z-10">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Transfert entre véhicules</h3>
+                <button @click="isOpen = false" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <form @submit.prevent="save()">
+                <div class="space-y-4">
+                    <div>
+                        <label class="label">Source *</label>
+                        <div class="flex gap-3 mb-2">
+                            <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                                <input type="radio" x-model="form.source_type" value="entrepot" class="text-primary-600" @change="form.vehicule_source_id = ''; form.produit_id = ''; form.caisses_pleine = 0; form.caisses_vide = 0;">
+                                Entrepôt
+                            </label>
+                            <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                                <input type="radio" x-model="form.source_type" value="vehicule" class="text-primary-600" @change="form.produit_id = ''; form.caisses_pleine = 0; form.caisses_vide = 0;">
+                                Véhicule
+                            </label>
+                        </div>
+                        <template x-if="form.source_type === 'vehicule'">
+                            <select x-model="form.vehicule_source_id" class="input" required @change="form.produit_id = ''; form.caisses_pleine = 0; form.caisses_vide = 0;">
+                                <option value="">Sélectionner le véhicule source</option>
+                                <template x-for="v in vehiculesEnMission()" :key="v.id">
+                                    <option :value="String(v.id)" x-text="v.immatriculation + ' - ' + (v.agent_nom || v.agent_prenom ? (v.agent_prenom || '') + ' ' + (v.agent_nom || '') : 'Sans agent')"></option>
+                                </template>
+                            </select>
+                        </template>
+                        <template x-if="form.source_type === 'entrepot'">
+                            <div class="p-2 bg-gray-100 dark:bg-gray-700 rounded text-sm text-gray-600 dark:text-gray-300">
+                                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                                Entrepôt principal
+                            </div>
+                        </template>
+                    </div>
+
+                    <div>
+                        <label class="label">Véhicule destination *</label>
+                        <select x-model="form.vehicule_dest_id" class="input" required>
+                            <option value="">Sélectionner le véhicule destination</option>
+                            <template x-for="v in vehiculesEnMission()" :key="v.id">
+                                <option :value="String(v.id)" x-text="v.immatriculation + ' - ' + (v.agent_nom || v.agent_prenom ? (v.agent_prenom || '') + ' ' + (v.agent_nom || '') : 'Sans agent')"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="label">Produit *</label>
+                        <select x-model="form.produit_id" class="input" required @change="form.caisses_pleine = 0; form.caisses_vide = 0;">
+                            <option value="">Sélectionner un produit</option>
+                            <template x-for="s in sourceStock()" :key="s.produit_id">
+                                <option :value="String(s.produit_id)" x-text="s.produit_nom + ' (' + (s.caisses_pleine || 0) + ' cs pleines, ' + (s.caisses_vide || 0) + ' cs vides)'"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <template x-if="form.produit_id && selectedProduitStock()">
+                        <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 text-sm">
+                            <p class="font-semibold text-blue-700 dark:text-blue-300">Stock disponible dans <span x-text="sourceLabel()"></span></p>
+                            <p class="mt-1">Caisses pleines: <b x-text="maxCaissesPleine()"></b> | Caisses vides: <b x-text="maxCaissesVide()"></b></p>
+                        </div>
+                    </template>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="label">Caisses pleines à transférer</label>
+                            <input type="number" x-model.number="form.caisses_pleine" class="input" min="0" :max="maxCaissesPleine()" step="1">
+                            <p class="text-[10px] text-gray-500 mt-1">Max: <span x-text="maxCaissesPleine()"></span></p>
+                        </div>
+                        <div>
+                            <label class="label">Caisses vides à transférer</label>
+                            <input type="number" x-model.number="form.caisses_vide" class="input" min="0" :max="maxCaissesVide()" step="1">
+                            <p class="text-[10px] text-gray-500 mt-1">Max: <span x-text="maxCaissesVide()"></span></p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="label">Motif</label>
+                        <input type="text" x-model="form.motif" class="input" placeholder="Raison du transfert (optionnel)">
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" @click="isOpen = false" class="btn btn-secondary">Annuler</button>
+                    <button type="submit" class="btn btn-warning" :disabled="loading">
+                        <span x-show="!loading">Transférer</span>
+                        <span x-show="loading">En cours...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 <?php endif; ?>
 
 <?php

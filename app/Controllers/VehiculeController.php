@@ -101,13 +101,27 @@ class VehiculeController extends Controller
             ]);
         }
 
-        $this->view('vehicules/inventaire', [
-            'vehicules' => $vehicules,
-            'totaux' => $totaux,
-            'produits' => $produits,
-            'print_mode' => $printMode,
-            'can_edit_inventory' => $canEditInventory,
-        ]);
+        if ($printMode) {
+            $params = (new Parametre())->getPersonnalisation();
+            $this->view('vehicules/print_inventaire', [
+                'vehicules' => $vehicules,
+                'totaux' => $totaux,
+                'produits' => $produits,
+                'params' => $params,
+            ]);
+        } else {
+            $entrepot = (new Emplacement())->getPrincipal();
+            $stockEntrepot = $entrepot ? (new Stock())->getByEmplacement($entrepot['id']) : [];
+
+            $this->view('vehicules/inventaire', [
+                'vehicules' => $vehicules,
+                'totaux' => $totaux,
+                'produits' => $produits,
+                'print_mode' => false,
+                'can_edit_inventory' => $canEditInventory,
+                'stock_entrepot' => $stockEntrepot,
+            ]);
+        }
     }
     
     /**
@@ -327,6 +341,211 @@ class VehiculeController extends Controller
         $this->vehiculeModel->update($id, $updateData);
         
         return $this->success(null, 'Véhicule mis à jour avec succès');
+    }
+    
+    /**
+     * Transfert de stock : véhicule→véhicule ou entrepôt→véhicule
+     */
+    public function transfertVehicule()
+    {
+        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        
+        $data = $this->getJsonInput();
+        
+        $errors = $this->validate($data, [
+            'source_type' => 'required',
+            'vehicule_dest_id' => 'required|numeric',
+            'produit_id' => 'required|numeric',
+            'caisses_pleine' => 'numeric',
+            'caisses_vide' => 'numeric',
+        ]);
+        
+        if (!empty($errors)) {
+            return $this->error('Erreurs de validation', 422, $errors);
+        }
+        
+        $sourceType = $data['source_type']; // 'entrepot' ou 'vehicule'
+        $caissesPleine = (int) ($data['caisses_pleine'] ?? 0);
+        $caissesVide = (int) ($data['caisses_vide'] ?? 0);
+        
+        if ($caissesPleine <= 0 && $caissesVide <= 0) {
+            return $this->error('La quantité à transférer doit être supérieure à 0', 422);
+        }
+        
+        try {
+            $this->db->beginTransaction();
+            
+            $stockModel = new Stock();
+            $mouvementModel = new MouvementStock();
+            $produit = (new Produit())->find($data['produit_id']);
+            if (!$produit) {
+                throw new Exception('Produit non trouvé');
+            }
+            $btlParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+            if ($btlParCaisse <= 0) $btlParCaisse = 24;
+            
+            // Déterminer l'emplacement source
+            if ($sourceType === 'entrepot') {
+                $emplacementModel = new Emplacement();
+                $entrepot = $emplacementModel->getPrincipal();
+                if (!$entrepot) {
+                    throw new Exception('Entrepôt principal non trouvé');
+                }
+                $emplacementSource = (int) $entrepot['id'];
+                $sourceLabel = $entrepot['nom'];
+            } else {
+                $source = $this->vehiculeModel->find($data['vehicule_source_id']);
+                if (!$source || !$source['emplacement_id']) {
+                    throw new Exception('Véhicule source non trouvé ou sans emplacement');
+                }
+                $emplacementSource = (int) $source['emplacement_id'];
+                $sourceLabel = $source['immatriculation'];
+                
+                if ((int) $data['vehicule_source_id'] === (int) $data['vehicule_dest_id']) {
+                    throw new Exception('Les véhicules source et destination doivent être différents');
+                }
+                
+                $sourceEnMission = $this->db->fetchColumn(
+                    "SELECT COUNT(*) FROM missions WHERE vehicule_id = :id AND statut = 'en_cours'",
+                    ['id' => $data['vehicule_source_id']]
+                );
+                if (!$sourceEnMission) {
+                    throw new Exception('Le véhicule source n\'est pas en mission');
+                }
+            }
+            
+            // Véhicule destination
+            $dest = $this->vehiculeModel->find($data['vehicule_dest_id']);
+            if (!$dest || !$dest['emplacement_id']) {
+                throw new Exception('Véhicule destination non trouvé ou sans emplacement');
+            }
+            $emplacementDest = (int) $dest['emplacement_id'];
+            
+            $destEnMission = $this->db->fetchColumn(
+                "SELECT COUNT(*) FROM missions WHERE vehicule_id = :id AND statut = 'en_cours'",
+                ['id' => $data['vehicule_dest_id']]
+            );
+            if (!$destEnMission) {
+                throw new Exception('Le véhicule destination n\'est pas en mission');
+            }
+            
+            // Vérifier le stock source
+            $stockSource = $stockModel->getStock($data['produit_id'], $emplacementSource);
+            if (!$stockSource) {
+                throw new Exception('Aucun stock de ce produit dans la source');
+            }
+            if ($caissesPleine > 0 && (int) ($stockSource['caisses_pleine'] ?? 0) < $caissesPleine) {
+                throw new Exception('Stock insuffisant : caisses pleines disponibles = ' . ($stockSource['caisses_pleine'] ?? 0) . ', demandées = ' . $caissesPleine);
+            }
+            if ($caissesVide > 0 && (int) ($stockSource['caisses_vide'] ?? 0) < $caissesVide) {
+                throw new Exception('Stock insuffisant : caisses vides disponibles = ' . ($stockSource['caisses_vide'] ?? 0) . ', demandées = ' . $caissesVide);
+            }
+            
+            // Déduire de la source
+            $stockModel->updateOrCreate($data['produit_id'], $emplacementSource, [
+                'caisses_pleine' => -$caissesPleine,
+                'caisses_vide' => -$caissesVide,
+                'quantite_pleine' => -($caissesPleine * $btlParCaisse),
+                'quantite_vide' => -($caissesVide * $btlParCaisse),
+            ]);
+            
+            // Ajouter au véhicule destination
+            $stockModel->updateOrCreate($data['produit_id'], $emplacementDest, [
+                'caisses_pleine' => $caissesPleine,
+                'caisses_vide' => $caissesVide,
+                'quantite_pleine' => $caissesPleine * $btlParCaisse,
+                'quantite_vide' => $caissesVide * $btlParCaisse,
+            ]);
+            
+            // Mettre à jour les mission_chargements du véhicule source (si véhicule)
+            if ($sourceType === 'vehicule') {
+                $missionSource = $this->db->fetch(
+                    "SELECT id FROM missions WHERE vehicule_id = :vid AND statut = 'en_cours' LIMIT 1",
+                    ['vid' => $data['vehicule_source_id']]
+                );
+                if ($missionSource) {
+                    $chargementSource = $this->db->fetch(
+                        "SELECT id, quantite_caisses FROM mission_chargements WHERE mission_id = :mid AND produit_id = :pid",
+                        ['mid' => $missionSource['id'], 'pid' => $data['produit_id']]
+                    );
+                    if ($chargementSource) {
+                        $newQte = max(0, (int) $chargementSource['quantite_caisses'] - $caissesPleine);
+                        $this->db->query(
+                            "UPDATE mission_chargements SET quantite_caisses = :qte WHERE id = :id",
+                            ['qte' => $newQte, 'id' => $chargementSource['id']]
+                        );
+                    }
+                }
+            }
+
+            // Mettre à jour les mission_chargements du véhicule destination
+            $missionDest = $this->db->fetch(
+                "SELECT id FROM missions WHERE vehicule_id = :vid AND statut = 'en_cours' LIMIT 1",
+                ['vid' => $data['vehicule_dest_id']]
+            );
+            if ($missionDest) {
+                $chargementDest = $this->db->fetch(
+                    "SELECT id, quantite_caisses FROM mission_chargements WHERE mission_id = :mid AND produit_id = :pid",
+                    ['mid' => $missionDest['id'], 'pid' => $data['produit_id']]
+                );
+                if ($chargementDest) {
+                    $newQte = (int) $chargementDest['quantite_caisses'] + $caissesPleine;
+                    $this->db->query(
+                        "UPDATE mission_chargements SET quantite_caisses = :qte WHERE id = :id",
+                        ['qte' => $newQte, 'id' => $chargementDest['id']]
+                    );
+                } else {
+                    $this->db->insert('mission_chargements', [
+                        'mission_id' => $missionDest['id'],
+                        'produit_id' => (int) $data['produit_id'],
+                        'quantite_caisses' => $caissesPleine,
+                        'caisses_deja_dans_vehicule' => 0,
+                        'quantite_chargee' => $caissesPleine * $btlParCaisse,
+                        'quantite_retournee' => 0,
+                        'quantite_vendue' => 0,
+                        'prix_caisse' => (float) ($produit['prix_vente_caisses'] ?? 0),
+                    ]);
+                }
+            }
+            
+            // Enregistrer les mouvements
+            $motif = $data['motif'] ?? ('Transfert de ' . $sourceLabel . ' vers ' . $dest['immatriculation']);
+            
+            $mouvementModel->create([
+                'produit_id' => $data['produit_id'],
+                'emplacement_id' => $emplacementSource,
+                'type_mouvement' => 'transfert',
+                'quantite' => -($caissesPleine * $btlParCaisse),
+                'quantite_avant' => $stockSource['quantite_pleine'] ?? 0,
+                'quantite_apres' => ($stockSource['quantite_pleine'] ?? 0) - ($caissesPleine * $btlParCaisse),
+                'reference_type' => $sourceType === 'entrepot' ? 'transfert_entrepot' : 'transfert_vehicule',
+                'reference_id' => (int) ($data['vehicule_source_id'] ?? 0),
+                'motif' => $motif,
+                'created_by' => $_SESSION['user_id']
+            ]);
+            
+            $stockDest = $stockModel->getStock($data['produit_id'], $emplacementDest);
+            $mouvementModel->create([
+                'produit_id' => $data['produit_id'],
+                'emplacement_id' => $emplacementDest,
+                'type_mouvement' => 'transfert',
+                'quantite' => $caissesPleine * $btlParCaisse,
+                'quantite_avant' => $stockDest['quantite_pleine'] ?? 0,
+                'quantite_apres' => ($stockDest['quantite_pleine'] ?? 0) + ($caissesPleine * $btlParCaisse),
+                'reference_type' => $sourceType === 'entrepot' ? 'transfert_entrepot' : 'transfert_vehicule',
+                'reference_id' => (int) $data['vehicule_dest_id'],
+                'motif' => $motif,
+                'created_by' => $_SESSION['user_id']
+            ]);
+            
+            $this->db->commit();
+            
+            return $this->success(null, 'Transfert effectué : ' . $caissesPleine . ' cs pleines et ' . $caissesVide . ' cs vides de ' . $sourceLabel . ' vers ' . $dest['immatriculation']);
+            
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            return $this->error($e->getMessage(), 400);
+        }
     }
     
     /**

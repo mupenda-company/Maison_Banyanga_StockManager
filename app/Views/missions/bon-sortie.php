@@ -92,7 +92,7 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
-                    <?php $totalCaisses = 0; ?>
+                    <?php $totalCaisses = 0; $totalStockDepart = 0; $totalAjoutMission = 0; ?>
                     <?php foreach ($mission['chargements'] as $chargement): ?>
                     <?php
                         $btlParCaisse = (int)($chargement['bouteilles_par_caisses'] ?? 24);
@@ -103,6 +103,8 @@
                         $stockDepartCaisses = (int) ($chargement['caisses_deja_dans_vehicule'] ?? 0);
                         $totalReelCaisses = (int) ($chargement['caisses_total'] ?? max(0, (int) ($chargement['quantite_caisses'] ?? 0)));
                         $ajoutMissionCaisses = $totalReelCaisses - $stockDepartCaisses;
+                        $totalStockDepart += $stockDepartCaisses;
+                        $totalAjoutMission += $ajoutMissionCaisses;
                         $totalCaisses += $totalReelCaisses;
                     ?>
                     <tr>
@@ -116,8 +118,9 @@
                 <tfoot class="border-t-2 border-gray-200">
                     <tr>
                         <td class="py-2 font-bold">Total</td>
-                        <td colspan="2"></td>
-                        <td class="py-2 text-right font-bold"><?= number_format($totalCaisses, 1, ',', ' ') ?> cs</td>
+                        <td class="py-2 text-right font-bold"><?= number_format($totalStockDepart, 1, ',', ' ') ?> cs</td>
+                        <td class="py-2 text-right font-bold"><?= number_format($totalAjoutMission, 1, ',', ' ') ?> cs</td>
+                        <td class="py-2 text-right font-bold text-blue-600"><?= number_format($totalCaisses, 1, ',', ' ') ?> cs</td>
                     </tr>
                 </tfoot>
             </table>
