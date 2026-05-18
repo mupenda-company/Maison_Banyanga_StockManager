@@ -327,6 +327,30 @@ class MobileController extends Controller {
             $params
         );
 
+        // Ajouter les détails produits pour chaque vente
+        if (!empty($rows)) {
+            $venteIds = array_map(fn($r) => (int) $r['id'], $rows);
+            $idList = implode(',', $venteIds);
+            $details = $this->db->fetchAll(
+                "SELECT vd.vente_id, vd.produit_id, p.nom as produit_nom, p.code as produit_code,
+                        vd.quantite, vd.quantite_caisses, vd.caisses_vides_recues,
+                        vd.prix_unitaire, vd.prix_caisse, vd.sous_total,
+                        p.bouteilles_par_caisses
+                 FROM vente_details vd
+                 JOIN produits p ON vd.produit_id = p.id
+                 WHERE vd.vente_id IN ($idList)
+                 ORDER BY vd.id"
+            );
+            $grouped = [];
+            foreach ($details as $d) {
+                $grouped[(int) $d['vente_id']][] = $d;
+            }
+            foreach ($rows as &$row) {
+                $row['details'] = $grouped[(int) $row['id']] ?? [];
+            }
+            unset($row);
+        }
+
         return $this->success($rows);
     }
 
