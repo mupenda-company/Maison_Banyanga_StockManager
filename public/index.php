@@ -160,6 +160,10 @@ $routes = [
     'GET::/rapports' => ['ReportController', 'index'],
     'GET::/rapports/ventes-par-agent' => ['ReportController', 'ventesParAgent'],
     
+    // Finance
+    'GET::/finance' => ['FinanceController', 'index'],
+    'GET::/api/finance/stats' => ['FinanceController', 'apiStats'],
+    
     // Ristournes
     'GET::/ristournes' => ['RistourneController', 'index'],
     'GET::/ristournes/calculer' => ['RistourneController', 'calculer'],
