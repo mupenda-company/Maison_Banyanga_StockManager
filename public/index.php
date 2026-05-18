@@ -148,6 +148,12 @@ $routes = [
     'DELETE::/api/pertes/(\d+)' => ['PerteController', 'delete'],
     'GET::/pertes/stats' => ['PerteController', 'stats'],
     
+    // Dépenses
+    'GET::/depenses' => ['DepenseController', 'index'],
+    'GET::/depenses/create' => ['DepenseController', 'create'],
+    'POST::/api/depenses' => ['DepenseController', 'store'],
+    'DELETE::/api/depenses/(\d+)' => ['DepenseController', 'delete'],
+    
     // Zones
     'GET::/zones' => ['ZoneController', 'index'],
     'GET::/zones/(\d+)' => ['ZoneController', 'show'],

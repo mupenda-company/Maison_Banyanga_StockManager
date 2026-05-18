@@ -8,6 +8,7 @@ class FinanceController extends Controller
     private $venteModel;
     private $perteModel;
     private $approvisionnementModel;
+    private $depenseModel;
 
     public function __construct()
     {
@@ -15,6 +16,7 @@ class FinanceController extends Controller
         $this->venteModel = new Vente();
         $this->perteModel = new Perte();
         $this->approvisionnementModel = new Approvisionnement();
+        $this->depenseModel = new Depense();
     }
 
     /**
@@ -58,7 +60,7 @@ class FinanceController extends Controller
         );
         $ristourneStats = $ristournes[0] ?? ['total_ristournes' => 0, 'nb_ristournes' => 0, 'ristournes_payees' => 0, 'ristournes_en_attente' => 0];
 
-        // Dettes emballages
+        // Dettes emballages (caisses vides)
         $dettesAppro = $this->db->fetch(
             "SELECT COALESCE(SUM(quantite_dette_caisses - quantite_remboursee), 0) as total_dettes,
                     COUNT(*) as nb_dettes
@@ -95,11 +97,16 @@ class FinanceController extends Controller
             ['debut' => $debut, 'fin' => $fin]
         );
 
-        // Calcul bénéfice = CA - pertes - ristournes payées
+        // Dépenses
+        $statsDepenses = $this->depenseModel->getStats($dateDebut, $dateFin);
+        $depensesParCategorie = $this->depenseModel->getByCategorie($dateDebut, $dateFin);
+        $totalDepenses = (float) ($statsDepenses['total_depenses'] ?? 0);
+
+        // Calcul bénéfice = CA - pertes - ristournes payées - dépenses
         $caTotal = (float) ($statsVentes['total_ttc'] ?? 0);
         $pertesValeur = (float) ($statsPertes['total_valeur'] ?? 0);
         $ristournesPayees = (float) ($ristourneStats['ristournes_payees'] ?? 0);
-        $benefice = $caTotal - $pertesValeur - $ristournesPayees;
+        $benefice = $caTotal - $pertesValeur - $ristournesPayees - $totalDepenses;
 
         // TVA collectée
         $tvaCollectee = (float) ($statsVentes['total_tva'] ?? 0);
@@ -116,6 +123,9 @@ class FinanceController extends Controller
             'dettesAppro' => $dettesAppro,
             'ventesParJour' => $ventesParJour,
             'topClients' => $topClients,
+            'statsDepenses' => $statsDepenses,
+            'depensesParCategorie' => $depensesParCategorie,
+            'totalDepenses' => $totalDepenses,
             'caTotal' => $caTotal,
             'pertesValeur' => $pertesValeur,
             'ristournesPayees' => $ristournesPayees,

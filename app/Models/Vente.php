@@ -22,22 +22,14 @@ class Vente extends Model
             $prefix .= '-';
         }
 
-        $rows = $this->db->fetchAll(
-            "SELECT numero_facture FROM {$this->table} WHERE numero_facture LIKE :prefix",
-            ['prefix' => $prefix . '%']
+        $row = $this->db->fetch(
+            "SELECT MAX(CAST(SUBSTRING(numero_facture, :offset) AS UNSIGNED)) as max_num
+             FROM {$this->table} 
+             WHERE numero_facture LIKE :prefix",
+            ['prefix' => $prefix . '%', 'offset' => strlen($prefix) + 1]
         );
 
-        $count = 0;
-        $pattern = '/^' . preg_quote($prefix, '/') . '\\d{4}$/';
-
-        foreach ($rows as $row) {
-            $numeroFacture = (string) ($row['numero_facture'] ?? '');
-            if (preg_match($pattern, $numeroFacture)) {
-                $count++;
-            }
-        }
-
-        $num = $count + 1;
+        $num = ((int) ($row['max_num'] ?? 0)) + 1;
 
         return $prefix . str_pad($num, 4, '0', STR_PAD_LEFT);
     }

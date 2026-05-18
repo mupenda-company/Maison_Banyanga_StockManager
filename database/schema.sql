@@ -491,3 +491,18 @@ INSERT INTO `paliers_ristourne` (`nom`, `ca_min`, `ca_max`, `taux_ristourne`) VA
 ('Platine', 2500000, NULL, 7.00);
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- --------------------------------------------------------
+-- Structure de la table `depenses`
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `depenses` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `categorie` ENUM('Transport', 'Carburant', 'Maintenance', 'Restauration', 'Autres') NOT NULL,
+    `description` VARCHAR(255) NOT NULL,
+    `montant` DECIMAL(12,2) NOT NULL,
+    `date_depense` DATE NOT NULL,
+    `created_by` INT UNSIGNED NULL,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

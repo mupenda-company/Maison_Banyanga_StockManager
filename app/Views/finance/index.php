@@ -56,7 +56,7 @@ ob_start();
             </div>
         </div>
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            CA - Pertes - Ristournes
+            CA - Pertes - Ristournes - Dépenses
         </p>
     </div>
 
@@ -75,6 +75,24 @@ ob_start();
         </div>
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
             <?= $statsPertes['nb_pertes'] ?? 0 ?> perte(s) · <?= number_format((int) round($statsPertes['total_caisses'] ?? 0), 0, '.', ' ') ?> caisse(s)
+        </p>
+    </div>
+
+    <!-- Dépenses -->
+    <div class="stat-card">
+        <div class="flex items-center justify-between">
+            <div class="min-w-0 flex-1 mr-2">
+                <p class="stat-label">Dépenses</p>
+                <p class="text-lg md:text-xl font-bold text-amber-600 dark:text-amber-400 truncate" title="<?= format_money_converted($totalDepenses) ?>">
+                    <?= format_money_converted($totalDepenses) ?>
+                </p>
+            </div>
+            <div class="w-10 h-10 bg-amber-100 dark:bg-amber-900/50 rounded-full flex items-center justify-center shrink-0">
+                <svg class="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            </div>
+        </div>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            <?= $statsDepenses['nb_depenses'] ?? 0 ?> dépense(s)
         </p>
     </div>
 
@@ -117,13 +135,13 @@ ob_start();
         </p>
     </div>
 
-    <!-- Dettes fournisseurs -->
+    <!-- Dettes emballages -->
     <div class="stat-card">
         <div class="flex items-center justify-between">
             <div class="min-w-0 flex-1 mr-2">
-                <p class="stat-label">Dettes fournisseurs</p>
+                <p class="stat-label">Dettes emballages</p>
                 <p class="text-lg md:text-xl font-bold text-red-700 dark:text-red-300 truncate">
-                    <?= format_money_converted($dettesAppro['total_dettes'] ?? 0) ?>
+                    <?= number_format((int)($dettesAppro['total_dettes'] ?? 0), 0, '.', ' ') ?> caisse(s)
                 </p>
             </div>
             <div class="w-10 h-10 bg-red-100 dark:bg-red-900/50 rounded-full flex items-center justify-center shrink-0">
@@ -280,8 +298,29 @@ ob_start();
         <?php foreach ($pertesParType as $pt): ?>
         <div class="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
             <p class="font-semibold text-red-700 dark:text-red-300"><?= htmlspecialchars($pt['type_perte'] ?? 'Autre') ?></p>
-            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1"><?= $pt['nb'] ?? 0 ?> perte(s) · <?= number_format((int) round($pt['total_caisses'] ?? 0), 0, '.', ' ') ?> caisse(s)</p>
-            <p class="text-sm font-bold text-red-600 dark:text-red-400 mt-1"><?= format_money_converted($pt['total_valeur'] ?? 0) ?></p>
+            <p class="text-sm text-gray-600 dark:text-gray-400"><?= $pt['nb'] ?? 0 ?> perte(s)</p>
+            <p class="text-sm font-bold text-red-600 dark:text-red-400 mt-1"><?= format_money_converted($pt['valeur'] ?? 0) ?></p>
+            <p class="text-xs text-gray-500 dark:text-gray-400"><?= number_format((int)($pt['quantite'] ?? 0), 0, '.', ' ') ?> caisse(s)</p>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- Dépenses par catégorie -->
+<?php if (!empty($depensesParCategorie)): ?>
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
+    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Dépenses par catégorie</h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <?php
+        $catColors = ['Transport' => 'blue', 'Carburant' => 'yellow', 'Maintenance' => 'orange', 'Restauration' => 'green', 'Autres' => 'gray'];
+        foreach ($depensesParCategorie as $dc):
+            $color = $catColors[$dc['categorie']] ?? 'gray';
+        ?>
+        <div class="p-4 bg-<?= $color ?>-50 dark:bg-<?= $color ?>-900/20 rounded-lg border border-<?= $color ?>-200 dark:border-<?= $color ?>-800">
+            <p class="font-semibold text-<?= $color ?>-700 dark:text-<?= $color ?>-300"><?= htmlspecialchars($dc['categorie']) ?></p>
+            <p class="text-sm text-gray-600 dark:text-gray-400"><?= $dc['nb'] ?? 0 ?> dépense(s)</p>
+            <p class="text-sm font-bold text-<?= $color ?>-600 dark:text-<?= $color ?>-400 mt-1"><?= format_money_converted($dc['total'] ?? 0) ?></p>
         </div>
         <?php endforeach; ?>
     </div>
@@ -311,6 +350,10 @@ ob_start();
         <div class="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
             <span class="text-gray-600 dark:text-gray-400">Ristournes payées</span>
             <span class="font-semibold text-orange-600 dark:text-orange-400">- <?= format_money_converted($ristournesPayees) ?></span>
+        </div>
+        <div class="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
+            <span class="text-gray-600 dark:text-gray-400">Dépenses</span>
+            <span class="font-semibold text-amber-600 dark:text-amber-400">- <?= format_money_converted($totalDepenses) ?></span>
         </div>
         <div class="flex justify-between items-center py-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg px-4 mt-2">
             <span class="font-bold text-gray-900 dark:text-white">Bénéfice net</span>

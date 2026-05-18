@@ -324,6 +324,16 @@
                     Pertes
                 </a>
                 
+                <!-- Dépenses -->
+                <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === ROLE_ADMIN): ?>
+                <a href="<?= url('depenses') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/depenses') !== false ? 'active' : '' ?>">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                    </svg>
+                    Dépenses
+                </a>
+                <?php endif; ?>
+                
                 <!-- Produits -->
                 <a href="<?= url('produits') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/produits') !== false ? 'active' : '' ?>">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
