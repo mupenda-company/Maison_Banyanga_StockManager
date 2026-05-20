@@ -129,6 +129,7 @@ $routes = [
     'POST::/api/missions' => ['MissionController', 'store'],
     'PUT::/api/missions/(\d+)' => ['MissionController', 'update'],
     'POST::/api/missions/(\d+)/terminer' => ['MissionController', 'terminer'],
+    'DELETE::/api/missions/(\d+)' => ['MissionController', 'annuler'],
     'GET::/missions/(\d+)/print' => ['MissionController', 'print'],
     'GET::/missions/(\d+)/facture' => ['MissionController', 'facture'],
 

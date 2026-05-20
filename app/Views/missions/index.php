@@ -55,6 +55,7 @@ ob_start();
                     <option value="">Tous</option>
                     <option value="en_cours" <?= ($filters['statut'] ?? '') == 'en_cours' ? 'selected' : '' ?>>En cours</option>
                     <option value="terminee" <?= ($filters['statut'] ?? '') == 'terminee' ? 'selected' : '' ?>>Terminées</option>
+                    <option value="annulee" <?= ($filters['statut'] ?? '') == 'annulee' ? 'selected' : '' ?>>Annulées</option>
                 </select>
             </div>
             <div>
@@ -139,6 +140,8 @@ ob_start();
                         <td>
                             <?php if ($mission['statut'] === 'en_cours'): ?>
                             <span class="badge-warning">En cours</span>
+                            <?php elseif ($mission['statut'] === 'annulee'): ?>
+                            <span class="badge-danger">Annulée</span>
                             <?php else: ?>
                             <span class="badge-success">Terminée</span>
                             <?php endif; ?>

@@ -1090,4 +1090,108 @@ class Mission extends Model
             return ['success' => false, 'message' => $e->getMessage()];
         }
     }
+
+    /**
+     * Annuler une mission en cours (reverse stock, supprime chargements)
+     */
+    public function annuler($id, $emplacementPrincipalId)
+    {
+        try {
+            $this->db->beginTransaction();
+
+            $mission = $this->getWithDetails($id);
+            if (!$mission) throw new Exception("Mission non trouvée");
+
+            if (($mission['statut'] ?? '') !== 'en_cours') {
+                throw new Exception('Seules les missions en cours peuvent être annulées');
+            }
+
+            // Vérifier qu'aucune vente validée n'est liée
+            $nbVentes = (int) $this->db->fetch(
+                "SELECT COUNT(*) as nb FROM ventes WHERE mission_id = :id AND statut = 'validee'",
+                ['id' => $id]
+            )['nb'] ?? 0;
+
+            if ($nbVentes > 0) {
+                throw new Exception('Impossible d\'annuler : cette mission a des ventes validées (' . $nbVentes . '). Terminez-la normalement.');
+            }
+
+            $vehicule = (new Vehicule())->find($mission['vehicule_id']);
+            if (!$vehicule) throw new Exception('Véhicule introuvable');
+
+            $emplacementVehicule = (int) ($vehicule['emplacement_id'] ?? 0);
+            if ($emplacementVehicule <= 0) throw new Exception('Emplacement véhicule introuvable');
+
+            $stockModel = new Stock();
+            $mouvementModel = new MouvementStock();
+            $chargements = $mission['chargements'] ?? [];
+
+            foreach ($chargements as $chargement) {
+                $produitId = (int) ($chargement['produit_id'] ?? 0);
+                if ($produitId <= 0) continue;
+
+                $produit = (new Produit())->find($produitId);
+                if (!$produit) continue;
+
+                $bouteillesParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+                if ($bouteillesParCaisse <= 0) $bouteillesParCaisse = 24;
+
+                $caissesDansVehicule = max(0, (int) ($chargement['caisses_total'] ?? $chargement['quantite_caisses'] ?? 0));
+                $quantiteBouteilles = $caissesDansVehicule * $bouteillesParCaisse;
+
+                if ($caissesDansVehicule <= 0) continue;
+
+                // Retirer du véhicule
+                $stockModel->updateOrCreate(
+                    $produitId,
+                    $emplacementVehicule,
+                    [
+                        'quantite_pleine' => -$quantiteBouteilles,
+                        'caisses_pleine' => -$caissesDansVehicule
+                    ]
+                );
+
+                // Réintégrer dans l'entrepôt principal
+                $stockModel->updateOrCreate(
+                    $produitId,
+                    $emplacementPrincipalId,
+                    [
+                        'quantite_pleine' => $quantiteBouteilles,
+                        'caisses_pleine' => $caissesDansVehicule
+                    ]
+                );
+
+                // Mouvement de retour
+                $mouvementModel->create([
+                    'produit_id' => $produitId,
+                    'emplacement_id' => $emplacementPrincipalId,
+                    'type_mouvement' => 'transfert',
+                    'quantite' => $quantiteBouteilles,
+                    'quantite_avant' => 0,
+                    'quantite_apres' => 0,
+                    'reference_type' => 'mission',
+                    'reference_id' => $id,
+                    'motif' => 'Annulation mission ' . $mission['numero_mission'],
+                    'created_by' => $_SESSION['user_id'] ?? ($mission['created_by'] ?? null)
+                ]);
+            }
+
+            // Supprimer les chargements
+            $this->db->query("DELETE FROM mission_chargements WHERE mission_id = :mission_id", ['mission_id' => $id]);
+
+            // Marquer la mission comme annulée
+            $this->update($id, [
+                'statut' => 'annulee',
+                'date_retour' => date('Y-m-d H:i:s'),
+                'notes' => ($mission['notes'] ?? '') . "\nMission annulée le " . date('d/m/Y H:i')
+            ]);
+
+            $this->db->commit();
+            return ['success' => true];
+
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
 }

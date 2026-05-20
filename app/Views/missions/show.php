@@ -39,6 +39,7 @@ ob_start();
                     </a>
                     <?php if ($mission['statut'] === 'en_cours' && can('missions.manage')): ?>
                     <button onclick="terminerMission()" class="btn btn-sm btn-primary"><?= $isRestourne ? 'Clôturer' : 'Terminer' ?></button>
+                    <button onclick="annulerMission()" class="btn btn-sm btn-danger">Annuler</button>
                     <?php endif; ?>
                 </div>
             </div>
@@ -106,6 +107,8 @@ ob_start();
                         <p class="text-sm text-gray-500 dark:text-gray-400">Statut</p>
                         <?php if ($mission['statut'] === 'en_cours'): ?>
                         <span class="badge-warning">En cours</span>
+                        <?php elseif ($mission['statut'] === 'annulee'): ?>
+                        <span class="badge-danger">Annulée</span>
                         <?php else: ?>
                         <span class="badge-success">Terminée</span>
                         <?php endif; ?>
@@ -480,6 +483,16 @@ ob_start();
 <script>
 function terminerMission() {
     window.dispatchEvent(new CustomEvent('open-modal-terminer'));
+}
+
+function annulerMission() {
+    if (!confirm('Êtes-vous sûr de vouloir annuler cette mission ? Le stock sera réintégré dans l\'entrepôt principal.')) return;
+    App.api('/api/missions/<?= (int) $mission['id'] ?>', 'DELETE')
+        .then(() => {
+            App.notify('Mission annulée avec succès');
+            window.location.href = (window.BASE_URL || '') + '/missions';
+        })
+        .catch(e => App.notify(e.message || 'Erreur lors de l\'annulation', 'error'));
 }
 
 <?php if (isset($_GET['terminer']) && (string)$_GET['terminer'] === '1' && ($mission['statut'] ?? null) === 'en_cours'): ?>

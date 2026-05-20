@@ -33,7 +33,7 @@ class MissionController extends Controller
         $this->requirePermission('missions.view');
         
         $filters = [
-            'statut' => in_array($_GET['statut'] ?? '', ['en_cours', 'terminee'], true) ? $_GET['statut'] : null,
+            'statut' => in_array($_GET['statut'] ?? '', ['en_cours', 'terminee', 'annulee'], true) ? $_GET['statut'] : null,
             'vehicule_id' => (int) ($_GET['vehicule_id'] ?? 0),
             'type_mission' => in_array($_GET['type_mission'] ?? '', ['vente', 'ristourne'], true) ? $_GET['type_mission'] : null,
             'date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['date'] ?? '') ? $_GET['date'] : null,
@@ -539,6 +539,32 @@ class MissionController extends Controller
 
         if ($result['success']) {
             return $this->success(null, 'Mission terminée et stock mis à jour avec succès');
+        }
+
+        return $this->error($result['message'], 400);
+    }
+
+    /**
+     * Annuler une mission en cours
+     */
+    public function annuler($id)
+    {
+        $this->requirePermission('missions.manage');
+
+        $mission = $this->missionModel->getWithDetails($id);
+        if (!$mission) {
+            return $this->error('Mission non trouvée', 404);
+        }
+
+        if (($mission['statut'] ?? '') !== 'en_cours') {
+            return $this->error('Seules les missions en cours peuvent être annulées', 422);
+        }
+
+        $emplacementPrincipal = $this->emplacementModel->getPrincipal();
+        $result = $this->missionModel->annuler($id, $emplacementPrincipal['id']);
+
+        if ($result['success']) {
+            return $this->success(null, 'Mission annulée avec succès');
         }
 
         return $this->error($result['message'], 400);
