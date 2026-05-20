@@ -24,6 +24,7 @@ class ReportController extends Controller
     public function index()
     {
         $this->requireAuth();
+        $this->requirePermission('rapports.view');
         
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
         $dateFin = $_GET['date_fin'] ?? date('Y-m-d');
@@ -49,6 +50,7 @@ class ReportController extends Controller
     public function ventesParAgent()
     {
         $this->requireAuth();
+        $this->requirePermission('rapports.view');
 
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-d');
         $dateFin = $_GET['date_fin'] ?? $dateDebut;

@@ -26,7 +26,7 @@ class VenteController extends Controller
      */
     public function index()
     {
-        $this->requireAuth();
+        $this->requirePermission('ventes.view');
         
         $filters = [
             'client_id' => $_GET['client_id'] ?? null,
@@ -54,7 +54,7 @@ class VenteController extends Controller
      */
     public function create()
     {
-        $this->requireAuth();
+        $this->requirePermission('ventes.create');
         
         $clients = $this->clientModel->getAllWithZone();
         $produits = $this->produitModel->getWithStock();
@@ -75,7 +75,7 @@ class VenteController extends Controller
      */
     public function store()
     {
-        $this->requireAuth();
+        $this->requirePermission('ventes.create');
         
         $data = $this->getJsonInput();
         
@@ -167,7 +167,7 @@ class VenteController extends Controller
      */
     public function show($id)
     {
-        $this->requireAuth();
+        $this->requirePermission('ventes.view');
         
         $vente = $this->venteModel->getWithDetails($id);
         
@@ -195,7 +195,7 @@ class VenteController extends Controller
      */
     public function annuler($id)
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('ventes.delete');
         
         $result = $this->venteModel->annuler($id);
         
@@ -211,7 +211,7 @@ class VenteController extends Controller
      */
     public function print($id)
     {
-        $this->requireAuth();
+        $this->requirePermission('ventes.view');
         
         $vente = $this->venteModel->getWithDetails($id);
         
@@ -247,7 +247,7 @@ class VenteController extends Controller
      */
     public function stats()
     {
-        $this->requireAuth();
+        $this->requirePermission('ventes.view');
         
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
         $dateFin = $_GET['date_fin'] ?? date('Y-m-d');
@@ -268,7 +268,7 @@ class VenteController extends Controller
      */
     public function parVehicule()
     {
-        $this->requireAuth();
+        $this->requirePermission('ventes.view');
         
         $vehiculeId = $_GET['vehicule_id'] ?? null;
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
@@ -362,7 +362,7 @@ class VenteController extends Controller
      */
     public function printParVehicule()
     {
-        $this->requireAuth();
+        $this->requirePermission('ventes.view');
         
         $vehiculeId = $_GET['vehicule_id'] ?? null;
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
@@ -435,7 +435,7 @@ class VenteController extends Controller
      */
     public function exportParVehicule()
     {
-        $this->requireAuth();
+        $this->requirePermission('ventes.view');
         
         $vehiculeId = $_GET['vehicule_id'] ?? null;
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
@@ -562,7 +562,7 @@ class VenteController extends Controller
      */
     public function exportAll()
     {
-        $this->requireAuth();
+        $this->requirePermission('ventes.view');
         
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
         $dateFin = $_GET['date_fin'] ?? date('Y-m-d');

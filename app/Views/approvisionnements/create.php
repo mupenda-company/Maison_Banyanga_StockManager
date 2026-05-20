@@ -4,6 +4,18 @@ ob_start();
 ?>
 
 <div class="max-w-4xl mx-auto">
+    <script>
+        function getPrixCaisse(produit, typeAchat) {
+            if (!produit) return 0;
+            if (typeAchat === 'enlever' && produit.prix_achat_enlever > 0) {
+                return produit.prix_achat_enlever * produit.bouteilles_par_caisses;
+            }
+            if (typeAchat === 'deposer' && produit.prix_achat_deposer > 0) {
+                return produit.prix_achat_deposer * produit.bouteilles_par_caisses;
+            }
+            return produit.prix_achat_caisse || (produit.prix_achat_unitaire * produit.bouteilles_par_caisses);
+        }
+    </script>
     <div class="card">
         <div class="card-header">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Nouvel approvisionnement Bralima</h2>
@@ -17,7 +29,7 @@ ob_start();
                     date: '<?= date('Y-m-d') ?>',
                     fournisseur: 'Bralima',
                     notes: '',
-                    lignes: [{ produit_id: '', quantite_caisses: 0 }],
+                    lignes: [{ produit_id: '', quantite_caisses: 0, type_achat: 'deposer' }],
                     produits: [],
                     loading: false,
                     total: 0
@@ -36,7 +48,7 @@ ob_start();
                         lignes.forEach(l => {
                             const p = produits.find(p => p.id == l.produit_id);
                             if (p) {
-                                const prixCaisse = p.prix_achat_caisse || (p.prix_achat_unitaire * p.bouteilles_par_caisses);
+                                const prixCaisse = getPrixCaisse(p, l.type_achat);
                                 total += l.quantite_caisses * prixCaisse;
                             }
                         });
@@ -49,7 +61,8 @@ ob_start();
                             const p = produits.find(p => p.id == l.produit_id);
                             return {
                                 produit_id: parseInt(l.produit_id),
-                                quantite_caisses: parseInt(l.quantite_caisses)
+                                quantite_caisses: parseInt(l.quantite_caisses),
+                                type_achat: l.type_achat
                             };
                         });
                         
@@ -95,7 +108,7 @@ ob_start();
                         <label class="label mb-0">Produits</label>
                         <button 
                             type="button"
-                            @click="lignes.push({ produit_id: '', quantite_caisses: 0 })"
+                            @click="lignes.push({ produit_id: '', quantite_caisses: 0, type_achat: 'deposer' })"
                             class="btn-secondary btn-sm"
                         >
                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -111,6 +124,7 @@ ob_start();
                                 <tr>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Produit</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Btl/Caisse</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Type d'achat</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Prix Caisse</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Nb Caisses</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Sous-total</th>
@@ -131,14 +145,20 @@ ob_start();
                                         <td class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">
                                             <span x-text="produits.find(p => p.id == ligne.produit_id)?.bouteilles_par_caisses || '-'"></span>
                                         </td>
+                                        <td class="px-4 py-2">
+                                            <select x-model="ligne.type_achat" class="input w-28" @change="">
+                                                <option value="deposer">Déposer</option>
+                                                <option value="enlever">Enlever</option>
+                                            </select>
+                                        </td>
                                         <td class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">
-                                            <span x-text="App.formatMoneyConverted((produits.find(p => p.id == ligne.produit_id)?.prix_achat_caisse || (produits.find(p => p.id == ligne.produit_id)?.prix_achat_unitaire * produits.find(p => p.id == ligne.produit_id)?.bouteilles_par_caisses)) || 0, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></span>
+                                            <span x-text="App.formatMoneyConverted(getPrixCaisse(produits.find(p => p.id == ligne.produit_id), ligne.type_achat) || 0, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></span>
                                         </td>
                                         <td class="px-4 py-2">
                                             <input type="number" x-model.number="ligne.quantite_caisses" class="input w-24" min="1" required>
                                         </td>
                                         <td class="px-4 py-2 text-sm font-medium">
-                                            <span x-text="App.formatMoneyConverted((ligne.quantite_caisses || 0) * ((produits.find(p => p.id == ligne.produit_id)?.prix_achat_caisse || (produits.find(p => p.id == ligne.produit_id)?.prix_achat_unitaire * produits.find(p => p.id == ligne.produit_id)?.bouteilles_par_caisses)) || 0), (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></span>
+                                            <span x-text="App.formatMoneyConverted((ligne.quantite_caisses || 0) * getPrixCaisse(produits.find(p => p.id == ligne.produit_id), ligne.type_achat) || 0, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></span>
                                         </td>
                                         <td class="px-4 py-2">
                                             <button 
@@ -157,7 +177,7 @@ ob_start();
                             </tbody>
                             <tfoot class="bg-gray-50 dark:bg-gray-700">
                                 <tr>
-                                    <td colspan="4" class="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">
+                                    <td colspan="5" class="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">
                                         Total HT:
                                     </td>
                                     <td class="px-4 py-3 font-bold text-gray-900 dark:text-white">

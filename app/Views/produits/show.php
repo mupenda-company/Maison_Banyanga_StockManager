@@ -18,12 +18,14 @@ ob_start();
         <div class="card">
             <div class="card-header flex items-center justify-between">
                 <h2 class="text-lg font-semibold"><?= htmlspecialchars($produit['nom']) ?></h2>
+                <?php if (can('produits.update')): ?>
                 <button onclick="openEditModal()" class="btn btn-sm btn-secondary">
                     <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                     </svg>
                     Modifier
                 </button>
+                <?php endif; ?>
             </div>
             <div class="card-body">
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -44,15 +46,15 @@ ob_start();
                         <p class="font-medium text-gray-900 dark:text-white"><?= $produit['bouteilles_par_caisses'] ?></p>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Prix achat unitaire</p>
-                        <p class="font-medium text-gray-900 dark:text-white"><?= format_money_converted($produit['prix_achat_unitaire'] ?? 0) ?></p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Prix d'achat à Déposer / Caisse</p>
+                        <p class="font-medium text-blue-600"><?= format_money_converted(($produit['prix_achat_deposer'] ?? 0) * ($produit['bouteilles_par_caisses'] ?? 1)) ?></p>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Prix vente unitaire</p>
-                        <p class="font-medium text-green-600"><?= format_money_converted($produit['prix_vente_unitaire'] ?? 0) ?></p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Prix d'achat à Enlever / Caisse (base)</p>
+                        <p class="font-medium text-indigo-600"><?= format_money_converted(($produit['prix_achat_enlever'] ?? 0) * ($produit['bouteilles_par_caisses'] ?? 1)) ?></p>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Prix vente caisse</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Prix de vente / Caisse</p>
                         <p class="font-medium text-green-600"><?= format_money_converted($produit['prix_vente_caisses'] ?? 0) ?></p>
                     </div>
                     <div>
@@ -168,16 +170,16 @@ ob_start();
                         <input type="text" x-model="form.nom" class="input" required>
                     </div>
                     <div>
-                        <label class="label">Prix achat unitaire</label>
-                        <input type="number" step="0.01" x-model="form.prix_achat_unitaire" class="input" required>
+                        <label class="label">Prix d'achat à Déposer / Caisse</label>
+                        <input type="number" step="0.01" x-model="form.prix_achat_deposer" class="input">
                     </div>
                     <div>
-                        <label class="label">Prix vente unitaire</label>
-                        <input type="number" step="0.01" x-model="form.prix_vente_unitaire" class="input" required>
+                        <label class="label">Prix d'achat à Enlever / Caisse (base)</label>
+                        <input type="number" step="0.01" x-model="form.prix_achat_enlever" class="input" required>
                     </div>
                     <div>
-                        <label class="label">Prix vente caisse</label>
-                        <input type="number" step="0.01" x-model="form.prix_vente_caisses" class="input">
+                        <label class="label">Prix de vente / Caisse</label>
+                        <input type="number" step="0.01" x-model="form.prix_vente_caisses" class="input" required>
                     </div>
                     <div>
                         <label class="label">Seuil d'alerte</label>
@@ -212,9 +214,9 @@ document.addEventListener('alpine:init', () => {
             code: '<?= addslashes($produit['code']) ?>',
             nom: '<?= addslashes($produit['nom']) ?>',
             description: '<?= addslashes($produit['description'] ?? '') ?>',
-            prix_achat_unitaire: <?= $produit['prix_achat_unitaire'] ?>,
-            prix_vente_unitaire: <?= $produit['prix_vente_unitaire'] ?>,
-            prix_vente_caisses: <?= $produit['prix_vente_caisses'] ?? 0 ?>,
+            prix_achat_deposer: <?= ($produit['prix_achat_deposer'] ?? 0) * ($produit['bouteilles_par_caisses'] ?? 1) ?>,
+            prix_achat_enlever: <?= ($produit['prix_achat_enlever'] ?? 0) * ($produit['bouteilles_par_caisses'] ?? 1) ?>,
+            prix_vente_caisses: <?= $produit['prix_vente_caisses'] ?? ($produit['prix_vente_unitaire'] * ($produit['bouteilles_par_caisses'] ?? 1)) ?>,
             seuil_alerte: <?= $produit['seuil_alerte'] ?>
         },
 
@@ -229,8 +231,8 @@ document.addEventListener('alpine:init', () => {
 
             this.form = {
                 ...base,
-                prix_achat_unitaire: App.convertMoney(parseFloat(base.prix_achat_unitaire || 0), baseDevise, devise),
-                prix_vente_unitaire: App.convertMoney(parseFloat(base.prix_vente_unitaire || 0), baseDevise, devise),
+                prix_achat_deposer: App.convertMoney(parseFloat(base.prix_achat_deposer || 0), baseDevise, devise),
+                prix_achat_enlever: App.convertMoney(parseFloat(base.prix_achat_enlever || 0), baseDevise, devise),
                 prix_vente_caisses: App.convertMoney(parseFloat(base.prix_vente_caisses || 0), baseDevise, devise)
             };
             this.isOpen = true;
@@ -245,10 +247,16 @@ document.addEventListener('alpine:init', () => {
             try {
                 const devise = window.DEVISE || 'CDF';
                 const baseDevise = window.BASE_DEVISE || 'CDF';
+                const btl = <?= $produit['bouteilles_par_caisses'] ?? 24 ?>;
                 const payload = { ...this.form };
-                payload.prix_achat_unitaire = App.convertMoney(parseFloat(payload.prix_achat_unitaire || 0), devise, baseDevise);
-                payload.prix_vente_unitaire = App.convertMoney(parseFloat(payload.prix_vente_unitaire || 0), devise, baseDevise);
-                payload.prix_vente_caisses = App.convertMoney(parseFloat(payload.prix_vente_caisses || 0), devise, baseDevise);
+                const prixAchatDeposerCaisse = App.convertMoney(parseFloat(payload.prix_achat_deposer || 0), devise, baseDevise);
+                const prixAchatEnleverCaisse = App.convertMoney(parseFloat(payload.prix_achat_enlever || 0), devise, baseDevise);
+                const prixVenteCaisse = App.convertMoney(parseFloat(payload.prix_vente_caisses || 0), devise, baseDevise);
+                payload.prix_achat_unitaire = parseFloat((prixAchatEnleverCaisse / btl).toFixed(2));
+                payload.prix_achat_deposer = parseFloat((prixAchatDeposerCaisse / btl).toFixed(2));
+                payload.prix_achat_enlever = parseFloat((prixAchatEnleverCaisse / btl).toFixed(2));
+                payload.prix_vente_unitaire = parseFloat((prixVenteCaisse / btl).toFixed(2));
+                payload.prix_vente_caisses = parseFloat(prixVenteCaisse.toFixed(2));
 
                 const result = await App.api('/api/produits/<?= $produit['id'] ?>', 'PUT', payload);
                 App.notify(result.message, 'success');

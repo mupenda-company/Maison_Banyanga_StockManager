@@ -25,6 +25,7 @@ class RetourController extends Controller
     public function index()
     {
         $this->requireAuth();
+        $this->requirePermission('emballages.manage');
         
         $retours = $this->retourModel->getRecents();
         $clients = $this->clientModel->all('nom');
@@ -45,6 +46,7 @@ class RetourController extends Controller
     public function store()
     {
         $this->requireAuth();
+        $this->requirePermission('emballages.manage');
         $data = $this->getJsonInput();
 
         if (empty($data['client_id']) || empty($data['produit_id']) || empty($data['quantite'])) {

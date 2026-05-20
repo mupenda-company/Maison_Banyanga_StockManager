@@ -138,7 +138,7 @@ ob_start();
             </p>
         </div>
 
-        <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === ROLE_ADMIN): ?>
+        <?php if (can('admin.view')): ?>
         <div class="flex justify-end">
             <a href="<?= url('admin/objectifs') ?>" class="btn btn-secondary">Gérer les objectifs</a>
         </div>

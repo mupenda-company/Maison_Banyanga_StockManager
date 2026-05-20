@@ -25,7 +25,7 @@ class FinanceController extends Controller
     public function index()
     {
         $this->requireAuth();
-        $this->requireRole([ROLE_ADMIN]);
+        $this->requirePermission('admin.view');
 
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
         $dateFin = $_GET['date_fin'] ?? date('Y-m-d');
@@ -102,11 +102,10 @@ class FinanceController extends Controller
         $depensesParCategorie = $this->depenseModel->getByCategorie($dateDebut, $dateFin);
         $totalDepenses = (float) ($statsDepenses['total_depenses'] ?? 0);
 
-        // Calcul bénéfice = CA - pertes - ristournes payées - dépenses
+        // Calcul bénéfice = CA - pertes - dépenses
         $caTotal = (float) ($statsVentes['total_ttc'] ?? 0);
         $pertesValeur = (float) ($statsPertes['total_valeur'] ?? 0);
-        $ristournesPayees = (float) ($ristourneStats['ristournes_payees'] ?? 0);
-        $benefice = $caTotal - $pertesValeur - $ristournesPayees - $totalDepenses;
+        $benefice = $caTotal - $pertesValeur - $totalDepenses;
 
         // TVA collectée
         $tvaCollectee = (float) ($statsVentes['total_tva'] ?? 0);
@@ -128,7 +127,6 @@ class FinanceController extends Controller
             'totalDepenses' => $totalDepenses,
             'caTotal' => $caTotal,
             'pertesValeur' => $pertesValeur,
-            'ristournesPayees' => $ristournesPayees,
             'benefice' => $benefice,
             'tvaCollectee' => $tvaCollectee,
         ]);
@@ -140,7 +138,7 @@ class FinanceController extends Controller
     public function apiStats()
     {
         $this->requireAuth();
-        $this->requireRole([ROLE_ADMIN]);
+        $this->requirePermission('admin.view');
 
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
         $dateFin = $_GET['date_fin'] ?? date('Y-m-d');

@@ -25,7 +25,7 @@ ob_start();
                         </svg>
                         Imprimer
                     </a>
-                    <?php if ($vente['statut'] === 'validee' && in_array($_SESSION['user_role'], ['admin', 'magasinier'])): ?>
+                    <?php if ($vente['statut'] === 'validee' && can('ventes.delete')): ?>
                     <button onclick="annulerVente()" class="btn btn-sm btn-danger">Annuler</button>
                     <?php endif; ?>
                 </div>

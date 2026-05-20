@@ -22,7 +22,7 @@ class PerteController extends Controller
      */
     public function index()
     {
-        $this->requireAuth();
+        $this->requirePermission('pertes.view');
         
         $filters = [
             'produit_id' => $_GET['produit_id'] ?? null,
@@ -53,7 +53,7 @@ class PerteController extends Controller
      */
     public function create()
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('pertes.create');
         
         $produits = $this->produitModel->getWithStock();
         $emplacements = $this->emplacementModel->all('type, nom');
@@ -69,7 +69,7 @@ class PerteController extends Controller
      */
     public function store()
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('pertes.create');
         
         $data = $this->getJsonInput();
         
@@ -110,7 +110,7 @@ class PerteController extends Controller
      */
     public function delete($id)
     {
-        $this->requireRole([ROLE_ADMIN]);
+        $this->requirePermission('pertes.view');
         
         $result = $this->perteModel->supprimer($id);
         
@@ -126,7 +126,7 @@ class PerteController extends Controller
      */
     public function stats()
     {
-        $this->requireAuth();
+        $this->requirePermission('pertes.view');
         
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
         $dateFin = $_GET['date_fin'] ?? date('Y-m-d');

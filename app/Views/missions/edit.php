@@ -175,9 +175,13 @@ ob_start();
                                     throw new Error('Sélectionnez un véhicule');
                                 }
 
+                                if (!this.zone_id) {
+                                    throw new Error('Sélectionnez une zone de destination');
+                                }
+
                                 await App.api('/api/missions/<?= (int) $mission['id'] ?>', 'PUT', {
                                     vehicule_id: parseInt(this.vehicule_id),
-                                    zone_id: this.zone_id ? parseInt(this.zone_id) : null,
+                                    zone_id: parseInt(this.zone_id),
                                     date_depart: this.date_depart,
                                     notes: this.notes,
                                     chargements: chargementsValides
@@ -206,9 +210,9 @@ ob_start();
                         </select>
                     </div>
                     <div>
-                        <label class="label">Zone de destination</label>
-                        <select x-model="zone_id" class="input">
-                            <option value="">Sélectionner</option>
+                        <label class="label">Zone de destination *</label>
+                        <select x-model="zone_id" class="input" required>
+                            <option value="">Sélectionner une zone</option>
                             <?php foreach ($zones as $zone): ?>
                             <option value="<?= $zone['id'] ?>"><?= htmlspecialchars($zone['nom']) ?></option>
                             <?php endforeach; ?>

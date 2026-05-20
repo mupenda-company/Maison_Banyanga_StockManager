@@ -77,6 +77,7 @@ ob_start();
                         <thead>
                             <tr>
                                 <th>Produit</th>
+                                <th class="text-right">Type</th>
                                 <th class="text-right">Caisses</th>
                                 <th class="text-right">Bouteilles</th>
                                 <th class="text-right">Prix Caisse</th>
@@ -89,6 +90,13 @@ ob_start();
                                 <td>
                                     <div class="font-medium"><?= htmlspecialchars($detail['produit_nom']) ?></div>
                                     <div class="text-xs text-gray-500"><?= htmlspecialchars($detail['produit_code']) ?></div>
+                                </td>
+                                <td class="text-right">
+                                    <?php if (($detail['type_achat'] ?? 'deposer') === 'enlever'): ?>
+                                        <span class="badge-info">Enlever</span>
+                                    <?php else: ?>
+                                        <span class="badge-success">Déposer</span>
+                                    <?php endif; ?>
                                 </td>
                                 <td class="text-right"><?= $detail['quantite_caisses'] ?></td>
                                 <td class="text-right"><?= ($detail['quantite_caisses'] * ($detail['bouteilles_par_caisses'] ?? 24)) ?></td>

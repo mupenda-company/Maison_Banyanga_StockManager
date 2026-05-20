@@ -40,12 +40,14 @@ ob_start();
                 </svg>
                 Exporter Excel
             </a>
+            <?php if (can('approvisionnements.create')): ?>
             <button @click="$dispatch('open-modal-appro')" class="btn-primary">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
                 Nouvel approvisionnement
             </button>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -80,6 +82,7 @@ ob_start();
                         <thead>
                             <tr>
                                 <th>Produit</th>
+                                <th>Type</th>
                                 <th>Prix Caisse</th>
                                 <th>Nb Caisses</th>
                                 <th>Sous-total</th>
@@ -98,13 +101,19 @@ ob_start();
                                         </select>
                                     </td>
                                     <td>
-                                        <span x-text="getProduit(ligne.produit_id) ? App.formatMoneyConverted(getProduit(ligne.produit_id).prix_achat_caisse || (getProduit(ligne.produit_id).prix_achat_unitaire * getProduit(ligne.produit_id).bouteilles_par_caisses), window.BASE_DEVISE, window.DEVISE) : '-'"></span>
+                                        <select x-model="ligne.type_achat" class="input w-24" @change="calculerTotal()">
+                                            <option value="deposer">Déposer</option>
+                                            <option value="enlever">Enlever</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <span x-text="getProduit(ligne.produit_id) ? App.formatMoneyConverted(getPrixCaisse(getProduit(ligne.produit_id), ligne.type_achat), window.BASE_DEVISE, window.DEVISE) : '-'"></span>
                                     </td>
                                     <td>
                                         <input type="number" x-model.number="ligne.quantite_caisses" class="input w-24" min="1" @input="calculerTotal()">
                                     </td>
                                     <td class="font-bold">
-                                        <span x-text="getProduit(ligne.produit_id) ? App.formatMoneyConverted((ligne.quantite_caisses || 0) * (getProduit(ligne.produit_id).prix_achat_caisse || (getProduit(ligne.produit_id).prix_achat_unitaire * getProduit(ligne.produit_id).bouteilles_par_caisses)), window.BASE_DEVISE, window.DEVISE) : '-'"></span>
+                                        <span x-text="getProduit(ligne.produit_id) ? App.formatMoneyConverted((ligne.quantite_caisses || 0) * getPrixCaisse(getProduit(ligne.produit_id), ligne.type_achat), window.BASE_DEVISE, window.DEVISE) : '-'"></span>
                                     </td>
                                     <td>
                                         <button @click="form.lignes.splice(index, 1); calculerTotal()" class="text-red-500" x-show="form.lignes.length > 1">&times;</button>
@@ -114,7 +123,7 @@ ob_start();
                         </tbody>
                     </table>
 
-                    <button @click="form.lignes.push({ produit_id: '', quantite_caisses: 1 })" class="btn-secondary btn-sm mb-6">+ Ajouter un produit</button>
+                    <button @click="form.lignes.push({ produit_id: '', quantite_caisses: 1, type_achat: 'deposer' })" class="btn-secondary btn-sm mb-6">+ Ajouter un produit</button>
 
                     <div class="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg flex justify-between items-center mb-6">
                         <span class="text-lg font-bold text-gray-700 dark:text-gray-300">TOTAL À PAYER :</span>
@@ -136,6 +145,17 @@ ob_start();
     </div>
 
 <script>
+function getPrixCaisse(produit, typeAchat) {
+    if (!produit) return 0;
+    if (typeAchat === 'enlever' && produit.prix_achat_enlever > 0) {
+        return produit.prix_achat_enlever * produit.bouteilles_par_caisses;
+    }
+    if (typeAchat === 'deposer' && produit.prix_achat_deposer > 0) {
+        return produit.prix_achat_deposer * produit.bouteilles_par_caisses;
+    }
+    return produit.prix_achat_caisse || (produit.prix_achat_unitaire * produit.bouteilles_par_caisses);
+}
+
 document.addEventListener('alpine:init', () => {
     Alpine.data('approModal', () => ({
         isOpen: false,
@@ -146,7 +166,7 @@ document.addEventListener('alpine:init', () => {
             date: '<?= date('Y-m-d') ?>',
             fournisseur: 'Bralima',
             notes: '',
-            lignes: [{ produit_id: '', quantite_caisses: 1 }]
+            lignes: [{ produit_id: '', quantite_caisses: 1, type_achat: 'deposer' }]
         },
 
         init() {
@@ -167,7 +187,7 @@ document.addEventListener('alpine:init', () => {
             this.form.lignes.forEach(l => {
                 const p = this.getProduit(l.produit_id);
                 if (p) {
-                    const prixCaisse = p.prix_achat_caisse || (p.prix_achat_unitaire * p.bouteilles_par_caisses);
+                    const prixCaisse = getPrixCaisse(p, l.type_achat);
                     sum += (l.quantite_caisses || 0) * prixCaisse;
                 }
             });
@@ -179,7 +199,7 @@ document.addEventListener('alpine:init', () => {
             this.form.lignes.forEach(l => {
                 const p = this.getProduit(l.produit_id);
                 if (p) {
-                    const prixCaisse = p.prix_achat_caisse || (p.prix_achat_unitaire * p.bouteilles_par_caisses);
+                    const prixCaisse = getPrixCaisse(p, l.type_achat);
                     sum += (l.quantite_caisses || 0) * prixCaisse;
                 }
             });
@@ -266,7 +286,7 @@ document.addEventListener('alpine:init', () => {
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                         </svg>
                                     </a>
-                                    <?php if ($appro['statut'] === 'valide' && in_array($_SESSION['user_role'], [ROLE_ADMIN, ROLE_MAGASINIER])): ?>
+                                    <?php if ($appro['statut'] === 'valide' && can('approvisionnements.delete')): ?>
                                     <button 
                                         @click="annulerApprovisionnement(<?= $appro['id'] ?>, '<?= htmlspecialchars($appro['numero_bon']) ?>')"
                                         class="btn-danger btn-sm"

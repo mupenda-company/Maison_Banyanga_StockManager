@@ -1,0 +1,101 @@
+<?php
+
+class Role extends Model
+{
+    protected $table = 'roles';
+    protected $fillable = ['nom', 'description', 'is_system'];
+
+    public function getAllWithPermissions()
+    {
+        $roles = $this->all('nom');
+        foreach ($roles as &$role) {
+            $role['permissions'] = $this->getPermissions($role['id']);
+        }
+        return $roles;
+    }
+
+    public function getPermissions($roleId)
+    {
+        return $this->db->fetchAll(
+            "SELECT p.* FROM permissions p
+             INNER JOIN role_permissions rp ON rp.permission_id = p.id
+             WHERE rp.role_id = :role_id
+             ORDER BY p.module, p.action",
+            ['role_id' => $roleId]
+        );
+    }
+
+    public function getPermissionCodes($roleId)
+    {
+        $rows = $this->db->fetchAll(
+            "SELECT p.code FROM permissions p
+             INNER JOIN role_permissions rp ON rp.permission_id = p.id
+             WHERE rp.role_id = :role_id",
+            ['role_id' => $roleId]
+        );
+        return array_column($rows, 'code');
+    }
+
+    public function syncPermissions($roleId, array $permissionIds)
+    {
+        $this->db->delete('role_permissions', 'role_id = :rid', ['rid' => $roleId]);
+        foreach ($permissionIds as $pid) {
+            $this->db->insert('role_permissions', [
+                'role_id' => $roleId,
+                'permission_id' => (int) $pid
+            ]);
+        }
+    }
+
+    public function getUserRoles($userId)
+    {
+        return $this->db->fetchAll(
+            "SELECT r.* FROM roles r
+             INNER JOIN user_roles ur ON ur.role_id = r.id
+             WHERE ur.user_id = :uid",
+            ['uid' => $userId]
+        );
+    }
+
+    public function getUserPermissionCodes($userId)
+    {
+        $rows = $this->db->fetchAll(
+            "SELECT DISTINCT p.code FROM permissions p
+             INNER JOIN role_permissions rp ON rp.permission_id = p.id
+             INNER JOIN user_roles ur ON ur.role_id = rp.role_id
+             WHERE ur.user_id = :uid",
+            ['uid' => $userId]
+        );
+        return array_column($rows, 'code');
+    }
+
+    public function assignRole($userId, $roleId)
+    {
+        $this->db->insert('user_roles', [
+            'user_id' => $userId,
+            'role_id' => $roleId
+        ]);
+    }
+
+    public function syncUserRoles($userId, array $roleIds)
+    {
+        $this->db->delete('user_roles', 'user_id = :uid', ['uid' => $userId]);
+        foreach ($roleIds as $rid) {
+            $this->db->insert('user_roles', [
+                'user_id' => $userId,
+                'role_id' => (int) $rid
+            ]);
+        }
+    }
+
+    public function nomExists($nom, $excludeId = null)
+    {
+        $sql = "SELECT COUNT(*) FROM {$this->table} WHERE nom = :nom";
+        $params = ['nom' => $nom];
+        if ($excludeId) {
+            $sql .= " AND id != :eid";
+            $params['eid'] = $excludeId;
+        }
+        return $this->db->fetchColumn($sql, $params) > 0;
+    }
+}

@@ -17,6 +17,7 @@ class EmballageController extends Controller
     public function index()
     {
         $this->requireAuth();
+        $this->requirePermission('emballages.view');
 
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
         $dateFin = $_GET['date_fin'] ?? date('Y-m-d');
@@ -41,6 +42,7 @@ class EmballageController extends Controller
     public function suivi()
     {
         $this->requireAuth();
+        $this->requirePermission('emballages.view');
 
         $dettesEnCours = $this->detteModel->getEnCours();
         $retoursRecents = $this->retourModel->getRecents(20);

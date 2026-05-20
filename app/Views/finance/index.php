@@ -56,7 +56,7 @@ ob_start();
             </div>
         </div>
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            CA - Pertes - Ristournes - Dépenses
+            CA - Pertes - Dépenses
         </p>
     </div>
 
@@ -115,25 +115,8 @@ ob_start();
     </div>
 </div>
 
-<!-- Deuxième rangée : Ristournes + Dettes -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-    <!-- Ristournes -->
-    <div class="stat-card">
-        <div class="flex items-center justify-between">
-            <div class="min-w-0 flex-1 mr-2">
-                <p class="stat-label">Ristournes</p>
-                <p class="text-lg md:text-xl font-bold text-orange-600 dark:text-orange-400 truncate">
-                    <?= format_money_converted($ristourneStats['total_ristournes'] ?? 0) ?>
-                </p>
-            </div>
-            <div class="w-10 h-10 bg-orange-100 dark:bg-orange-900/50 rounded-full flex items-center justify-center shrink-0">
-                <svg class="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V5m0 12v-1"/></svg>
-            </div>
-        </div>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Payées: <?= format_money_converted($ristourneStats['ristournes_payees'] ?? 0) ?> · En attente: <?= format_money_converted($ristourneStats['ristournes_en_attente'] ?? 0) ?>
-        </p>
-    </div>
+<!-- Deuxième rangée : Dettes + Panier -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
 
     <!-- Dettes emballages -->
     <div class="stat-card">
@@ -346,10 +329,6 @@ ob_start();
         <div class="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
             <span class="text-gray-600 dark:text-gray-400">Valeur des pertes</span>
             <span class="font-semibold text-red-600 dark:text-red-400">- <?= format_money_converted($pertesValeur) ?></span>
-        </div>
-        <div class="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
-            <span class="text-gray-600 dark:text-gray-400">Ristournes payées</span>
-            <span class="font-semibold text-orange-600 dark:text-orange-400">- <?= format_money_converted($ristournesPayees) ?></span>
         </div>
         <div class="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
             <span class="text-gray-600 dark:text-gray-400">Dépenses</span>

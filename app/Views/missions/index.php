@@ -10,13 +10,23 @@ ob_start();
         <p class="text-gray-500 dark:text-gray-400">Gestion des missions de livraison et de ristourne</p>
     </div>
     <div class="flex gap-2 flex-wrap justify-end">
+        <?php if (can('missions.view')): ?>
+        <a href="<?= url('missions/synthese') ?>" target="_blank" class="btn btn-secondary">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+            </svg>
+            Synthèse agents
+        </a>
+        <?php endif; ?>
+        <?php if (can('missions.create')): ?>
         <a href="<?= url('missions/create') ?>" class="btn btn-primary">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
             </svg>
             Nouvelle mission
         </a>
-        <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === ROLE_ADMIN): ?>
+        <?php endif; ?>
+        <?php if (can('admin.view')): ?>
         <a href="<?= url('missions/ristourne/create') ?>" class="btn btn-secondary">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -141,7 +151,7 @@ ob_start();
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                     </svg>
                                 </a>
-                                <?php if ($mission['statut'] === 'en_cours' && $_SESSION['user_role'] === ROLE_ADMIN): ?>
+                                <?php if ($mission['statut'] === 'en_cours' && can('missions.update')): ?>
                                 <a href="<?= url('missions/' . $mission['id'] . '/edit') ?>" class="text-blue-600 hover:text-blue-700" title="Modifier">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -153,7 +163,7 @@ ob_start();
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
                                     </svg>
                                 </a>
-                                <?php if ($mission['statut'] === 'en_cours'): ?>
+                                <?php if ($mission['statut'] === 'en_cours' && can('missions.manage')): ?>
                                 <button onclick="terminerMission(<?= $mission['id'] ?>)" class="text-green-600 hover:text-green-700" title="Terminer">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>

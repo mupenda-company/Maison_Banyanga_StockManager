@@ -31,24 +31,6 @@ ob_start();
     </div>
 </div>
 
-<!-- Paliers actifs -->
-<div class="card mb-6">
-    <div class="card-header">
-        <h3 class="font-semibold">Paliers de ristourne actifs</h3>
-    </div>
-    <div class="card-body">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <?php foreach ($paliers as $palier): ?>
-            <div class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg text-center">
-                <p class="font-semibold text-gray-700 dark:text-gray-300"><?= htmlspecialchars($palier['nom']) ?></p>
-                <p class="text-sm text-gray-500">≥ <?= format_money_converted($palier['ca_min'] ?? 0) ?></p>
-                <p class="text-2xl font-bold text-primary-600"><?= $palier['taux_ristourne'] ?>%</p>
-            </div>
-            <?php endforeach; ?>
-        </div>
-    </div>
-</div>
-
 <!-- Résultats -->
 <div class="card">
     <div class="card-header flex items-center justify-between">
@@ -71,7 +53,6 @@ ob_start();
                     <tr>
                         <th>Client</th>
                         <th>Total achats</th>
-                        <th>Palier</th>
                         <th>Taux</th>
                         <th>Ristourne</th>
                         <th>Action</th>
@@ -87,9 +68,6 @@ ob_start();
                             <div class="text-xs text-gray-500"><?= htmlspecialchars($r['zone_nom'] ?? '') ?></div>
                         </td>
                         <td class="font-medium"><?= format_money_converted($r['ca_total'] ?? 0) ?></td>
-                        <td>
-                            <span class="badge-info"><?= htmlspecialchars($r['palier_nom'] ?? 'Aucun') ?></span>
-                        </td>
                         <td><?= $r['taux_applique'] ?>%</td>
                         <td class="font-bold text-green-600"><?= format_money_converted($r['montant_ristourne'] ?? 0) ?></td>
                         <td>
@@ -107,7 +85,7 @@ ob_start();
                 </tbody>
                 <tfoot class="bg-gray-50 dark:bg-gray-700/50 font-bold">
                     <tr>
-                        <td colspan="4">TOTAL</td>
+                        <td colspan="3">TOTAL</td>
                         <td class="text-green-600"><?= format_money_converted($totalRistournes ?? 0) ?></td>
                         <td></td>
                     </tr>

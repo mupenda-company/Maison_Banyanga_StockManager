@@ -20,7 +20,7 @@ class VehiculeController extends Controller
      */
     public function index()
     {
-        $this->requireAuth();
+        $this->requirePermission('vehicules.view');
         
         $vehicules = $this->vehiculeModel->getWithAgent();
         $agents = $this->userModel->getByRole(ROLE_VENDEUR);
@@ -36,10 +36,10 @@ class VehiculeController extends Controller
      */
     public function inventaire()
     {
-        $this->requireAuth();
+        $this->requirePermission('vehicules.view');
 
         $printMode = isset($_GET['print']) && (string) $_GET['print'] === '1';
-        $canEditInventory = isset($_SESSION['user_role']) && in_array($_SESSION['user_role'], [ROLE_ADMIN, ROLE_MAGASINIER], true);
+        $canEditInventory = $this->hasPermission('vehicules.manage');
 
         $vehiculesBase = $this->vehiculeModel->getWithAgent();
         $vehicules = [];
@@ -163,7 +163,7 @@ class VehiculeController extends Controller
      */
     public function show($id)
     {
-        $this->requireAuth();
+        $this->requirePermission('vehicules.view');
         
         $vehicule = $this->vehiculeModel->getWithStock($id);
         
@@ -219,7 +219,7 @@ class VehiculeController extends Controller
      */
     public function print($id)
     {
-        $this->requireAuth();
+        $this->requirePermission('vehicules.view');
 
         $vehicule = $this->vehiculeModel->getWithStock($id);
 
@@ -268,7 +268,7 @@ class VehiculeController extends Controller
      */
     public function store()
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('vehicules.manage');
         
         $data = $this->getJsonInput();
         
@@ -310,7 +310,7 @@ class VehiculeController extends Controller
      */
     public function update($id)
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('vehicules.manage');
         
         $vehicule = $this->vehiculeModel->find($id);
         
@@ -348,7 +348,7 @@ class VehiculeController extends Controller
      */
     public function transfertVehicule()
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('vehicules.manage');
         
         $data = $this->getJsonInput();
         
@@ -553,7 +553,7 @@ class VehiculeController extends Controller
      */
     public function delete($id)
     {
-        $this->requireRole([ROLE_ADMIN]);
+        $this->requirePermission('admin.view');
         
         $vehicule = $this->vehiculeModel->find($id);
         

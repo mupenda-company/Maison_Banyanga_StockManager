@@ -23,7 +23,7 @@ ob_start();
                     <?= $isRestourne ? 'Mission de ristourne N° ' : 'Mission N° ' ?><?= htmlspecialchars($mission['numero_mission']) ?>
                 </h2>
                 <div class="flex gap-2">
-                    <?php if ($mission['statut'] === 'en_cours' && $_SESSION['user_role'] === ROLE_ADMIN): ?>
+                    <?php if ($mission['statut'] === 'en_cours' && can('missions.update')): ?>
                     <a href="<?= url('missions/' . $mission['id'] . '/edit') ?>" class="btn btn-sm btn-secondary">
                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -37,7 +37,7 @@ ob_start();
                         </svg>
                         <?= $isRestourne ? 'Bon de ristourne' : ($mission['statut'] === 'terminee' ? 'Facture de mission' : 'Bon de sortie') ?>
                     </a>
-                    <?php if ($mission['statut'] === 'en_cours'): ?>
+                    <?php if ($mission['statut'] === 'en_cours' && can('missions.manage')): ?>
                     <button onclick="terminerMission()" class="btn btn-sm btn-primary"><?= $isRestourne ? 'Clôturer' : 'Terminer' ?></button>
                     <?php endif; ?>
                 </div>

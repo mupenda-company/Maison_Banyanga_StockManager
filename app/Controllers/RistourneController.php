@@ -20,7 +20,7 @@ class RistourneController extends Controller
      */
     public function index()
     {
-        $this->requireRole([ROLE_ADMIN]);
+        $this->requirePermission('admin.view');
         
         $filters = [
             'mois' => $_GET['mois'] ?? date('n'),
@@ -43,7 +43,7 @@ class RistourneController extends Controller
      */
     public function calculer()
     {
-        $this->requireRole([ROLE_ADMIN]);
+        $this->requirePermission('admin.view');
         
         $mois = $_GET['mois'] ?? date('n');
         $annee = $_GET['annee'] ?? date('Y');
@@ -85,7 +85,7 @@ class RistourneController extends Controller
      */
     public function payer($id)
     {
-        $this->requireRole([ROLE_ADMIN]);
+        $this->requirePermission('admin.view');
         
         $result = $this->ristourneModel->marquerPayee($id);
         
@@ -101,7 +101,7 @@ class RistourneController extends Controller
      */
     public function paliers()
     {
-        $this->requireRole([ROLE_ADMIN]);
+        $this->requirePermission('admin.view');
         $paliers = $this->ristourneModel->getPaliers();
         $this->view('ristournes/paliers', ['paliers' => $paliers]);
     }
@@ -111,7 +111,7 @@ class RistourneController extends Controller
      */
     public function storePalier()
     {
-        $this->requireRole([ROLE_ADMIN]);
+        $this->requirePermission('admin.view');
         $data = $this->getJsonInput();
 
         $errors = $this->validate($data, [
@@ -151,7 +151,7 @@ class RistourneController extends Controller
      */
     public function deletePalier($id)
     {
-        $this->requireRole([ROLE_ADMIN]);
+        $this->requirePermission('admin.view');
         $this->db->delete('paliers_ristourne', 'id = :id', ['id' => $id]);
         return $this->success(null, 'Palier supprimé.');
     }

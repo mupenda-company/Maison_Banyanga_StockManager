@@ -20,7 +20,7 @@ class ProduitController extends Controller
      */
     public function index()
     {
-        $this->requireAuth();
+        $this->requirePermission('produits.view');
         $produits = $this->produitModel->getWithStock();
         $categories = $this->produitModel->getCategories();
         
@@ -77,7 +77,7 @@ class ProduitController extends Controller
      */
     public function show($id)
     {
-        $this->requireAuth();
+        $this->requirePermission('produits.view');
         
         $produit = $this->produitModel->find($id);
         
@@ -113,7 +113,7 @@ class ProduitController extends Controller
      */
     public function store()
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('produits.create');
         
         $data = $this->getJsonInput();
         
@@ -126,6 +126,8 @@ class ProduitController extends Controller
             'code' => 'required|unique:produits,code',
             'nom' => 'required',
             'prix_achat_unitaire' => 'required|numeric',
+            'prix_achat_deposer' => 'numeric',
+            'prix_achat_enlever' => 'numeric',
             'prix_vente_unitaire' => 'required|numeric',
             'bouteilles_par_caisses' => 'required|numeric',
             'seuil_alerte' => 'numeric'
@@ -142,7 +144,9 @@ class ProduitController extends Controller
             'categorie' => $data['categorie'] ?? null,
             'unite_base' => $data['unite_base'] ?? 'bouteille',
             'bouteilles_par_caisses' => $data['bouteilles_par_caisses'],
-            'prix_achat_unitaire' => $data['prix_achat_unitaire'],
+            'prix_achat_unitaire' => $data['prix_achat_enlever'] ?? $data['prix_achat_unitaire'],
+            'prix_achat_deposer' => $data['prix_achat_deposer'] ?? 0,
+            'prix_achat_enlever' => $data['prix_achat_enlever'] ?? 0,
             'prix_vente_unitaire' => $data['prix_vente_unitaire'],
             'prix_vente_caisses' => $data['prix_vente_caisses'] ?? 0,
             'seuil_alerte' => $data['seuil_alerte'] ?? DEFAULT_ALERT_THRESHOLD,
@@ -174,7 +178,7 @@ class ProduitController extends Controller
      */
     public function update($id)
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('produits.create');
         
         $produit = $this->produitModel->find($id);
         
@@ -187,6 +191,8 @@ class ProduitController extends Controller
         $errors = $this->validate($data, [
             'nom' => 'required',
             'prix_achat_unitaire' => 'numeric',
+            'prix_achat_deposer' => 'numeric',
+            'prix_achat_enlever' => 'numeric',
             'prix_vente_unitaire' => 'numeric'
         ]);
         
@@ -203,9 +209,13 @@ class ProduitController extends Controller
         
         $updateData = array_intersect_key($data, array_flip([
             'code', 'nom', 'description', 'categorie', 'unite_base',
-            'bouteilles_par_caisses', 'prix_achat_unitaire', 'prix_vente_unitaire',
+            'bouteilles_par_caisses', 'prix_achat_deposer', 'prix_achat_enlever', 'prix_vente_unitaire',
             'prix_vente_caisses', 'seuil_alerte'
         ]));
+        
+        if (isset($data['prix_achat_enlever'])) {
+            $updateData['prix_achat_unitaire'] = $data['prix_achat_enlever'];
+        }
         
         $this->produitModel->update($id, $updateData);
         
@@ -217,7 +227,7 @@ class ProduitController extends Controller
      */
     public function delete($id)
     {
-        $this->requireRole([ROLE_ADMIN]);
+        $this->requirePermission('produits.delete');
         
         $produit = $this->produitModel->find($id);
         

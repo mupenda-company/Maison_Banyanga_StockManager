@@ -1,18 +1,22 @@
 <?php 
 $pageTitle = 'Gestion des utilisateurs';
 $usersJson = json_encode($users, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+$rolesList = (new Role())->all('nom');
+$rolesJson = json_encode($rolesList, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 ob_start();
 ?>
 
 <div class="card" x-data="usersManager">
     <div class="card-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Liste des utilisateurs</h2>
+        <?php if (can('admin.users')): ?>
         <button @click="openModal()" class="btn btn-primary">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
             </svg>
             Nouvel utilisateur
         </button>
+        <?php endif; ?>
     </div>
     <div class="card-body p-0">
         <div class="table-container">
@@ -50,9 +54,8 @@ ob_start();
                             </td>
                             <td x-text="user.telephone"></td>
                             <td>
-                                <span class="badge" 
-                                      :class="user.role === 'admin' ? 'badge-danger' : (user.role === 'magasinier' ? 'badge-warning' : 'badge-info')"
-                                      x-text="user.role.charAt(0).toUpperCase() + user.role.slice(1)">
+                                <span class="badge badge-info"
+                                      x-text="getUserRoleNames(user)">
                                 </span>
                             </td>
                             <td>
@@ -132,22 +135,24 @@ ob_start();
                                 <label class="label">Mot de passe <span x-show="editMode">(laisser vide pour ne pas modifier)</span><span x-show="!editMode">*</span></label>
                                 <input type="password" x-model="form.password" class="input" :required="!editMode">
                             </div>
-                            <div class="grid grid-cols-2 gap-4 mt-4">
-                                <div>
-                                    <label class="label">Rôle *</label>
-                                    <select x-model="form.role" class="input" required>
-                                        <option value="vendeur">Vendeur</option>
-                                        <option value="magasinier">Magasinier</option>
-                                        <option value="admin">Administrateur</option>
-                                    </select>
+                            <div class="mt-4">
+                                <label class="label">Rôles</label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <template x-for="r in allRoles" :key="r.id">
+                                        <label class="flex items-center space-x-2 cursor-pointer">
+                                            <input type="checkbox" :value="r.id" x-model.number="form.role_ids"
+                                                   class="rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                                            <span class="text-sm text-gray-700 dark:text-gray-300" x-text="r.nom"></span>
+                                        </label>
+                                    </template>
                                 </div>
-                                <div>
-                                    <label class="label">Statut</label>
-                                    <select x-model.number="form.actif" class="input">
-                                        <option value="1">Actif</option>
-                                        <option value="0">Inactif</option>
-                                    </select>
-                                </div>
+                            </div>
+                            <div class="mt-4">
+                                <label class="label">Statut</label>
+                                <select x-model.number="form.actif" class="input">
+                                    <option value="1">Actif</option>
+                                    <option value="0">Inactif</option>
+                                </select>
                             </div>
                             <div class="flex justify-end space-x-3 mt-6">
                                 <button type="button" @click="closeModal()" class="btn btn-secondary">Annuler</button>
@@ -169,24 +174,31 @@ document.addEventListener('alpine:init', () => {
         editMode: false,
         editId: null,
         loading: false,
+        allRoles: <?= $rolesJson ?>,
         form: {
-            username: '', telephone: '', password: '', nom: '', prenom: '', role: 'vendeur', actif: 1
+            username: '', telephone: '', password: '', nom: '', prenom: '', actif: 1, role_ids: []
         },
         
         openModal() {
             this.editMode = false;
             this.editId = null;
-            this.form = { username: '', telephone: '', password: '', nom: '', prenom: '', role: 'vendeur', actif: 1 };
+            this.form = { username: '', telephone: '', password: '', nom: '', prenom: '', actif: 1, role_ids: [] };
             this.modalOpen = true;
         },
         
         closeModal() {
             this.modalOpen = false;
         },
+        getUserRoleNames(user) {
+            if (user.role_names && user.role_names.length > 0) {
+                return user.role_names.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(', ');
+            }
+            return (user.role || '').charAt(0).toUpperCase() + (user.role || '').slice(1) || '-';
+        },
         editUser(user) {
             this.editMode = true;
             this.editId = user.id;
-            this.form = { ...user, password: '' };
+            this.form = { ...user, password: '', role_ids: user.role_ids || [] };
             this.modalOpen = true;
         },
         
@@ -196,10 +208,16 @@ document.addEventListener('alpine:init', () => {
                 const url = this.editMode ? '/api/admin/users/' + this.editId : '/api/admin/users';
                 const method = this.editMode ? 'PUT' : 'POST';
                 
-                // On crée une copie propre des données pour l'envoi
                 const formData = { ...this.form };
                 
                 const result = await App.api(url, method, formData);
+                
+                // Sync roles separately
+                if (this.form.role_ids && this.form.role_ids.length > 0) {
+                    try {
+                        await App.api('/api/admin/users/' + (result.data?.id || this.editId) + '/roles', 'PUT', { role_ids: this.form.role_ids });
+                    } catch(e) { /* ignore role sync error */ }
+                }
                 
                 if (this.editMode) {
                     const idx = this.users.findIndex(u => u.id === this.editId);

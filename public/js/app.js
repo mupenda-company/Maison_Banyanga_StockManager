@@ -103,6 +103,10 @@ document.addEventListener('alpine:init', () => {
 });
 
 // Fonctions utilitaires
+function can(permissionCode) {
+    return (window.USER_PERMISSIONS || []).includes(permissionCode);
+}
+
 const App = {
     // Effectuer une requête API
     async api(url, method = 'GET', data = null) {
@@ -132,6 +136,11 @@ const App = {
             }
             
             const result = await response.json();
+            
+        // Rafraîchir les permissions côté client si le serveur les renvoie
+        if (result && result.data && result.data._session_permissions) {
+            window.USER_PERMISSIONS = result.data._session_permissions;
+        }
             
         if (!response.ok) {
             let errorMsg = 'Une erreur est survenue';

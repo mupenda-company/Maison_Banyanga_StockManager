@@ -30,7 +30,7 @@ class MissionController extends Controller
      */
     public function index()
     {
-        $this->requireAuth();
+        $this->requirePermission('missions.view');
         
         $filters = [
             'statut' => in_array($_GET['statut'] ?? '', ['en_cours', 'terminee'], true) ? $_GET['statut'] : null,
@@ -103,7 +103,7 @@ class MissionController extends Controller
      */
     public function createRestourne()
     {
-        $this->requireRole([ROLE_ADMIN]);
+        $this->requirePermission('admin.view');
 
         $vehicules = $this->vehiculeModel->getDisponibles();
         $produits = $this->produitModel->getWithStock();
@@ -134,7 +134,7 @@ class MissionController extends Controller
      */
     public function enCours()
     {
-        $this->requireAuth();
+        $this->requirePermission('missions.view');
         
         $missions = $this->missionModel->getEnCours();
         
@@ -152,7 +152,7 @@ class MissionController extends Controller
      */
     public function create()
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('missions.manage');
         
         $vehicules = $this->vehiculeModel->getDisponibles();
         $produits = $this->produitModel->getWithStock();
@@ -173,12 +173,13 @@ class MissionController extends Controller
      */
     public function store()
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('missions.manage');
         
         $data = $this->getJsonInput();
         
         $errors = $this->validate($data, [
             'vehicule_id' => 'required|numeric',
+            'zone_id' => 'required|numeric',
             'date_depart' => 'required',
             'chargements' => 'required'
         ]);
@@ -264,6 +265,7 @@ class MissionController extends Controller
             'zone_id' => $data['zone_id'] ?? null,
             'notes' => $data['notes'] ?? '',
             'statut' => 'en_cours',
+            'type_mission' => 'vente',
             'created_by' => $_SESSION['user_id']
         ];
         
@@ -285,7 +287,7 @@ class MissionController extends Controller
      */
     public function storeRestourne()
     {
-        $this->requireRole([ROLE_ADMIN]);
+        $this->requirePermission('admin.view');
 
         $data = $this->getJsonInput();
 
@@ -362,7 +364,7 @@ class MissionController extends Controller
      */
     public function show($id)
     {
-        $this->requireAuth();
+        $this->requirePermission('missions.view');
         
         $mission = $this->missionModel->getWithDetails($id);
         
@@ -384,7 +386,7 @@ class MissionController extends Controller
      */
     public function edit($id)
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('missions.manage');
 
         $mission = $this->missionModel->getWithDetails($id);
         if (!$mission) {
@@ -435,7 +437,7 @@ class MissionController extends Controller
      */
     public function update($id)
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('missions.manage');
 
         $mission = $this->missionModel->getWithDetails($id);
         if (!$mission) {
@@ -445,6 +447,7 @@ class MissionController extends Controller
         $data = $this->getJsonInput();
         $errors = $this->validate($data, [
             'vehicule_id' => 'required|numeric',
+            'zone_id' => 'required|numeric',
             'date_depart' => 'required',
             'chargements' => 'required'
         ]);
@@ -495,7 +498,7 @@ class MissionController extends Controller
      */
     public function terminer($id)
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('missions.manage');
 
         $data = $this->getJsonInput();
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
@@ -546,7 +549,7 @@ class MissionController extends Controller
      */
     public function print($id)
     {
-        $this->requireAuth();
+        $this->requirePermission('missions.view');
         
         $mission = $this->missionModel->getWithDetails($id);
         if (!$mission) {
@@ -566,7 +569,7 @@ class MissionController extends Controller
      */
     public function facture($id)
     {
-        $this->requireAuth();
+        $this->requirePermission('missions.view');
 
         $mission = $this->missionModel->getWithDetails($id);
         if (!$mission) {
@@ -578,6 +581,104 @@ class MissionController extends Controller
         $this->view('missions/facture', [
             'mission' => $mission,
             'params' => $params
+        ]);
+    }
+
+    /**
+     * Synthèse des missions par agent (imprimable)
+     */
+    public function synthese()
+    {
+        $this->requirePermission('missions.view');
+
+        $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
+        $dateFin = $_GET['date_fin'] ?? date('Y-m-d');
+        $statut = in_array($_GET['statut'] ?? '', ['en_cours', 'terminee'], true) ? $_GET['statut'] : null;
+        $printMode = isset($_GET['print']) && (string)$_GET['print'] === '1';
+
+        $conditions = ["m.date_depart BETWEEN :date_debut AND :date_fin"];
+        $params = [
+            'date_debut' => $dateDebut . ' 00:00:00',
+            'date_fin' => $dateFin . ' 23:59:59'
+        ];
+
+        if ($statut) {
+            $conditions[] = "m.statut = :statut";
+            $params['statut'] = $statut;
+        }
+
+        // Récupérer les IDs des missions de la période
+        $missionRows = $this->db->fetchAll(
+            "SELECT m.id, CONCAT(COALESCE(u.prenom, ''), ' ', COALESCE(u.nom, '')) as agent_nom
+             FROM missions m
+             JOIN vehicules v ON m.vehicule_id = v.id
+             LEFT JOIN users u ON v.agent_responsable_id = u.id
+             WHERE " . implode(' AND ', $conditions) . "
+             ORDER BY u.nom, u.prenom, m.date_depart DESC",
+            $params
+        );
+
+        // Charger les détails complets de chaque mission
+        $missionsByAgent = [];
+        $totauxGeneraux = [
+            'nb_missions' => 0,
+            'total_caisses' => 0,
+            'total_clients' => 0,
+            'total_attendu' => 0,
+            'total_encaisse' => 0
+        ];
+
+        foreach ($missionRows as $row) {
+            $mission = $this->missionModel->getWithDetails($row['id']);
+            if (!$mission) continue;
+
+            $agent = trim($row['agent_nom']) ?: 'Non assigné';
+            if (!isset($missionsByAgent[$agent])) {
+                $missionsByAgent[$agent] = [
+                    'agent' => $agent,
+                    'missions' => [],
+                    'nb_missions' => 0,
+                    'total_caisses' => 0,
+                    'total_clients' => 0,
+                    'total_attendu' => 0,
+                    'total_encaisse' => 0
+                ];
+            }
+
+            $montantAttendu = (float)($mission['montant_attendu'] ?? 0);
+            $montantEncaisse = (float)($mission['montant_encaisse'] ?? 0);
+            $nbClients = count($mission['clients'] ?? []);
+            $totalCaisses = (int)($mission['total_caisses'] ?? 0);
+
+            $mission['montant_attendu'] = $montantAttendu;
+            $mission['nb_clients'] = $nbClients;
+
+            $missionsByAgent[$agent]['missions'][] = $mission;
+            $missionsByAgent[$agent]['nb_missions']++;
+            $missionsByAgent[$agent]['total_caisses'] += $totalCaisses;
+            $missionsByAgent[$agent]['total_clients'] += $nbClients;
+            $missionsByAgent[$agent]['total_attendu'] += $montantAttendu;
+            $missionsByAgent[$agent]['total_encaisse'] += $montantEncaisse;
+
+            $totauxGeneraux['nb_missions']++;
+            $totauxGeneraux['total_caisses'] += $totalCaisses;
+            $totauxGeneraux['total_clients'] += $nbClients;
+            $totauxGeneraux['total_attendu'] += $montantAttendu;
+            $totauxGeneraux['total_encaisse'] += $montantEncaisse;
+        }
+
+        $synthese = array_values($missionsByAgent);
+
+        $params = (new Parametre())->getPersonnalisation();
+
+        $this->view('missions/synthese', [
+            'synthese' => $synthese,
+            'totauxGeneraux' => $totauxGeneraux,
+            'dateDebut' => $dateDebut,
+            'dateFin' => $dateFin,
+            'statut' => $statut,
+            'params' => $params,
+            'printMode' => $printMode
         ]);
     }
 }

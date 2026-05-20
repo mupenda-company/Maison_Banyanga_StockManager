@@ -9,12 +9,14 @@ ob_start();
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Pertes</h1>
         <p class="text-gray-500 dark:text-gray-400">Gestion des pertes et casses</p>
     </div>
+    <?php if (can('pertes.create')): ?>
     <a href="<?= url('pertes/create') ?>" class="btn btn-primary">
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
         </svg>
         Déclarer une perte
     </a>
+    <?php endif; ?>
 </div>
 
 <!-- Stats -->
@@ -122,7 +124,7 @@ ob_start();
                         <td><?= htmlspecialchars($perte['emplacement_nom'] ?? '-') ?></td>
                         <td class="max-w-xs truncate text-sm"><?= htmlspecialchars($perte['motif'] ?? '-') ?></td>
                         <td class="text-right">
-                            <?php if ($_SESSION['user_role'] === 'admin'): ?>
+                            <?php if (can('pertes.view')): ?>
                             <button onclick="supprimerPerte(<?= $perte['id'] ?>)" class="text-red-500 hover:text-red-700 transition-colors" title="Supprimer">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>

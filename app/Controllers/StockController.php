@@ -24,7 +24,7 @@ class StockController extends Controller
      */
     public function index()
     {
-        $this->requireAuth();
+        $this->requirePermission('stock.view');
         
         $filters = [
             'produit_id' => $_GET['produit_id'] ?? null,
@@ -64,7 +64,7 @@ class StockController extends Controller
      */
     public function inventaireInitial()
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('stock.manage');
 
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
         $produits = $this->produitModel->getActive();
@@ -86,7 +86,7 @@ class StockController extends Controller
      */
     public function enregistrerInventaireInitial()
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('stock.manage');
 
         $data = $this->getJsonInput();
 
@@ -178,7 +178,7 @@ class StockController extends Controller
      */
     public function inventaire()
     {
-        $this->requireAuth();
+        $this->requirePermission('stock.view');
         
         $filters = [
             'emplacement_id' => $_GET['emplacement_id'] ?? null,
@@ -289,7 +289,7 @@ class StockController extends Controller
      */
     public function byEmplacement($emplacementId)
     {
-        $this->requireAuth();
+        $this->requirePermission('stock.view');
         
         $emplacement = $this->emplacementModel->find($emplacementId);
         
@@ -317,7 +317,7 @@ class StockController extends Controller
      */
     public function mouvements()
     {
-        $this->requireAuth();
+        $this->requirePermission('stock.view');
 
         $printMode = isset($_GET['print']) && (string)$_GET['print'] === '1';
 
@@ -471,7 +471,7 @@ class StockController extends Controller
      */
     public function transfert()
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('stock.manage');
         
         $data = $this->getJsonInput();
         
@@ -543,7 +543,7 @@ class StockController extends Controller
      */
     public function ajustement()
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('stock.manage');
         
         $data = $this->getJsonInput();
         

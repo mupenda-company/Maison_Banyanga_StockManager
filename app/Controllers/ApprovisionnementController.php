@@ -24,7 +24,7 @@ class ApprovisionnementController extends Controller
      */
     public function index()
     {
-        $this->requireAuth();
+        $this->requirePermission('approvisionnements.view');
         
         $filters = [
             'date_debut' => $_GET['date_debut'] ?? null,
@@ -90,7 +90,7 @@ class ApprovisionnementController extends Controller
      */
     public function create()
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('approvisionnements.view');
         
         $produits = $this->produitModel->getActive();
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
@@ -107,7 +107,7 @@ class ApprovisionnementController extends Controller
      */
     public function store()
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('approvisionnements.view');
         
         $data = $this->getJsonInput();
         
@@ -137,15 +137,25 @@ class ApprovisionnementController extends Controller
         
         foreach ($data['details'] as $detail) {
             $produit = $this->produitModel->find($detail['produit_id']);
+            $typeAchat = $detail['type_achat'] ?? 'deposer';
             
-            $sousTotal = $detail['quantite_caisses'] * $produit['prix_achat_unitaire'] * $produit['bouteilles_par_caisses'];
+            if ($typeAchat === 'enlever' && $produit['prix_achat_enlever'] > 0) {
+                $prixUnitaire = $produit['prix_achat_enlever'];
+            } elseif ($typeAchat === 'deposer' && $produit['prix_achat_deposer'] > 0) {
+                $prixUnitaire = $produit['prix_achat_deposer'];
+            } else {
+                $prixUnitaire = $produit['prix_achat_unitaire'];
+            }
+            
+            $sousTotal = $detail['quantite_caisses'] * $prixUnitaire * $produit['bouteilles_par_caisses'];
             $totalHt += $sousTotal;
             
             $details[] = [
                 'produit_id' => $detail['produit_id'],
                 'quantite_caisses' => $detail['quantite_caisses'],
                 'quantite_bouteilles' => $detail['quantite_caisses'] * $produit['bouteilles_par_caisses'],
-                'prix_unitaire' => $produit['prix_achat_unitaire'],
+                'prix_unitaire' => $prixUnitaire,
+                'type_achat' => $typeAchat,
                 'sous_total' => $sousTotal
             ];
         }
@@ -170,7 +180,7 @@ class ApprovisionnementController extends Controller
      */
     public function show($id)
     {
-        $this->requireAuth();
+        $this->requirePermission('approvisionnements.view');
         
         $approvisionnement = $this->approvisionnementModel->getWithDetails($id);
         
@@ -205,7 +215,7 @@ class ApprovisionnementController extends Controller
      */
     public function annuler($id)
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('approvisionnements.view');
         
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
         $result = $this->approvisionnementModel->annuler($id, $emplacementPrincipal['id']);
@@ -222,7 +232,7 @@ class ApprovisionnementController extends Controller
      */
     public function dettes()
     {
-        $this->requireAuth();
+        $this->requirePermission('approvisionnements.view');
         
         $dettes = $this->detteModel->getWithDetails(['statut' => 'en_cours']);
         $total = $this->detteModel->getTotalEnCours();
@@ -238,7 +248,7 @@ class ApprovisionnementController extends Controller
      */
     public function rembourserDette($id)
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('approvisionnements.view');
         
         $data = $this->getJsonInput();
         

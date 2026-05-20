@@ -19,7 +19,7 @@ class DepenseController extends Controller
     public function index()
     {
         $this->requireAuth();
-        $this->requireRole([ROLE_ADMIN]);
+        $this->requirePermission('depenses.view');
         
         $filters = [
             'categorie' => $_GET['categorie'] ?? null,
@@ -44,7 +44,7 @@ class DepenseController extends Controller
      */
     public function create()
     {
-        $this->requireRole([ROLE_ADMIN]);
+        $this->requirePermission('depenses.create');
         
         $this->view('depenses/create');
     }
@@ -54,7 +54,7 @@ class DepenseController extends Controller
      */
     public function store()
     {
-        $this->requireRole([ROLE_ADMIN]);
+        $this->requirePermission('depenses.create');
         
         $data = $this->getJsonInput();
         
@@ -81,7 +81,7 @@ class DepenseController extends Controller
      */
     public function delete($id)
     {
-        $this->requireRole([ROLE_ADMIN]);
+        $this->requirePermission('depenses.create');
         
         $depense = $this->depenseModel->find($id);
         if (!$depense) {

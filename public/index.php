@@ -32,6 +32,7 @@ $uri = $requestPath;
 $routes = [
     // Auth
     'GET::/login' => ['AuthController', 'login'],
+    'GET::/unauthorized' => ['AuthController', 'unauthorized'],
     'POST::/api/auth/login' => ['AuthController', 'authenticate'],
     'GET::/logout' => ['AuthController', 'logout'],
     'GET::/profile' => ['AuthController', 'profile'],
@@ -121,6 +122,7 @@ $routes = [
     'GET::/missions/en-cours' => ['MissionController', 'enCours'],
     'GET::/missions/create' => ['MissionController', 'create'],
     'GET::/missions/ristourne/create' => ['MissionController', 'createRestourne'],
+    'GET::/missions/synthese' => ['MissionController', 'synthese'],
     'GET::/missions/(\d+)/edit' => ['MissionController', 'edit'],
     'GET::/missions/(\d+)' => ['MissionController', 'show'],
     'POST::/api/missions/ristourne' => ['MissionController', 'storeRestourne'],
@@ -175,9 +177,6 @@ $routes = [
     'GET::/ristournes/calculer' => ['RistourneController', 'calculer'],
     'POST::/api/ristournes' => ['RistourneController', 'store'],
     'POST::/api/ristournes/(\d+)/payer' => ['RistourneController', 'payer'],
-    'GET::/ristournes/paliers' => ['RistourneController', 'paliers'],
-    'POST::/api/ristournes/paliers' => ['RistourneController', 'storePalier'],
-    'DELETE::/api/ristournes/paliers/(\d+)' => ['RistourneController', 'deletePalier'],
     
     // Admin
     'GET::/admin' => ['AdminController', 'index'],
@@ -192,6 +191,15 @@ $routes = [
     'POST::/api/admin/settings' => ['AdminController', 'updateSettings'],
     'POST::/api/admin/logo' => ['AdminController', 'uploadLogo'],
     'GET::/api/admin/taux-change' => ['AdminController', 'getTauxChange'],
+
+    // Rôles et permissions
+    'GET::/admin/roles' => ['RoleController', 'index'],
+    'GET::/api/admin/roles' => ['RoleController', 'index'],
+    'GET::/api/admin/permissions' => ['RoleController', 'permissions'],
+    'POST::/api/admin/roles' => ['RoleController', 'store'],
+    'PUT::/api/admin/roles/(\d+)' => ['RoleController', 'update'],
+    'DELETE::/api/admin/roles/(\d+)' => ['RoleController', 'delete'],
+    'PUT::/api/admin/users/(\d+)/roles' => ['RoleController', 'syncUserRoles'],
 ];
 
 // Fonction de routage

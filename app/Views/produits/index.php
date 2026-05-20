@@ -17,7 +17,7 @@ ob_start();
                 <?php endforeach; ?>
             </select>
             
-            <?php if (in_array($_SESSION['user_role'], [ROLE_ADMIN, ROLE_MAGASINIER])): ?>
+            <?php if (can('produits.create')): ?>
             <button onclick="openProduitModal()" class="btn btn-primary">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -105,6 +105,7 @@ ob_start();
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                         </svg>
                                     </a>
+                                    <?php if (can('produits.create')): ?>
                                     <button 
                                         onclick='editProduit(<?= json_encode($produit, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)'
                                         class="btn btn-sm btn-secondary"
@@ -114,7 +115,8 @@ ob_start();
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                         </svg>
                                     </button>
-                                    <?php if ($_SESSION['user_role'] === ROLE_ADMIN): ?>
+                                    <?php endif; ?>
+                                    <?php if (can('produits.delete')): ?>
                                     <button 
                                         onclick="deleteProduit(<?= $produit['id'] ?>, '<?= htmlspecialchars($produit['nom'], ENT_QUOTES) ?>')"
                                         class="btn btn-sm btn-danger"
@@ -190,28 +192,19 @@ ob_start();
                             </div>
                             <div>
                                 <label class="label">Bouteilles par caisse *</label>
-                                <input type="number" x-model.number="form.bouteilles_par_caisses" class="input" required min="1" @input="calculerPrixCaisse()">
+                                <input type="number" x-model.number="form.bouteilles_par_caisses" class="input" required min="1">
                             </div>
                             <div>
-                                <label class="label text-primary-600 font-bold">Prix achat par Caisse (<span x-text="window.DEVISE"></span>) *</label>
-                                <input type="number" x-model.number="form.prix_achat_caisse" class="input border-primary-300 focus:border-primary-500" required step="0.01" min="0" @input="calculerPrixUnitaire()">
+                                <label class="label text-blue-600 font-bold">Prix d'achat à Déposer / Caisse (<span x-text="window.DEVISE"></span>) *</label>
+                                <input type="number" x-model.number="form.prix_achat_deposer" class="input border-blue-300 focus:border-blue-500" required step="0.01" min="0">
                             </div>
                             <div>
-                                <label class="label text-green-600 font-bold">Prix vente par Caisse (<span x-text="window.DEVISE"></span>) *</label>
-                                <input type="number" x-model.number="form.prix_vente_caisses" class="input border-green-300 focus:border-green-500" required step="0.01" min="0" @input="calculerPrixUnitaire()">
+                                <label class="label text-indigo-600 font-bold">Prix d'achat à Enlever / Caisse (<span x-text="window.DEVISE"></span>) *</label>
+                                <input type="number" x-model.number="form.prix_achat_enlever" class="input border-indigo-300 focus:border-indigo-500" required step="0.01" min="0">
                             </div>
-                            <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700 md:col-span-2">
-                                <p class="text-xs font-semibold text-gray-500 uppercase mb-2">Détails unitaires (calculés automatiquement)</p>
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label class="label text-xs">Prix achat / bouteille</label>
-                                        <div class="text-sm font-medium" x-text="App.formatMoney(form.prix_achat_unitaire || 0, window.DEVISE)"></div>
-                                    </div>
-                                    <div>
-                                        <label class="label text-xs">Prix vente / bouteille</label>
-                                        <div class="text-sm font-medium" x-text="App.formatMoney(form.prix_vente_unitaire || 0, window.DEVISE)"></div>
-                                    </div>
-                                </div>
+                            <div>
+                                <label class="label text-green-600 font-bold">Prix de vente / Caisse (<span x-text="window.DEVISE"></span>) *</label>
+                                <input type="number" x-model.number="form.prix_vente_caisses" class="input border-green-300 focus:border-green-500" required step="0.01" min="0">
                             </div>
                             <div>
                                 <label class="label">Seuil d'alerte (en caisses)</label>
@@ -247,31 +240,13 @@ document.addEventListener('alpine:init', () => {
             description: '',
             categorie: '',
             bouteilles_par_caisses: 24,
-            prix_achat_caisse: '',
-            prix_achat_unitaire: 0,
-            prix_vente_unitaire: 0,
+            prix_achat_deposer: '',
+            prix_achat_enlever: '',
             prix_vente_caisses: '',
             seuil_alerte: 10
         },
         errors: {},
         loading: false,
-        
-        calculerPrixUnitaire() {
-            const btl = this.form.bouteilles_par_caisses || 1;
-            if (this.form.prix_achat_caisse) {
-                // On garde 2 décimales maximum pour le prix unitaire
-                this.form.prix_achat_unitaire = parseFloat((this.form.prix_achat_caisse / btl).toFixed(2));
-            }
-            if (this.form.prix_vente_caisses) {
-                this.form.prix_vente_unitaire = parseFloat((this.form.prix_vente_caisses / btl).toFixed(2));
-            }
-        },
-        
-        calculerPrixCaisse() {
-            const btl = this.form.bouteilles_par_caisses || 1;
-            // Si on change le nombre de bouteilles, on recalcule l'unitaire pour garder le prix caisse fixe
-            this.calculerPrixUnitaire();
-        },
         
         open() {
             this.editMode = false;
@@ -282,9 +257,8 @@ document.addEventListener('alpine:init', () => {
                 description: '',
                 categorie: '',
                 bouteilles_par_caisses: 24,
-                prix_achat_caisse: '',
-                prix_achat_unitaire: 0,
-                prix_vente_unitaire: 0,
+                prix_achat_deposer: '',
+                prix_achat_enlever: '',
                 prix_vente_caisses: '',
                 seuil_alerte: 10
             };
@@ -314,20 +288,16 @@ document.addEventListener('alpine:init', () => {
             const devise = window.DEVISE || 'CDF';
             const baseDevise = window.BASE_DEVISE || 'CDF';
             const btl = parseInt(produit.bouteilles_par_caisses) || 24;
-            const prixAchatUnitaire = App.convertMoney(parseFloat(produit.prix_achat_unitaire || 0), baseDevise, devise);
-            const prixVenteUnitaire = App.convertMoney(parseFloat(produit.prix_vente_unitaire || 0), baseDevise, devise);
-            const prixVenteCaisseBase = produit.prix_vente_caisses ? parseFloat(produit.prix_vente_caisses) : (parseFloat(produit.prix_vente_unitaire || 0) * btl);
-            const prixVenteCaisse = App.convertMoney(prixVenteCaisseBase, baseDevise, devise);
+            const prixAchatDeposerCaisse = App.convertMoney(parseFloat(produit.prix_achat_deposer || 0) * btl, baseDevise, devise);
+            const prixAchatEnleverCaisse = App.convertMoney(parseFloat(produit.prix_achat_enlever || 0) * btl, baseDevise, devise);
+            const prixVenteCaisse = App.convertMoney(parseFloat(produit.prix_vente_caisses || produit.prix_vente_unitaire * btl || 0), baseDevise, devise);
 
             this.form = {
                 ...produit,
-                prix_achat_unitaire: prixAchatUnitaire,
-                prix_vente_unitaire: prixVenteUnitaire,
+                prix_achat_deposer: prixAchatDeposerCaisse,
+                prix_achat_enlever: prixAchatEnleverCaisse,
                 prix_vente_caisses: prixVenteCaisse
             };
-
-            // Calculer le prix d'achat caisse à partir du prix unitaire (devise affichée)
-            this.form.prix_achat_caisse = (prixAchatUnitaire * btl).toFixed(2);
             this.errors = {};
             this.isOpen = true;
         },
@@ -342,13 +312,13 @@ document.addEventListener('alpine:init', () => {
                 this.loading = false;
                 return;
             }
-            if (!this.form.prix_achat_caisse || this.form.prix_achat_caisse <= 0) {
-                this.errors.prix_achat_caisse = ['Le prix d\'achat caisse est requis'];
+            if (!this.form.prix_achat_enlever || this.form.prix_achat_enlever <= 0) {
+                this.errors.prix_achat_enlever = ['Le prix d\'achat à Enlever (base) est requis'];
                 this.loading = false;
                 return;
             }
             if (!this.form.prix_vente_caisses || this.form.prix_vente_caisses <= 0) {
-                this.errors.prix_vente_caisses = ['Le prix de vente caisse est requis'];
+                this.errors.prix_vente_caisses = ['Le prix de vente est requis'];
                 this.loading = false;
                 return;
             }
@@ -371,19 +341,20 @@ document.addEventListener('alpine:init', () => {
                 const devise = window.DEVISE || 'CDF';
                 const baseDevise = window.BASE_DEVISE || 'CDF';
                 const btl = this.form.bouteilles_par_caisses || 1;
-                const prixAchatCaisseDevise = parseFloat(this.form.prix_achat_caisse) || 0;
+                const prixAchatDeposerCaisseDevise = parseFloat(this.form.prix_achat_deposer) || 0;
+                const prixAchatEnleverCaisseDevise = parseFloat(this.form.prix_achat_enlever) || 0;
                 const prixVenteCaisseDevise = parseFloat(this.form.prix_vente_caisses) || 0;
 
-                const prixAchatCaisseBase = App.convertMoney(prixAchatCaisseDevise, devise, baseDevise);
+                const prixAchatDeposerCaisseBase = App.convertMoney(prixAchatDeposerCaisseDevise, devise, baseDevise);
+                const prixAchatEnleverCaisseBase = App.convertMoney(prixAchatEnleverCaisseDevise, devise, baseDevise);
                 const prixVenteCaisseBase = App.convertMoney(prixVenteCaisseDevise, devise, baseDevise);
-                const prixAchatUnitaireBase = btl > 0 ? (prixAchatCaisseBase / btl) : 0;
-                const prixVenteUnitaireBase = btl > 0 ? (prixVenteCaisseBase / btl) : 0;
 
                 const payload = { ...this.form };
-                payload.prix_achat_unitaire = parseFloat(prixAchatUnitaireBase.toFixed(2));
-                payload.prix_vente_unitaire = parseFloat(prixVenteUnitaireBase.toFixed(2));
+                payload.prix_achat_unitaire = parseFloat((prixAchatEnleverCaisseBase / btl).toFixed(2));
+                payload.prix_achat_deposer = parseFloat((prixAchatDeposerCaisseBase / btl).toFixed(2));
+                payload.prix_achat_enlever = parseFloat((prixAchatEnleverCaisseBase / btl).toFixed(2));
+                payload.prix_vente_unitaire = parseFloat((prixVenteCaisseBase / btl).toFixed(2));
                 payload.prix_vente_caisses = parseFloat(prixVenteCaisseBase.toFixed(2));
-                delete payload.prix_achat_caisse;
 
                 const result = await App.api(url, method, payload);
                 

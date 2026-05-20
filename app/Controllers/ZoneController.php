@@ -20,7 +20,7 @@ class ZoneController extends Controller
      */
     public function index()
     {
-        $this->requireAuth();
+        $this->requirePermission('clients.view');
         
         $zones = $this->zoneModel->getWithStats();
         
@@ -34,7 +34,7 @@ class ZoneController extends Controller
      */
     public function show($id)
     {
-        $this->requireAuth();
+        $this->requirePermission('clients.view');
         
         $zone = $this->zoneModel->find($id);
         
@@ -108,7 +108,7 @@ class ZoneController extends Controller
      */
     public function store()
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('clients.create');
         
         $data = $this->getJsonInput();
         
@@ -134,7 +134,7 @@ class ZoneController extends Controller
      */
     public function update($id)
     {
-        $this->requireRole([ROLE_ADMIN, ROLE_MAGASINIER]);
+        $this->requirePermission('clients.create');
         
         $zone = $this->zoneModel->find($id);
         
@@ -156,7 +156,7 @@ class ZoneController extends Controller
      */
     public function delete($id)
     {
-        $this->requireRole([ROLE_ADMIN]);
+        $this->requirePermission('clients.delete');
         
         $zone = $this->zoneModel->find($id);
         

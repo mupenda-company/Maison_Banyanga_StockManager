@@ -44,6 +44,8 @@
         window.LOGO_URL = '<?= $logo ? asset('uploads/' . $logo) : '' ?>';
         window.NOM_ENTREPRISE = '<?= htmlspecialchars($nomEntreprise) ?>';
         window.COULEUR_PRIMAIRE = '<?= htmlspecialchars($couleurPrimaire) ?>';
+        window.USER_PERMISSIONS = <?= json_encode($_SESSION['user_permissions'] ?? []) ?>;
+        window.USER_ROLE = '<?= $_SESSION['user_role'] ?? '' ?>';
     </script>
     
     <!-- App JS -->
@@ -230,7 +232,7 @@
         >
             <!-- Logo -->
             <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 dark:border-gray-700">
-                <a href="<?= (isset($_SESSION['user_role']) && $_SESSION['user_role'] === ROLE_ADMIN) ? url('/') : url('ventes') ?>" class="flex items-center space-x-2">
+                <a href="<?= url(getDefaultRoute()) ?>" class="flex items-center space-x-2">
                     <?php 
                     $params = new Parametre();
                     $logo = $params->get('logo');
@@ -250,7 +252,7 @@
             <!-- Navigation -->
             <nav class="flex-1 min-h-0 px-4 py-4 space-y-1 overflow-y-auto overscroll-contain">
                 <!-- Dashboard -->
-                <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === ROLE_ADMIN): ?>
+                <?php if (can('dashboard.view')): ?>
                 <a href="<?= url('/') ?>" class="sidebar-link <?= ($_SERVER['REQUEST_URI'] === '/' || strpos($_SERVER['REQUEST_URI'], '/dashboard') !== false) ? 'active' : '' ?>">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
@@ -260,14 +262,17 @@
                 <?php endif; ?>
                 
                 <!-- Approvisionnements -->
+                <?php if (can('approvisionnements.view')): ?>
                 <a href="<?= url('approvisionnements') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/approvisionnements') !== false ? 'active' : '' ?>">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                     </svg>
                     Approvisionnements
                 </a>
+                <?php endif; ?>
 
                 <!-- Emballages -->
+                <?php if (can('emballages.view')): ?>
                 <a href="<?= url('emballages') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/emballages') !== false ? 'active' : '' ?>">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V7a2 2 0 00-1-1.732l-6-3.464a2 2 0 00-2 0l-6 3.464A2 2 0 004 7v6a2 2 0 001 1.732l6 3.464a2 2 0 002 0l6-3.464A2 2 0 0020 13z"/>
@@ -275,57 +280,70 @@
                     </svg>
                     Emballages
                 </a>
+                <?php endif; ?>
                 
                 <!-- Stocks -->
+                <?php if (can('stock.view')): ?>
                 <a href="<?= url('stocks') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/stocks') !== false ? 'active' : '' ?>">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
                     </svg>
                     Stocks
                 </a>
+                <?php endif; ?>
                 
                 <!-- Ventes -->
+                <?php if (can('ventes.view')): ?>
                 <a href="<?= url('ventes') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/ventes') !== false ? 'active' : '' ?>">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
                     </svg>
                     Ventes
                 </a>
+                <?php endif; ?>
                 
                 <!-- Clients -->
+                <?php if (can('clients.view')): ?>
                 <a href="<?= url('clients') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/clients') !== false ? 'active' : '' ?>">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
                     </svg>
                     Clients
                 </a>
+                <?php endif; ?>
                 
                 <!-- Véhicules -->
+                <?php if (can('vehicules.view')): ?>
                 <a href="<?= url('vehicules') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/vehicules') !== false ? 'active' : '' ?>">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
                     </svg>
                     Véhicules
                 </a>
+                <?php endif; ?>
                 
                 <!-- Missions -->
+                <?php if (can('missions.view')): ?>
                 <a href="<?= url('missions') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/missions') !== false ? 'active' : '' ?>">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m0 0a3 3 0 016 0v2m-6 0h6m-6 0H5a2 2 0 01-2-2V7a2 2 0 012-2h2m6 12h6m0 0a2 2 0 002-2v-5a2 2 0 00-2-2h-1m1 7v2m0-2h-1"/>
                     </svg>
                     Missions
                 </a>
+                <?php endif; ?>
                 
                 <!-- Pertes -->
+                <?php if (can('pertes.view')): ?>
                 <a href="<?= url('pertes') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/pertes') !== false ? 'active' : '' ?>">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                     </svg>
                     Pertes
                 </a>
+                <?php endif; ?>
                 
                 <!-- Dépenses -->
-                <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === ROLE_ADMIN): ?>
+                <?php if (can('depenses.view')): ?>
                 <a href="<?= url('depenses') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/depenses') !== false ? 'active' : '' ?>">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
@@ -335,32 +353,39 @@
                 <?php endif; ?>
                 
                 <!-- Produits -->
+                <?php if (can('produits.view')): ?>
                 <a href="<?= url('produits') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/produits') !== false ? 'active' : '' ?>">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-1-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
                     </svg>
                     Produits
                 </a>
+                <?php endif; ?>
                 
-                <!-- Admin (si admin) -->
-                <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === ROLE_ADMIN): ?>
+                <!-- Admin -->
+                <?php if (can('admin.view') || can('rapports.view')): ?>
                 <div class="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
                     <p class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Administration</p>
 
+                    <?php if (can('admin.view')): ?>
                     <a href="<?= url('finance') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/finance') !== false ? 'active' : '' ?>">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0-1v6m0-6l9-3m-9 3v6m9-3l3 1m-3-1v-6m3 1v6m-9 6l3 1m0-1v-6m0 1l9-3m-9 3v6m9-3l3 1m-3-1v-6"/>
                         </svg>
                         Finance
                     </a>
+                    <?php endif; ?>
 
+                    <?php if (can('rapports.view')): ?>
                     <a href="<?= url('rapports') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/rapports') !== false ? 'active' : '' ?>">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-6m4 6V7m4 10v-3m2 3H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2z"/>
                         </svg>
                         Rapports
                     </a>
+                    <?php endif; ?>
 
+                    <?php if (can('admin.view')): ?>
                     <a href="<?= url('admin/objectifs') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/admin/objectifs') !== false ? 'active' : '' ?>">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V5m0 12v-1m8-5a8 8 0 11-16 0 8 8 0 0116 0z"/>
@@ -374,21 +399,27 @@
                         </svg>
                         Ristournes
                     </a>
+                    <?php endif; ?>
 
-                    <!-- <a href="<?= url('missions/ristourne/create') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/missions/ristourne') !== false ? 'active' : '' ?>">
-                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                        </svg>
-                        Mission de ristourne
-                    </a> -->
-                    
+                    <?php if (can('admin.users')): ?>
                     <a href="<?= url('admin/users') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/admin/users') !== false ? 'active' : '' ?>">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
                         </svg>
                         Utilisateurs
                     </a>
-                    
+                    <?php endif; ?>
+
+                    <?php if (can('admin.roles')): ?>
+                    <a href="<?= url('admin/roles') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/admin/roles') !== false ? 'active' : '' ?>">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                        </svg>
+                        Rôles &amp; Permissions
+                    </a>
+                    <?php endif; ?>
+
+                    <?php if (can('admin.settings')): ?>
                     <a href="<?= url('admin/settings') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/admin/settings') !== false ? 'active' : '' ?>">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
@@ -396,6 +427,7 @@
                         </svg>
                         Paramètres
                     </a>
+                    <?php endif; ?>
                 </div>
                 <?php endif; ?>
             </nav>

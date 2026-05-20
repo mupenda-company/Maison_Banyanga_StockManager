@@ -19,12 +19,14 @@ ob_start();
             </svg>
             Par véhicule
         </a>
+        <?php if (can('ventes.create')): ?>
         <a href="<?= url('ventes/create') ?>" class="btn btn-primary">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
             </svg>
             Nouvelle vente
         </a>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -85,7 +87,9 @@ ob_start();
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
             </svg>
             <p class="text-gray-500 dark:text-gray-400">Aucune vente trouvée</p>
+            <?php if (can('ventes.create')): ?>
             <a href="<?= url('ventes/create') ?>" class="btn btn-primary mt-4">Créer une vente</a>
+            <?php endif; ?>
         </div>
         <?php else: ?>
         <div class="table-container">
@@ -136,7 +140,7 @@ ob_start();
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
                                     </svg>
                                 </a>
-                                <?php if ($vente['statut'] === 'validee' && in_array($_SESSION['user_role'], ['admin', 'magasinier'])): ?>
+                                <?php if ($vente['statut'] === 'validee' && can('ventes.delete')): ?>
                                 <button onclick="annulerVente(<?= $vente['id'] ?>)" class="text-red-600 hover:text-red-700" title="Annuler">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>

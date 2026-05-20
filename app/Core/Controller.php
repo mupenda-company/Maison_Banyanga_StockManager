@@ -10,6 +10,7 @@ abstract class Controller
     public function __construct()
     {
         $this->db = Database::getInstance();
+        $this->refreshSessionPermissions();
     }
     
     /**
@@ -115,20 +116,44 @@ abstract class Controller
             if ($this->isAjax()) {
                 return $this->error('Accès refusé', 403);
             }
-            // Supprimer après 3 secondes
-            echo '<script>
-                setTimeout(() => {
-                    if (notification && notification.parentNode) {
-                        notification.style.opacity = "0";
-                        notification.style.transition = "opacity 0.5s ease";
-                        setTimeout(() => {
-                            if (notification.parentNode) notification.remove();
-                        }, 500);
-                    }
-                }, 3000);
-            </script>';
             redirect('unauthorized');
         }
+    }
+    
+    /**
+     * Vérifier une permission granulaire
+     */
+    protected function requirePermission($permissionCode)
+    {
+        $this->requireAuth();
+        
+        $permissions = $_SESSION['user_permissions'] ?? [];
+        if (!in_array($permissionCode, $permissions)) {
+            if ($this->isAjax()) {
+                return $this->error('Accès refusé - permission requise : ' . $permissionCode, 403);
+            }
+            redirect('unauthorized');
+        }
+        return true;
+    }
+    
+    /**
+     * Vérifier si l'utilisateur a une permission (sans redirection)
+     */
+    protected function hasPermission($permissionCode)
+    {
+        if (!isset($_SESSION['user_id'])) return false;
+        return in_array($permissionCode, $_SESSION['user_permissions'] ?? []);
+    }
+
+    /**
+     * Rafraîchir les permissions de l'utilisateur courant en session
+     */
+    protected function refreshSessionPermissions()
+    {
+        if (!isset($_SESSION['user_id'])) return;
+        $roleModel = new Role();
+        $_SESSION['user_permissions'] = $roleModel->getUserPermissionCodes($_SESSION['user_id']);
     }
     
     /**

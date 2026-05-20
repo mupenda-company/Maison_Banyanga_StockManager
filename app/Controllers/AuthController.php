@@ -19,7 +19,7 @@ class AuthController extends Controller
     public function login()
     {
         if (isset($_SESSION['user_id'])) {
-            redirect(($_SESSION['user_role'] ?? null) === ROLE_ADMIN ? 'dashboard' : 'ventes');
+            redirect(getDefaultRoute());
         }
         
         $this->view('auth/login');
@@ -51,7 +51,11 @@ class AuthController extends Controller
             $_SESSION['user_role'] = $user['role'];
             $_SESSION['user_telephone'] = $user['telephone'];
 
-            $redirectTo = $user['role'] === ROLE_ADMIN ? 'dashboard' : 'ventes';
+            // Charger les permissions du rôle
+            $roleModel = new Role();
+            $_SESSION['user_permissions'] = $roleModel->getUserPermissionCodes($user['id']);
+
+            $redirectTo = getDefaultRoute();
             
             return $this->success([
                 'redirect' => url($redirectTo)
@@ -68,6 +72,15 @@ class AuthController extends Controller
     {
         session_destroy();
         redirect('login');
+    }
+    
+    /**
+     * Page accès refusé
+     */
+    public function unauthorized()
+    {
+        http_response_code(403);
+        $this->view('errors/unauthorized');
     }
     
     /**
