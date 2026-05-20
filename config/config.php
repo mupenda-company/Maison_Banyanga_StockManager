@@ -4,17 +4,17 @@
  */
 
 // Configuration de la base de données
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'bralima_logistique');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_CHARSET', 'utf8mb4');
-// Configuration de la base de données on line
 // define('DB_HOST', 'localhost');
-// define('DB_NAME', 'suncityc_bralima_logistique');
-// define('DB_USER', 'suncityc_NelsonMupenda');
-// define('DB_PASS', 'HgK9Em3H=}lJ_[jj');
+// define('DB_NAME', 'bralima_logistique');
+// define('DB_USER', 'root');
+// define('DB_PASS', '');
 // define('DB_CHARSET', 'utf8mb4');
+// Configuration de la base de données on line
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'suncityc_bralima_logistique');
+define('DB_USER', 'suncityc_NelsonMupenda');
+define('DB_PASS', 'HgK9Em3H=}lJ_[jj');
+define('DB_CHARSET', 'utf8mb4');
 
 // Configuration de l'application
 define('APP_NAME', 'SUN CITY-CE SARL');
@@ -43,8 +43,8 @@ define('ROLE_VENDEUR', 'vendeur');
 define('DEFAULT_ALERT_THRESHOLD', 10);
 
 // Fuseau horaire
-$timezone = getenv('APP_TIMEZONE') ?: ini_get('date.timezone') ?: date_default_timezone_get();
-date_default_timezone_set($timezone ?: 'UTC');
+$timezone = getenv('APP_TIMEZONE') ?: ini_get('date.timezone') ?: 'Africa/Kigali';
+date_default_timezone_set($timezone);
 
 // Démarrage de la session
 if (session_status() === PHP_SESSION_NONE) {
