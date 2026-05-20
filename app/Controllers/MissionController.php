@@ -236,6 +236,69 @@ class MissionController extends Controller
             return $this->error('Ajoutez au moins un produit présent dans le véhicule ou une quantité à charger avant de lancer la mission.', 422);
         }
 
+        // Vérifier le stock disponible dans l'entrepôt principal
+        $emplacementPrincipal = $this->emplacementModel->getPrincipal();
+        $stockInsuffisants = [];
+        foreach ($chargements as $chargement) {
+            $produitId = (int) ($chargement['produit_id'] ?? 0);
+            if ($produitId <= 0) continue;
+
+            $produit = $this->produitModel->find($produitId);
+            if (!$produit) continue;
+
+            $bouteillesParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+            if ($bouteillesParCaisse <= 0) $bouteillesParCaisse = 24;
+
+            // Caisses demandées pour la mission (quantite_caisses = stock final dans le véhicule)
+            $caissesDemandees = max(0, (int) ($chargement['quantite_caisses'] ?? 0));
+
+            // Stock déjà dans le véhicule
+            $caissesDejaDansVehicule = 0;
+            foreach (($vehicule['stock'] ?? []) as $vs) {
+                if ((int) ($vs['produit_id'] ?? 0) === $produitId) {
+                    $caissesDejaDansVehicule = max(0, (int) ($vs['caisses_pleine'] ?? 0));
+                    if ($caissesDejaDansVehicule <= 0) {
+                        $caissesDejaDansVehicule = (int) floor(((int) ($vs['quantite_pleine'] ?? 0)) / $bouteillesParCaisse);
+                    }
+                    break;
+                }
+            }
+
+            // Ce qu'on doit réellement sortir de l'entrepôt
+            $caissesASortir = max(0, $caissesDemandees - $caissesDejaDansVehicule);
+
+            if ($caissesASortir <= 0) continue;
+
+            // Stock disponible dans l'entrepôt principal
+            $stockPrincipal = $this->db->fetch(
+                "SELECT COALESCE(caisses_pleine, 0) as caisses_disponibles
+                 FROM stocks
+                 WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id
+                 LIMIT 1",
+                [
+                    'produit_id' => $produitId,
+                    'emplacement_id' => (int) ($emplacementPrincipal['id'] ?? 0)
+                ]
+            );
+            $caissesDisponibles = max(0, (int) ($stockPrincipal['caisses_disponibles'] ?? 0));
+
+            if ($caissesASortir > $caissesDisponibles) {
+                $stockInsuffisants[] = sprintf(
+                    '%s : demandé %d cs à sortir de l\'entrepôt, disponible %d cs',
+                    $produit['nom'] ?? 'Produit #' . $produitId,
+                    $caissesASortir,
+                    $caissesDisponibles
+                );
+            }
+        }
+
+        if (!empty($stockInsuffisants)) {
+            return $this->error(
+                'Stock insuffisant dans l\'entrepôt pour créer la mission : ' . implode(' ; ', $stockInsuffisants),
+                422
+            );
+        }
+
         $capaciteVehicule = (int) ($vehicule['capacite'] ?? 0);
         if ($capaciteVehicule > 0) {
             $totalMissionCaisses = 0;
@@ -254,8 +317,6 @@ class MissionController extends Controller
                 );
             }
         }
-        
-        $emplacementPrincipal = $this->emplacementModel->getPrincipal();
         
         $missionData = [
             'numero_mission' => $this->missionModel->generateNumeroMission(),
@@ -475,10 +536,71 @@ class MissionController extends Controller
         }
 
         if (empty($chargements)) {
-            return $this->error('Ajoutez au moins un produit présent dans le véhicule ou une quantité à charger avant d’enregistrer la modification.', 422);
+            return $this->error('Ajoutez au moins un produit présent dans le véhicule ou une quantité à charger avant d\'enregistrer la modification.', 422);
         }
 
+        // Vérifier le stock disponible dans l'entrepôt principal pour les ajouts
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
+        $vehicule = $this->vehiculeModel->getWithStock((int) ($data['vehicule_id'] ?? 0));
+        $stockInsuffisants = [];
+        foreach ($chargements as $chargement) {
+            $produitId = (int) ($chargement['produit_id'] ?? 0);
+            if ($produitId <= 0) continue;
+
+            $produit = $this->produitModel->find($produitId);
+            if (!$produit) continue;
+
+            $bouteillesParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+            if ($bouteillesParCaisse <= 0) $bouteillesParCaisse = 24;
+
+            $caissesDemandees = max(0, (int) ($chargement['quantite_caisses'] ?? 0));
+
+            // Stock déjà dans le véhicule
+            $caissesDejaDansVehicule = 0;
+            if ($vehicule) {
+                foreach (($vehicule['stock'] ?? []) as $vs) {
+                    if ((int) ($vs['produit_id'] ?? 0) === $produitId) {
+                        $caissesDejaDansVehicule = max(0, (int) ($vs['caisses_pleine'] ?? 0));
+                        if ($caissesDejaDansVehicule <= 0) {
+                            $caissesDejaDansVehicule = (int) floor(((int) ($vs['quantite_pleine'] ?? 0)) / $bouteillesParCaisse);
+                        }
+                        break;
+                    }
+                }
+            }
+
+            $caissesASortir = max(0, $caissesDemandees - $caissesDejaDansVehicule);
+            if ($caissesASortir <= 0) continue;
+
+            $stockPrincipal = $this->db->fetch(
+                "SELECT COALESCE(caisses_pleine, 0) as caisses_disponibles
+                 FROM stocks
+                 WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id
+                 LIMIT 1",
+                [
+                    'produit_id' => $produitId,
+                    'emplacement_id' => (int) ($emplacementPrincipal['id'] ?? 0)
+                ]
+            );
+            $caissesDisponibles = max(0, (int) ($stockPrincipal['caisses_disponibles'] ?? 0));
+
+            if ($caissesASortir > $caissesDisponibles) {
+                $stockInsuffisants[] = sprintf(
+                    '%s : demandé %d cs à sortir de l\'entrepôt, disponible %d cs',
+                    $produit['nom'] ?? 'Produit #' . $produitId,
+                    $caissesASortir,
+                    $caissesDisponibles
+                );
+            }
+        }
+
+        if (!empty($stockInsuffisants)) {
+            return $this->error(
+                'Stock insuffisant dans l\'entrepôt pour modifier la mission : ' . implode(' ; ', $stockInsuffisants),
+                422
+            );
+        }
+
         $result = $this->missionModel->updateWithChargement(
             $id,
             $data,

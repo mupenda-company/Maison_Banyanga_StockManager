@@ -95,6 +95,24 @@ ob_start();
                         if (capaciteVehicule > 0 && totalMissionCaisses > capaciteVehicule) {
                             throw new Error(`La mission dépasse la capacité du véhicule. Capacité: ${capaciteVehicule} caisses, stock final demandé: ${totalMissionCaisses} caisses.`);
                         }
+
+                        // Vérifier le stock disponible dans l'entrepôt
+                        const stockErrors = [];
+                        for (const ligne of chargementsValides) {
+                            const p = produits.find(pr => String(pr.id) === String(ligne.produit_id));
+                            if (!p) continue;
+                            const caissesDemandees = Math.max(0, parseInt(ligne.quantite_caisses || 0));
+                            const caissesDejaDansVehicule = parseInt(ligne.stock_depart_caisses || 0);
+                            const caissesASortir = Math.max(0, caissesDemandees - caissesDejaDansVehicule);
+                            if (caissesASortir <= 0) continue;
+                            const caissesDisponibles = Math.max(0, parseInt(p.stock_caisses_pleine || 0));
+                            if (caissesASortir > caissesDisponibles) {
+                                stockErrors.push(`${p.nom || 'Produit'}: demandé ${caissesASortir} cs, disponible ${caissesDisponibles} cs`);
+                            }
+                        }
+                        if (stockErrors.length > 0) {
+                            throw new Error('Stock insuffisant dans l\'entrepôt : ' + stockErrors.join(' ; '));
+                        }
                         
                         if (chargementsValides.length === 0) {
                             throw new Error('Ajoutez au moins un produit présent dans le véhicule ou une quantité à charger');
