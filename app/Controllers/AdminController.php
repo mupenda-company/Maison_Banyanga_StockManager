@@ -207,9 +207,27 @@ class AdminController extends Controller
             return $this->error('Vous ne pouvez pas supprimer votre propre compte', 400);
         }
         
-        $this->userModel->update($id, ['actif' => 0]);
+        $user = $this->userModel->find($id);
+        if (!$user) {
+            return $this->error('Utilisateur non trouvé', 404);
+        }
         
-        return $this->success(null, 'Utilisateur désactivé avec succès');
+        try {
+            $this->db->beginTransaction();
+            
+            // Supprimer les associations de rôles
+            $this->db->delete('user_roles', 'user_id = :uid', ['uid' => $id]);
+            
+            // Supprimer l'utilisateur
+            $this->userModel->delete($id);
+            
+            $this->db->commit();
+            
+            return $this->success(null, 'Utilisateur supprimé avec succès');
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            return $this->error('Erreur lors de la suppression : ' . $e->getMessage(), 500);
+        }
     }
     
     /**

@@ -115,7 +115,7 @@ class RoleController extends Controller
             return $this->error('Les rôles système ne peuvent pas être supprimés', 400);
         }
 
-        $this->roleModel->delete($id);
+        $this->roleModel->deleteRole($id);
 
         return $this->success(null, 'Rôle supprimé avec succès');
     }

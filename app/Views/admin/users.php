@@ -88,6 +88,17 @@ ob_start();
                                             </svg>
                                         </button>
                                     </template>
+                                    <!-- Bouton supprimer - caché pour utilisation future
+                                    <template x-if="user.id != <?= $_SESSION['user_id'] ?>">
+                                        <button @click="deleteUser(user)" 
+                                                class="btn btn-sm btn-danger" 
+                                                title="Supprimer">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                            </svg>
+                                        </button>
+                                    </template>
+                                    -->
                                 </div>
                             </td>
                         </tr>
@@ -210,7 +221,10 @@ document.addEventListener('alpine:init', () => {
                 
                 const formData = { ...this.form };
                 
-                const result = await App.api(url, method, formData);
+                const response = await App.api(url, method, formData);
+                
+                // Extract user data from response (App.api returns {success, message, data})
+                const result = response.data || response;
                 
                 // Sync roles separately
                 const userId = result.id || this.editId;
@@ -226,13 +240,20 @@ document.addEventListener('alpine:init', () => {
                 if (this.editMode) {
                     const idx = this.users.findIndex(u => u.id === this.editId);
                     if (idx !== -1) {
-                        this.users[idx] = { ...result };
+                        this.users[idx] = { ...result, role_ids: this.form.role_ids };
                     }
                     App.notify('Utilisateur mis à jour', 'success');
                 } else {
                     // S'assurer que les données reçues sont ajoutées au tableau
                     if (result && result.id) {
-                        this.users.push({ ...result });
+                        // Add new user with the selected role_ids for immediate display
+                        this.users.push({ 
+                            ...result, 
+                            role_ids: this.form.role_ids,
+                            role_names: this.allRoles
+                                .filter(r => this.form.role_ids.includes(r.id))
+                                .map(r => r.nom)
+                        });
                     } else {
                         throw new Error('Données reçues invalides');
                     }
@@ -285,6 +306,25 @@ document.addEventListener('alpine:init', () => {
             try {
                 const result = await App.api('/api/admin/users/' + user.id + '/reset-password', 'POST');
                 App.notify('Mot de passe réinitialisé. Nouveau mot de passe: ' + result.data.password, 'success');
+            } catch (e) {
+                App.notify(e.message, 'error');
+            }
+        },
+
+        async deleteUser(user) {
+            const ok = await App.confirm({
+                title: 'Supprimer l\'utilisateur ?',
+                message: 'Êtes-vous sûr de vouloir supprimer définitivement ' + user.prenom + ' ' + user.nom + ' ? Cette action est irréversible.',
+                confirmText: 'Supprimer',
+                cancelText: 'Annuler',
+                type: 'danger'
+            });
+            if (!ok) return;
+            
+            try {
+                await App.api('/api/admin/users/' + user.id, 'DELETE');
+                this.users = this.users.filter(u => u.id !== user.id);
+                App.notify('Utilisateur supprimé avec succès', 'success');
             } catch (e) {
                 App.notify(e.message, 'error');
             }

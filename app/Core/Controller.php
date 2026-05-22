@@ -128,9 +128,6 @@ abstract class Controller
         $this->requireAuth();
         $this->refreshSessionPermissions();
         $permissions = $_SESSION['user_permissions'] ?? [];
-        // DEBUG TEMPORAIRE : Afficher la permission demandée et les permissions de session
-        echo "<script>console.log('Permission demandée : ' + " . json_encode($permissionCode) . ");</script>";
-        echo "<script>console.log('Permissions session : ' + " . json_encode($permissions) . ");</script>";
         if (!in_array($permissionCode, $permissions)) {
             if ($this->isAjax()) {
                 return $this->error('Accès refusé - permission requise : ' . $permissionCode, 403);
@@ -159,12 +156,6 @@ abstract class Controller
         require_once ROOT_PATH . '/app/Models/Role.php';
         $roleModel = new Role();
         $_SESSION['user_permissions'] = $roleModel->getUserPermissionCodes($_SESSION['user_id']);
-        // DEBUG TEMPORAIRE : Afficher les permissions dans la console navigateur
-        if (isset($_SESSION['user_permissions'])) {
-            echo "<script>console.log('Permissions chargées : " . json_encode($_SESSION['user_permissions']) . "');</script>";
-        } else {
-            echo "<script>console.log('Aucune permission chargée');</script>";
-        }
     }
     
     /**

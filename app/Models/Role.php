@@ -111,4 +111,30 @@ class Role extends Model
         }
         return $this->db->fetchColumn($sql, $params) > 0;
     }
+
+    /**
+     * Supprimer un rôle en gérant les contraintes de clé étrangère
+     */
+    public function deleteRole($id)
+    {
+        try {
+            $this->db->beginTransaction();
+            
+            // Supprimer les associations de permissions
+            $this->db->delete('role_permissions', 'role_id = :rid', ['rid' => $id]);
+            
+            // Supprimer les associations d'utilisateurs
+            $this->db->delete('user_roles', 'role_id = :rid', ['rid' => $id]);
+            
+            // Supprimer le rôle
+            $this->db->delete($this->table, 'id = :id', ['id' => $id]);
+            
+            $this->db->commit();
+            
+            return true;
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
 }
