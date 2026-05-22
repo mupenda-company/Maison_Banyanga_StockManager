@@ -3,7 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connexion - <?= APP_NAME ?></title>
+    <?php 
+    $parametreModelHead = new Parametre();
+    $logoHead = $parametreModelHead->get('logo');
+    $nomEntrepriseHead = $parametreModelHead->get('nom_entreprise', APP_NAME);
+    $pageTitle = "Connexion";
+    ?>
+    <title><?= isset($pageTitle) ? $pageTitle . ' - ' : '' ?><?= htmlspecialchars($nomEntrepriseHead) ?></title>
+    <!-- Favicon -->
+    <?php if ($logoHead): ?>
+    <link rel="icon" type="image/png" href="<?= asset('uploads/' . $logoHead) ?>">
+    <link rel="apple-touch-icon" href="<?= asset('uploads/' . $logoHead) ?>">
+    <?php else: ?>
+    <link rel="icon" type="image/x-icon" href="<?= asset('favicon.ico') ?>">
+    <?php endif; ?>
     <link href="<?= asset('css/app.css') ?>" rel="stylesheet">
     <style>
         :root {
