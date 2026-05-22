@@ -20,7 +20,7 @@ class VehiculeController extends Controller
      */
     public function index()
     {
-        $this->requirePermission('vehicules.view');
+        $this->requirePermission('vehicules.voir');
         
         $vehicules = $this->vehiculeModel->getWithAgent();
         $agents = $this->userModel->getByRole(ROLE_VENDEUR);
@@ -36,10 +36,10 @@ class VehiculeController extends Controller
      */
     public function inventaire()
     {
-        $this->requirePermission('vehicules.view');
+        $this->requirePermission('vehicules.voir');
 
         $printMode = isset($_GET['print']) && (string) $_GET['print'] === '1';
-        $canEditInventory = $this->hasPermission('vehicules.manage');
+        $canEditInventory = $this->hasPermission('vehicules.gerer');
 
         $vehiculesBase = $this->vehiculeModel->getWithAgent();
         $vehicules = [];
@@ -163,7 +163,7 @@ class VehiculeController extends Controller
      */
     public function show($id)
     {
-        $this->requirePermission('vehicules.view');
+        $this->requirePermission('vehicules.voir');
         
         $vehicule = $this->vehiculeModel->getWithStock($id);
         
@@ -219,7 +219,7 @@ class VehiculeController extends Controller
      */
     public function print($id)
     {
-        $this->requirePermission('vehicules.view');
+        $this->requirePermission('vehicules.voir');
 
         $vehicule = $this->vehiculeModel->getWithStock($id);
 
@@ -268,7 +268,7 @@ class VehiculeController extends Controller
      */
     public function store()
     {
-        $this->requirePermission('vehicules.manage');
+        $this->requirePermission('vehicules.gerer');
         
         $data = $this->getJsonInput();
         
@@ -310,7 +310,7 @@ class VehiculeController extends Controller
      */
     public function update($id)
     {
-        $this->requirePermission('vehicules.manage');
+        $this->requirePermission('vehicules.gerer');
         
         $vehicule = $this->vehiculeModel->find($id);
         
@@ -348,7 +348,7 @@ class VehiculeController extends Controller
      */
     public function transfertVehicule()
     {
-        $this->requirePermission('vehicules.manage');
+        $this->requirePermission('vehicules.gerer');
         
         $data = $this->getJsonInput();
         
@@ -553,7 +553,7 @@ class VehiculeController extends Controller
      */
     public function delete($id)
     {
-        $this->requirePermission('admin.view');
+        $this->requirePermission('admin.voir');
         
         $vehicule = $this->vehiculeModel->find($id);
         

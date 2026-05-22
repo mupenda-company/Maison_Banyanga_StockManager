@@ -24,7 +24,7 @@ class AdminController extends Controller
      */
     public function index()
     {
-        $this->requirePermission('admin.view');
+        $this->requirePermission('admin.voir');
         
         $stats = [
             'users' => $this->userModel->count(),
@@ -43,7 +43,7 @@ class AdminController extends Controller
      */
     public function users()
     {
-        $this->requirePermission('admin.view');
+        $this->requirePermission('admin.voir');
         
         $users = $this->userModel->all('nom, prenom');
         $roleModel = new Role();
@@ -65,7 +65,7 @@ class AdminController extends Controller
      */
     public function storeUser()
     {
-        $this->requirePermission('admin.view');
+        $this->requirePermission('admin.voir');
         
         $data = $this->getJsonInput();
         
@@ -81,19 +81,24 @@ class AdminController extends Controller
             return $this->error('Erreurs de validation', 422, $errors);
         }
         
-        // Déduire le rôle legacy depuis les role_ids
+        // Déduire le rôle legacy depuis les role_ids (seulement pour les rôles système)
         $roleModel = new Role();
-        $legacyRole = 'vendeur';
+        $legacyRole = 'vendeur'; // Par défaut pour les rôles personnalisés
         if (!empty($data['role_ids'])) {
-            $assignedRoles = $roleModel->getUserRoles(0); // dummy
             $roleNames = [];
             foreach ($data['role_ids'] as $rid) {
                 $r = $roleModel->find((int)$rid);
                 if ($r) $roleNames[] = $r['nom'];
             }
-            if (in_array('admin', $roleNames)) $legacyRole = 'admin';
-            elseif (in_array('magasinier', $roleNames)) $legacyRole = 'magasinier';
-            elseif (!empty($roleNames)) $legacyRole = $roleNames[0];
+            // Only set legacy role if it's a system role
+            if (in_array('admin', $roleNames)) {
+                $legacyRole = 'admin';
+            } elseif (in_array('magasinier', $roleNames)) {
+                $legacyRole = 'magasinier';
+            } elseif (in_array('vendeur', $roleNames)) {
+                $legacyRole = 'vendeur';
+            }
+            // For custom roles, keep default 'vendeur'
         }
         
         $userData = [
@@ -121,63 +126,74 @@ class AdminController extends Controller
      */
     public function updateUser($id)
     {
-        $this->requirePermission('admin.view');
-        
-        $user = $this->userModel->find($id);
-        
-        if (!$user) {
-            return $this->error('Utilisateur non trouvé', 404);
-        }
-        
-        $data = $this->getJsonInput();
-        
-        // Vérifier username unique
-        if (isset($data['username']) && $data['username'] !== $user['username']) {
-            if ($this->userModel->usernameExists($data['username'], $id)) {
-                return $this->error('Ce nom d\'utilisateur existe déjà', 422);
+        try {
+            $this->requirePermission('admin.voir');
+            
+            $user = $this->userModel->find($id);
+            
+            if (!$user) {
+                return $this->error('Utilisateur non trouvé', 404);
             }
-        }
-        
-        // Vérifier téléphone unique
-        if (isset($data['telephone']) && $data['telephone'] !== $user['telephone']) {
-            if ($this->userModel->telephoneExists($data['telephone'], $id)) {
-                return $this->error('Ce numéro de téléphone existe déjà', 422);
+            
+            $data = $this->getJsonInput();
+            
+            // Vérifier username unique
+            if (isset($data['username']) && $data['username'] !== $user['username']) {
+                if ($this->userModel->usernameExists($data['username'], $id)) {
+                    return $this->error('Ce nom d\'utilisateur existe déjà', 422);
+                }
             }
-        }
-        
-        $updateData = array_intersect_key($data, array_flip([
-            'username', 'telephone', 'nom', 'prenom', 'actif'
-        ]));
-        
-        // Sync legacy role field from role_ids
-        if (!empty($data['role_ids'])) {
+            
+            // Vérifier téléphone unique
+            if (isset($data['telephone']) && $data['telephone'] !== $user['telephone']) {
+                if ($this->userModel->telephoneExists($data['telephone'], $id)) {
+                    return $this->error('Ce numéro de téléphone existe déjà', 422);
+                }
+            }
+            
+            $updateData = array_intersect_key($data, array_flip([
+                'username', 'telephone', 'nom', 'prenom', 'actif'
+            ]));
+            
+            // Sync legacy role field from role_ids (only for system roles)
+            if (!empty($data['role_ids'])) {
+                $roleModel = new Role();
+                $roleNames = [];
+                foreach ($data['role_ids'] as $rid) {
+                    $r = $roleModel->find((int)$rid);
+                    if ($r) $roleNames[] = $r['nom'];
+                }
+                // Only set legacy role if it's a system role
+                if (in_array('admin', $roleNames)) {
+                    $updateData['role'] = 'admin';
+                } elseif (in_array('magasinier', $roleNames)) {
+                    $updateData['role'] = 'magasinier';
+                } elseif (in_array('vendeur', $roleNames)) {
+                    $updateData['role'] = 'vendeur';
+                }
+                // For custom roles, don't update the legacy role field
+            }
+            
+            // Mettre à jour le mot de passe si fourni
+            if (!empty($data['password'])) {
+                $updateData['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
+            }
+            
+            $this->userModel->update($id, $updateData);
+            
+            $user = $this->userModel->find($id);
+            
+            // Ajouter role_ids et role_names à la réponse
             $roleModel = new Role();
-            $roleNames = [];
-            foreach ($data['role_ids'] as $rid) {
-                $r = $roleModel->find((int)$rid);
-                if ($r) $roleNames[] = $r['nom'];
-            }
-            if (in_array('admin', $roleNames)) $updateData['role'] = 'admin';
-            elseif (in_array('magasinier', $roleNames)) $updateData['role'] = 'magasinier';
-            elseif (!empty($roleNames)) $updateData['role'] = $roleNames[0];
+            $userRoles = $roleModel->getUserRoles($id);
+            $user['role_ids'] = array_column($userRoles, 'id');
+            $user['role_names'] = array_column($userRoles, 'nom');
+            
+            return $this->success($user, 'Utilisateur mis à jour avec succès');
+        } catch (Exception $e) {
+            error_log('updateUser error: ' . $e->getMessage());
+            return $this->error('Erreur lors de la mise à jour: ' . $e->getMessage(), 500);
         }
-        
-        // Mettre à jour le mot de passe si fourni
-        if (!empty($data['password'])) {
-            $updateData['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
-        }
-        
-        $this->userModel->update($id, $updateData);
-        
-        $user = $this->userModel->find($id);
-        
-        // Ajouter role_ids et role_names à la réponse
-        $roleModel = new Role();
-        $userRoles = $roleModel->getUserRoles($id);
-        $user['role_ids'] = array_column($userRoles, 'id');
-        $user['role_names'] = array_column($userRoles, 'nom');
-        
-        return $this->success($user, 'Utilisateur mis à jour avec succès');
     }
     
     /**
@@ -185,7 +201,7 @@ class AdminController extends Controller
      */
     public function deleteUser($id)
     {
-        $this->requirePermission('admin.view');
+        $this->requirePermission('admin.voir');
         
         if ($id == $_SESSION['user_id']) {
             return $this->error('Vous ne pouvez pas supprimer votre propre compte', 400);
@@ -201,7 +217,7 @@ class AdminController extends Controller
      */
     public function resetPassword($id)
     {
-        $this->requirePermission('admin.view');
+        $this->requirePermission('admin.voir');
         
         $newPassword = substr(md5(uniqid()), 0, 8);
         $this->userModel->updatePassword($id, $newPassword);
@@ -214,7 +230,7 @@ class AdminController extends Controller
      */
     public function settings()
     {
-        $this->requirePermission('admin.view');
+        $this->requirePermission('admin.voir');
         
         $params = $this->parametreModel->getPersonnalisation();
         
@@ -228,7 +244,7 @@ class AdminController extends Controller
      */
     public function objectifs()
     {
-        $this->requirePermission('admin.view');
+        $this->requirePermission('admin.voir');
 
         $periode = $_GET['periode'] ?? date('Y-m');
         if (!preg_match('/^\d{4}-\d{2}$/', (string) $periode)) {
@@ -259,7 +275,7 @@ class AdminController extends Controller
      */
     public function storeObjectifs()
     {
-        $this->requirePermission('admin.view');
+        $this->requirePermission('admin.voir');
 
         $data = $this->getJsonInput();
         if (empty($data)) {
@@ -312,7 +328,7 @@ class AdminController extends Controller
      */
     public function updateSettings()
     {
-        $this->requirePermission('admin.view');
+        $this->requirePermission('admin.voir');
         
         $data = $this->getJsonInput();
         
@@ -338,7 +354,7 @@ class AdminController extends Controller
      */
     public function uploadLogo()
     {
-        $this->requirePermission('admin.view');
+        $this->requirePermission('admin.voir');
         
         if (!isset($_FILES['logo']) || $_FILES['logo']['error'] !== UPLOAD_ERR_OK) {
             return $this->error('Erreur lors de l\'upload', 400);

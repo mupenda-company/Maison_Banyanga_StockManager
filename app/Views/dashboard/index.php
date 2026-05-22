@@ -138,7 +138,7 @@ ob_start();
             </p>
         </div>
 
-        <?php if (can('admin.view')): ?>
+        <?php if (can('admin.voir')): ?>
         <div class="flex justify-end">
             <a href="<?= url('admin/objectifs') ?>" class="btn btn-secondary">Gérer les objectifs</a>
         </div>

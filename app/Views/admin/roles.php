@@ -200,7 +200,7 @@ document.addEventListener('alpine:init', () => {
                     // Reload to refresh sidebar/buttons with updated permissions
                     setTimeout(() => window.location.reload(), 800);
                 } else {
-                    this.roles.push(result.data);
+                    this.roles.push(result);
                     App.notify('Rôle créé', 'success');
                 }
                 this.closeModal();

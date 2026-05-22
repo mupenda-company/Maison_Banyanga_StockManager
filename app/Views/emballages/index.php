@@ -11,7 +11,7 @@ ob_start();
 
     <div class="flex items-center gap-3">
         <a href="<?= url('emballages/suivi') ?>" class="btn btn-secondary">Suivi détaillé</a>
-        <?php if (can('emballages.manage')): ?>
+        <?php if (can('emballages.gerer')): ?>
         <a href="<?= url('retours-emballages') ?>" class="btn btn-primary">Nouveau retour</a>
         <?php endif; ?>
     </div>

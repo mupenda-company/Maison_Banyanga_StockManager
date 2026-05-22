@@ -41,44 +41,48 @@ INSERT INTO `roles` (`nom`, `description`, `is_system`) VALUES
 
 -- Permissions par module/action
 INSERT INTO `permissions` (`code`, `module`, `action`, `description`) VALUES
-('dashboard.view', 'dashboard', 'view', 'Voir le tableau de bord'),
-('ventes.view', 'ventes', 'view', 'Voir les ventes'),
-('ventes.create', 'ventes', 'create', 'Créer une vente'),
-('ventes.update', 'ventes', 'update', 'Modifier une vente'),
-('ventes.delete', 'ventes', 'delete', 'Annuler une vente'),
-('clients.view', 'clients', 'view', 'Voir les clients'),
-('clients.create', 'clients', 'create', 'Créer un client'),
-('clients.update', 'clients', 'update', 'Modifier un client'),
-('clients.delete', 'clients', 'delete', 'Supprimer un client'),
-('produits.view', 'produits', 'view', 'Voir les produits'),
-('produits.create', 'produits', 'create', 'Créer un produit'),
-('produits.update', 'produits', 'update', 'Modifier un produit'),
-('produits.delete', 'produits', 'delete', 'Supprimer un produit'),
-('stock.view', 'stock', 'view', 'Voir le stock'),
-('stock.manage', 'stock', 'manage', 'Gérer le stock (transferts, inventaire)'),
-('approvisionnements.view', 'approvisionnements', 'view', 'Voir les approvisionnements'),
-('approvisionnements.create', 'approvisionnements', 'create', 'Créer un approvisionnement'),
-('approvisionnements.update', 'approvisionnements', 'update', 'Modifier un approvisionnement'),
-('approvisionnements.delete', 'approvisionnements', 'delete', 'Annuler un approvisionnement'),
-('missions.view', 'missions', 'view', 'Voir les missions'),
-('missions.create', 'missions', 'create', 'Créer une mission'),
-('missions.update', 'missions', 'update', 'Modifier une mission'),
-('missions.delete', 'missions', 'delete', 'Annuler une mission'),
-('vehicules.view', 'vehicules', 'view', 'Voir les véhicules'),
-('vehicules.manage', 'vehicules', 'manage', 'Gérer les véhicules'),
-('depenses.view', 'depenses', 'view', 'Voir les dépenses'),
-('depenses.create', 'depenses', 'create', 'Créer une dépense'),
-('depenses.delete', 'depenses', 'delete', 'Supprimer une dépense'),
-('emballages.view', 'emballages', 'view', 'Voir les emballages'),
-('emballages.manage', 'emballages', 'manage', 'Gérer les emballages'),
-('rapports.view', 'rapports', 'view', 'Voir les rapports'),
-('admin.view', 'admin', 'view', 'Accès administration'),
-('admin.users', 'admin', 'users', 'Gérer les utilisateurs'),
-('admin.settings', 'admin', 'settings', 'Gérer les paramètres'),
-('admin.roles', 'admin', 'roles', 'Gérer les rôles et permissions'),
-('missions.manage', 'missions', 'manage', 'Créer, modifier, terminer des missions'),
-('pertes.view', 'pertes', 'view', 'Voir les pertes'),
-('pertes.create', 'pertes', 'create', 'Déclarer une perte');
+('dashboard.voir', 'dashboard', 'voir', 'Voir le tableau de bord'),
+('ventes.voir', 'ventes', 'voir', 'Voir les ventes'),
+('ventes.creer', 'ventes', 'creer', 'Créer une vente'),
+('ventes.modifier', 'ventes', 'modifier', 'Modifier une vente'),
+('ventes.supprimer', 'ventes', 'supprimer', 'Annuler une vente'),
+('clients.voir', 'clients', 'voir', 'Voir les clients'),
+('clients.creer', 'clients', 'creer', 'Créer un client'),
+('clients.modifier', 'clients', 'modifier', 'Modifier un client'),
+('clients.supprimer', 'clients', 'supprimer', 'Supprimer un client'),
+('produits.voir', 'produits', 'voir', 'Voir les produits'),
+('produits.creer', 'produits', 'creer', 'Créer un produit'),
+('produits.modifier', 'produits', 'modifier', 'Modifier un produit'),
+('produits.supprimer', 'produits', 'supprimer', 'Supprimer un produit'),
+('stock.voir', 'stock', 'voir', 'Voir le stock'),
+('stock.gerer', 'stock', 'gerer', 'Gérer le stock (transferts, inventaire)'),
+('approvisionnements.voir', 'approvisionnements', 'voir', 'Voir les approvisionnements'),
+('approvisionnements.creer', 'approvisionnements', 'creer', 'Créer un approvisionnement'),
+('approvisionnements.modifier', 'approvisionnements', 'modifier', 'Modifier un approvisionnement'),
+('approvisionnements.supprimer', 'approvisionnements', 'supprimer', 'Annuler un approvisionnement'),
+('missions.voir', 'missions', 'voir', 'Voir les missions'),
+('missions.creer', 'missions', 'creer', 'Créer une mission'),
+('missions.modifier', 'missions', 'modifier', 'Modifier une mission'),
+('missions.supprimer', 'missions', 'supprimer', 'Annuler une mission'),
+('missions.gerer', 'missions', 'gerer', 'Créer, modifier, terminer des missions'),
+('vehicules.voir', 'vehicules', 'voir', 'Voir les véhicules'),
+('vehicules.gerer', 'vehicules', 'gerer', 'Gérer les véhicules'),
+('depenses.voir', 'depenses', 'voir', 'Voir les dépenses'),
+('depenses.creer', 'depenses', 'creer', 'Créer une dépense'),
+('depenses.supprimer', 'depenses', 'supprimer', 'Supprimer une dépense'),
+('emballages.voir', 'emballages', 'voir', 'Voir les emballages'),
+('emballages.gerer', 'emballages', 'gerer', 'Gérer les emballages'),
+('pertes.voir', 'pertes', 'voir', 'Voir les pertes'),
+('pertes.creer', 'pertes', 'creer', 'Déclarer une perte'),
+('rapports.voir', 'rapports', 'voir', 'Voir les rapports'),
+('finance.voir', 'finance', 'voir', 'Voir la finance'),
+('finance.creer', 'finance', 'creer', 'Créer une opération financière'),
+('finance.modifier', 'finance', 'modifier', 'Modifier une opération financière'),
+('finance.supprimer', 'finance', 'supprimer', 'Supprimer une opération financière'),
+('admin.voir', 'admin', 'voir', 'Accès administration'),
+('admin.utilisateurs', 'admin', 'utilisateurs', 'Gérer les utilisateurs'),
+('admin.parametres', 'admin', 'parametres', 'Gérer les paramètres'),
+('admin.roles', 'admin', 'roles', 'Gérer les rôles et permissions');
 
 -- Admin = toutes les permissions
 INSERT INTO `role_permissions` (`role_id`, `permission_id`)
@@ -88,26 +92,26 @@ SELECT r.id, p.id FROM `roles` r, `permissions` p WHERE r.nom = 'admin';
 INSERT INTO `role_permissions` (`role_id`, `permission_id`)
 SELECT r.id, p.id FROM `roles` r, `permissions` p
 WHERE r.nom = 'magasinier' AND p.code IN (
-    'dashboard.view',
-    'ventes.view', 'ventes.create', 'ventes.update', 'ventes.delete',
-    'clients.view', 'clients.create', 'clients.update',
-    'produits.view',
-    'stock.view', 'stock.manage',
-    'approvisionnements.view', 'approvisionnements.create', 'approvisionnements.update', 'approvisionnements.delete',
-    'missions.view', 'missions.create', 'missions.update', 'missions.delete', 'missions.manage',
-    'pertes.view', 'pertes.create',
-    'vehicules.view', 'vehicules.manage',
-    'emballages.view', 'emballages.manage',
-    'rapports.view'
+    'dashboard.voir',
+    'ventes.voir', 'ventes.creer', 'ventes.modifier', 'ventes.supprimer',
+    'clients.voir', 'clients.creer', 'clients.modifier',
+    'produits.voir',
+    'stock.voir', 'stock.gerer',
+    'approvisionnements.voir', 'approvisionnements.creer', 'approvisionnements.modifier', 'approvisionnements.supprimer',
+    'missions.voir', 'missions.creer', 'missions.modifier', 'missions.supprimer', 'missions.gerer',
+    'pertes.voir', 'pertes.creer',
+    'vehicules.voir', 'vehicules.gerer',
+    'emballages.voir', 'emballages.gerer',
+    'rapports.voir'
 );
 
 -- Vendeur
 INSERT INTO `role_permissions` (`role_id`, `permission_id`)
 SELECT r.id, p.id FROM `roles` r, `permissions` p
 WHERE r.nom = 'vendeur' AND p.code IN (
-    'ventes.view', 'ventes.create', 'ventes.update',
-    'clients.view', 'clients.create', 'clients.update',
-    'produits.view'
+    'ventes.voir', 'ventes.creer', 'ventes.modifier',
+    'clients.voir', 'clients.creer', 'clients.modifier',
+    'produits.voir'
 );
 
 -- Assigner les rôles aux utilisateurs existants selon leur champ `role`

@@ -19,7 +19,7 @@ class DepenseController extends Controller
     public function index()
     {
         $this->requireAuth();
-        $this->requirePermission('depenses.view');
+        $this->requirePermission('depenses.voir');
         
         $filters = [
             'categorie' => $_GET['categorie'] ?? null,
@@ -44,7 +44,7 @@ class DepenseController extends Controller
      */
     public function create()
     {
-        $this->requirePermission('depenses.create');
+        $this->requirePermission('depenses.creer');
         
         $this->view('depenses/create');
     }
@@ -54,7 +54,7 @@ class DepenseController extends Controller
      */
     public function store()
     {
-        $this->requirePermission('depenses.create');
+        $this->requirePermission('depenses.creer');
         
         $data = $this->getJsonInput();
         
@@ -81,7 +81,7 @@ class DepenseController extends Controller
      */
     public function delete($id)
     {
-        $this->requirePermission('depenses.create');
+        $this->requirePermission('depenses.creer');
         
         $depense = $this->depenseModel->find($id);
         if (!$depense) {

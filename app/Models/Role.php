@@ -79,12 +79,25 @@ class Role extends Model
 
     public function syncUserRoles($userId, array $roleIds)
     {
-        $this->db->delete('user_roles', 'user_id = :uid', ['uid' => $userId]);
-        foreach ($roleIds as $rid) {
-            $this->db->insert('user_roles', [
-                'user_id' => $userId,
-                'role_id' => (int) $rid
-            ]);
+        try {
+            $this->db->beginTransaction();
+            
+            $this->db->delete('user_roles', 'user_id = :uid', ['uid' => $userId]);
+            
+            foreach ($roleIds as $rid) {
+                $rid = (int) $rid;
+                if ($rid > 0) {
+                    $this->db->insert('user_roles', [
+                        'user_id' => $userId,
+                        'role_id' => $rid
+                    ]);
+                }
+            }
+            
+            $this->db->commit();
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
         }
     }
 

@@ -122,35 +122,40 @@ class RoleController extends Controller
 
     public function syncUserRoles($userId)
     {
-        $this->requirePermission('admin.roles');
+        try {
+            $this->requirePermission('admin.utilisateurs');
 
-        $data = $this->getJsonInput();
+            $data = $this->getJsonInput();
 
-        if (!isset($data['role_ids']) || !is_array($data['role_ids'])) {
-            return $this->error('role_ids est requis', 422);
+            if (!isset($data['role_ids']) || !is_array($data['role_ids'])) {
+                return $this->error('role_ids est requis', 422);
+            }
+
+            $this->roleModel->syncUserRoles($userId, $data['role_ids']);
+
+            // Rafraîchir les permissions en session si l'utilisateur courant est modifié
+            if ($userId == ($_SESSION['user_id'] ?? null)) {
+                $this->refreshSessionPermissions();
+            }
+
+            $userModel = new User();
+            $user = $userModel->find($userId);
+            if (!$user) {
+                return $this->error('Utilisateur non trouvé', 404);
+            }
+
+            $roles = $this->roleModel->getUserRoles($userId);
+            $permissionCodes = $this->roleModel->getUserPermissionCodes($userId);
+
+            return $this->success([
+                'roles' => $roles,
+                'permissions' => $permissionCodes,
+                '_session_permissions' => $_SESSION['user_permissions'] ?? []
+            ], 'Rôles mis à jour');
+        } catch (Exception $e) {
+            error_log('syncUserRoles error: ' . $e->getMessage());
+            return $this->error('Erreur lors de la synchronisation des rôles: ' . $e->getMessage(), 500);
         }
-
-        $this->roleModel->syncUserRoles($userId, $data['role_ids']);
-
-        // Rafraîchir les permissions en session si l'utilisateur courant est modifié
-        if ($userId == ($_SESSION['user_id'] ?? null)) {
-            $this->refreshSessionPermissions();
-        }
-
-        $userModel = new User();
-        $user = $userModel->find($userId);
-        if (!$user) {
-            return $this->error('Utilisateur non trouvé', 404);
-        }
-
-        $roles = $this->roleModel->getUserRoles($userId);
-        $permissionCodes = $this->roleModel->getUserPermissionCodes($userId);
-
-        return $this->success([
-            'roles' => $roles,
-            'permissions' => $permissionCodes,
-            '_session_permissions' => $_SESSION['user_permissions'] ?? []
-        ], 'Rôles mis à jour');
     }
 
     public function permissions()

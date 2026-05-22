@@ -25,7 +25,7 @@ ob_start();
                         </svg>
                         Imprimer
                     </a>
-                    <?php if ($vente['statut'] === 'validee' && can('ventes.delete')): ?>
+                    <?php if ($vente['statut'] === 'validee' && can('ventes.supprimer')): ?>
                     <button onclick="annulerVente()" class="btn btn-sm btn-danger">Annuler</button>
                     <?php endif; ?>
                 </div>

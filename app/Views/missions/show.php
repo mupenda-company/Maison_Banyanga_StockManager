@@ -23,7 +23,7 @@ ob_start();
                     <?= $isRestourne ? 'Mission de ristourne N° ' : 'Mission N° ' ?><?= htmlspecialchars($mission['numero_mission']) ?>
                 </h2>
                 <div class="flex gap-2">
-                    <?php if ($mission['statut'] === 'en_cours' && can('missions.update')): ?>
+                    <?php if ($mission['statut'] === 'en_cours' && can('missions.modifier')): ?>
                     <a href="<?= url('missions/' . $mission['id'] . '/edit') ?>" class="btn btn-sm btn-secondary">
                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -37,7 +37,7 @@ ob_start();
                         </svg>
                         <?= $isRestourne ? 'Bon de ristourne' : ($mission['statut'] === 'terminee' ? 'Facture de mission' : 'Bon de sortie') ?>
                     </a>
-                    <?php if ($mission['statut'] === 'en_cours' && can('missions.manage')): ?>
+                    <?php if ($mission['statut'] === 'en_cours' && can('missions.gerer')): ?>
                     <button onclick="terminerMission()" class="btn btn-sm btn-primary"><?= $isRestourne ? 'Clôturer' : 'Terminer' ?></button>
                     <button onclick="annulerMission()" class="btn btn-sm btn-danger">Annuler</button>
                     <?php endif; ?>
@@ -79,13 +79,13 @@ ob_start();
                     </div>
                     <?php if ($isRestourne): ?>
                     <div>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Client</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Nb ristournes</p>
                         <p class="font-medium text-gray-900 dark:text-white">
-                            <?= htmlspecialchars($mission['client']['nom'] ?? $mission['ristourne']['client_nom'] ?? 'N/A') ?>
+                            <?= count($mission['ristournes'] ?? []) ?> client(s)
                         </p>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Montant ristourne</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Montant ristourne total</p>
                         <p class="font-medium text-gray-900 dark:text-white">
                             <?= format_money_converted($mission['montant_ristourne_initial'] ?? 0) ?>
                         </p>
@@ -121,11 +121,28 @@ ob_start();
                     <p class="text-gray-900 dark:text-white"><?= htmlspecialchars($mission['notes']) ?></p>
                 </div>
                 <?php endif; ?>
-                <?php if ($isRestourne && !empty($mission['ristourne'])): ?>
+                <?php if ($isRestourne && !empty($mission['ristournes'])): ?>
+                <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">Ristournes liées</p>
+                    <div class="space-y-2">
+                    <?php foreach ($mission['ristournes'] as $mr): ?>
+                        <div class="flex items-center justify-between py-2 border-b last:border-0">
+                            <div>
+                                <p class="font-medium text-gray-900 dark:text-white"><?= htmlspecialchars($mr['client_nom'] ?? 'N/A') ?><?= !empty($mr['numero_client']) ? ' (' . htmlspecialchars($mr['numero_client']) . ')' : '' ?></p>
+                                <p class="text-xs text-gray-500"><?= htmlspecialchars($mr['produit_nom'] ?? 'N/A') ?> — <?= (int) ($mr['caisses_livrees'] ?? 0) ?> cs</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-semibold"><?= format_money_converted($mr['montant_ristourne'] ?? 0) ?></p>
+                                <p class="text-xs text-amber-600">Reste: <?= format_money_converted($mr['montant_restant_admin'] ?? 0) ?></p>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php elseif ($isRestourne && !empty($mission['ristourne'])): ?>
                 <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
                     <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">Ristourne liée</p>
                     <p class="text-gray-900 dark:text-white font-medium"><?= htmlspecialchars($mission['ristourne']['client_nom'] ?? 'N/A') ?></p>
-                    <p class="text-sm text-gray-500">Période: <?= htmlspecialchars($mission['ristourne']['periode_debut'] ?? '') ?> → <?= htmlspecialchars($mission['ristourne']['periode_fin'] ?? '') ?></p>
                 </div>
                 <?php endif; ?>
             </div>
@@ -199,6 +216,27 @@ ob_start();
             <div class="card-body p-0">
                 <?php if ($isRestourne): ?>
                 <div class="p-6">
+                    <?php if (!empty($mission['ristournes'])): ?>
+                    <div class="space-y-3">
+                        <?php foreach ($mission['ristournes'] as $mr): ?>
+                        <div class="rounded-xl border bg-gray-50 dark:bg-gray-900/50 p-4">
+                            <div class="flex items-center justify-between gap-4">
+                                <div>
+                                    <p class="font-medium text-gray-900 dark:text-white"><?= htmlspecialchars($mr['client_nom'] ?? 'Client') ?><?= !empty($mr['numero_client']) ? ' (' . htmlspecialchars($mr['numero_client']) . ')' : '' ?></p>
+                                    <p class="text-sm text-gray-500">Produit: <?= htmlspecialchars($mr['produit_nom'] ?? 'N/A') ?></p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-semibold"><?= (int) ($mr['caisses_livrees'] ?? 0) ?> caisses</p>
+                                    <p class="text-sm text-gray-500"><?= format_money_converted($mr['montant_livre'] ?? 0) ?></p>
+                                    <?php if (($mr['montant_restant_admin'] ?? 0) > 0): ?>
+                                    <p class="text-xs text-amber-600">Reste admin: <?= format_money_converted($mr['montant_restant_admin'] ?? 0) ?></p>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php else: ?>
                     <div class="rounded-xl border bg-gray-50 dark:bg-gray-900/50 p-4">
                         <div class="flex items-center justify-between gap-4">
                             <div>
@@ -211,6 +249,7 @@ ob_start();
                             </div>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </div>
                 <?php elseif (empty($mission['clients'])): ?>
                 <div class="p-6 text-center text-gray-500">Aucune vente enregistrée</div>

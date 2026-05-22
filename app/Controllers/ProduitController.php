@@ -20,7 +20,7 @@ class ProduitController extends Controller
      */
     public function index()
     {
-        $this->requirePermission('produits.view');
+        $this->requirePermission('produits.voir');
         $produits = $this->produitModel->getWithStock();
         $categories = $this->produitModel->getCategories();
         
@@ -77,7 +77,7 @@ class ProduitController extends Controller
      */
     public function show($id)
     {
-        $this->requirePermission('produits.view');
+        $this->requirePermission('produits.voir');
         
         $produit = $this->produitModel->find($id);
         
@@ -113,7 +113,7 @@ class ProduitController extends Controller
      */
     public function store()
     {
-        $this->requirePermission('produits.create');
+        $this->requirePermission('produits.creer');
         
         $data = $this->getJsonInput();
         
@@ -178,7 +178,7 @@ class ProduitController extends Controller
      */
     public function update($id)
     {
-        $this->requirePermission('produits.create');
+        $this->requirePermission('produits.creer');
         
         $produit = $this->produitModel->find($id);
         
@@ -227,7 +227,7 @@ class ProduitController extends Controller
      */
     public function delete($id)
     {
-        $this->requirePermission('produits.delete');
+        $this->requirePermission('produits.supprimer');
         
         $produit = $this->produitModel->find($id);
         

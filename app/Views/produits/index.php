@@ -17,7 +17,7 @@ ob_start();
                 <?php endforeach; ?>
             </select>
             
-            <?php if (can('produits.create')): ?>
+            <?php if (can('produits.creer')): ?>
             <button onclick="openProduitModal()" class="btn btn-primary">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -105,7 +105,7 @@ ob_start();
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                         </svg>
                                     </a>
-                                    <?php if (can('produits.create')): ?>
+                                    <?php if (can('produits.creer')): ?>
                                     <button 
                                         onclick='editProduit(<?= json_encode($produit, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)'
                                         class="btn btn-sm btn-secondary"
@@ -116,7 +116,7 @@ ob_start();
                                         </svg>
                                     </button>
                                     <?php endif; ?>
-                                    <?php if (can('produits.delete')): ?>
+                                    <?php if (can('produits.supprimer')): ?>
                                     <button 
                                         onclick="deleteProduit(<?= $produit['id'] ?>, '<?= htmlspecialchars($produit['nom'], ENT_QUOTES) ?>')"
                                         class="btn btn-sm btn-danger"

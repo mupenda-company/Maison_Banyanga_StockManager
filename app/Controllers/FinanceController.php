@@ -25,7 +25,7 @@ class FinanceController extends Controller
     public function index()
     {
         $this->requireAuth();
-        $this->requirePermission('admin.view');
+        $this->requirePermission('finance.voir');
 
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
         $dateFin = $_GET['date_fin'] ?? date('Y-m-d');
@@ -138,7 +138,7 @@ class FinanceController extends Controller
     public function apiStats()
     {
         $this->requireAuth();
-        $this->requirePermission('admin.view');
+        $this->requirePermission('finance.voir');
 
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
         $dateFin = $_GET['date_fin'] ?? date('Y-m-d');

@@ -4,17 +4,17 @@
  */
 
 // Configuration de la base de données
-// define('DB_HOST', 'localhost');
-// define('DB_NAME', 'bralima_logistique');
-// define('DB_USER', 'root');
-// define('DB_PASS', '');
-// define('DB_CHARSET', 'utf8mb4');
-// Configuration de la base de données on line
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'suncityc_bralima_logistique');
-define('DB_USER', 'suncityc_NelsonMupenda');
-define('DB_PASS', 'HgK9Em3H=}lJ_[jj');
+define('DB_NAME', 'bralima_logistique');
+define('DB_USER', 'root');
+define('DB_PASS', '');
 define('DB_CHARSET', 'utf8mb4');
+// Configuration de la base de données on line
+// define('DB_HOST', 'localhost');
+// define('DB_NAME', 'suncityc_bralima_logistique');
+// define('DB_USER', 'suncityc_NelsonMupenda');
+// define('DB_PASS', 'HgK9Em3H=}lJ_[jj');
+// define('DB_CHARSET', 'utf8mb4');
 
 // Configuration de l'application
 define('APP_NAME', 'SUN CITY-CE SARL');
@@ -92,19 +92,20 @@ function can($permissionCode) {
 function getDefaultRoute() {
     $perms = $_SESSION['user_permissions'] ?? [];
     $routeMap = [
-        'dashboard.view' => '/',
-        'ventes.view' => 'ventes',
-        'clients.view' => 'clients',
-        'produits.view' => 'produits',
-        'stock.view' => 'stocks',
-        'approvisionnements.view' => 'approvisionnements',
-        'missions.view' => 'missions',
-        'vehicules.view' => 'vehicules',
-        'emballages.view' => 'emballages',
-        'pertes.view' => 'pertes',
-        'depenses.view' => 'depenses',
-        'rapports.view' => 'rapports',
-        'admin.view' => 'admin',
+        'dashboard.voir' => '/',
+        'ventes.voir' => 'ventes',
+        'clients.voir' => 'clients',
+        'produits.voir' => 'produits',
+        'stock.voir' => 'stocks',
+        'approvisionnements.voir' => 'approvisionnements',
+        'missions.voir' => 'missions',
+        'vehicules.voir' => 'vehicules',
+        'emballages.voir' => 'emballages',
+        'pertes.voir' => 'pertes',
+        'depenses.voir' => 'depenses',
+        'finance.voir' => 'finance',
+        'rapports.voir' => 'rapports',
+        'admin.voir' => 'admin',
     ];
     foreach ($routeMap as $perm => $route) {
         if (in_array($perm, $perms)) return $route;

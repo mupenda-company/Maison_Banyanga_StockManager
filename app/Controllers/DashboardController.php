@@ -31,7 +31,7 @@ class DashboardController extends Controller
     public function index()
     {
         $this->requireAuth();
-        $this->requirePermission('dashboard.view');
+        $this->requirePermission('dashboard.voir');
         
         // Vérifier et générer les alertes
         $this->alerteModel->checkStockAlerts();
@@ -122,7 +122,7 @@ class DashboardController extends Controller
     public function apiStats()
     {
         $this->requireAuth();
-        $this->requirePermission('dashboard.view');
+        $this->requirePermission('dashboard.voir');
         
         $period = $_GET['period'] ?? 'today';
         
@@ -163,7 +163,7 @@ class DashboardController extends Controller
     public function apiAlertes()
     {
         $this->requireAuth();
-        $this->requirePermission('dashboard.view');
+        $this->requirePermission('dashboard.voir');
         
         // On ne récupère que les alertes non lues ET non résolues
         $alertes = $this->alerteModel->getNonLues(20);
@@ -181,7 +181,7 @@ class DashboardController extends Controller
     public function markAlertsRead()
     {
         $this->requireAuth();
-        $this->requirePermission('dashboard.view');
+        $this->requirePermission('dashboard.voir');
         
         $this->alerteModel->marquerToutesLues();
         

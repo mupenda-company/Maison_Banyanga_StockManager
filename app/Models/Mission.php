@@ -120,6 +120,33 @@ class Mission extends Model
         }
 
         self::$restourneColumnsChecked = true;
+
+        // Créer la table de liaison mission_ristournes si elle n'existe pas
+        $tableExists = (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*)
+             FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'mission_ristournes'"
+        );
+        if (!$tableExists) {
+            $this->db->query(
+                "CREATE TABLE `mission_ristournes` (
+                    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                    `mission_id` INT UNSIGNED NOT NULL,
+                    `ristourne_id` INT UNSIGNED NOT NULL,
+                    `produit_id` INT UNSIGNED NOT NULL,
+                    `montant_ristourne` DECIMAL(15,2) NOT NULL DEFAULT 0,
+                    `caisses_livrees` INT NOT NULL DEFAULT 0,
+                    `montant_livre` DECIMAL(15,2) NOT NULL DEFAULT 0,
+                    `montant_restant_admin` DECIMAL(15,2) NOT NULL DEFAULT 0,
+                    `client_id` INT UNSIGNED NOT NULL,
+                    FOREIGN KEY (`mission_id`) REFERENCES `missions`(`id`) ON DELETE CASCADE,
+                    FOREIGN KEY (`ristourne_id`) REFERENCES `ristournes`(`id`) ON DELETE CASCADE,
+                    FOREIGN KEY (`produit_id`) REFERENCES `produits`(`id`) ON DELETE CASCADE,
+                    FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+        }
     }
     
     /**
@@ -194,6 +221,20 @@ class Mission extends Model
                  WHERE r.id = :id",
                 ['id' => $mission['ristourne_id']]
             ) : null;
+
+            // Charger les ristournes multiples depuis la table de liaison
+            $mission['ristournes'] = [];
+            if (($mission['type_mission'] ?? 'vente') === 'ristourne') {
+                $mission['ristournes'] = $this->db->fetchAll(
+                    "SELECT mr.*, c.nom as client_nom, c.numero_client, p.nom as produit_nom, p.code as produit_code
+                     FROM mission_ristournes mr
+                     JOIN clients c ON mr.client_id = c.id
+                     JOIN produits p ON mr.produit_id = p.id
+                     WHERE mr.mission_id = :mission_id
+                     ORDER BY c.nom ASC",
+                    ['mission_id' => $id]
+                );
+            }
             
             $mission['chargements'] = $this->db->fetchAll(
                 "SELECT mc.*, p.nom as produit_nom, p.code as produit_code, p.prix_vente_unitaire, p.prix_vente_caisses, p.bouteilles_par_caisses
@@ -750,53 +791,16 @@ class Mission extends Model
     }
 
     /**
-     * Créer une mission de ristourne
+     * Créer une mission de ristourne avec plusieurs ristournes
      */
-    public function createWithRestourne($data, $chargement, $emplacementPrincipalId)
+    public function createWithMultipleRestournes($data, $ristournesData, $emplacementPrincipalId)
     {
         try {
             $this->db->beginTransaction();
 
-            $ristourne = $this->db->fetch(
-                "SELECT r.*, c.nom as client_nom, c.zone_id
-                 FROM ristournes r
-                 JOIN clients c ON r.client_id = c.id
-                 WHERE r.id = :id",
-                ['id' => (int) ($data['ristourne_id'] ?? 0)]
-            );
-
-            if (!$ristourne) {
-                throw new Exception('Ristourne non trouvée');
+            if (empty($ristournesData)) {
+                throw new Exception('Aucune ristourne sélectionnée');
             }
-
-            $produit = (new Produit())->find((int) ($chargement['produit_id'] ?? 0));
-            if (!$produit) {
-                throw new Exception('Produit non trouvé');
-            }
-
-            $bouteillesParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
-            if ($bouteillesParCaisse <= 0) {
-                $bouteillesParCaisse = 24;
-            }
-
-            $prixCaisse = (float) ($produit['prix_vente_caisses'] ?: (($produit['prix_vente_unitaire'] ?? 0) * $bouteillesParCaisse));
-            if ($prixCaisse <= 0) {
-                throw new Exception('Le produit sélectionné doit avoir un prix caisse valide');
-            }
-
-            $montantInitial = (float) ($data['montant_ristourne_initial'] ?? $ristourne['montant_ristourne'] ?? 0);
-            if ($montantInitial <= 0) {
-                throw new Exception('Le montant de ristourne doit être supérieur à zéro');
-            }
-
-            $caissesLivrees = (int) floor($montantInitial / $prixCaisse);
-            if ($caissesLivrees <= 0) {
-                throw new Exception('Le montant de ristourne est insuffisant pour livrer ce produit');
-            }
-
-            $montantLivre = round($caissesLivrees * $prixCaisse, 2);
-            $montantRestantAdmin = round(max($montantInitial - $montantLivre, 0), 2);
-            $quantiteBouteilles = $caissesLivrees * $bouteillesParCaisse;
 
             $vehicule = (new Vehicule())->find((int) ($data['vehicule_id'] ?? 0));
             if (!$vehicule) {
@@ -809,80 +813,192 @@ class Mission extends Model
             }
 
             $stockModel = new Stock();
-            $stockPrincipal = $stockModel->getStock((int) $produit['id'], (int) $emplacementPrincipalId);
-            $caissesDisponibles = (int) ($stockPrincipal['caisses_pleine'] ?? floor(((int) ($stockPrincipal['quantite_pleine'] ?? 0)) / $bouteillesParCaisse));
-            if ($caissesDisponibles < $caissesLivrees) {
-                throw new Exception('Stock principal insuffisant pour créer cette mission de ristourne');
+            $mouvementModel = new MouvementStock();
+            $totalMontantRistourne = 0;
+            $totalMontantLivre = 0;
+            $totalMontantRestantAdmin = 0;
+            $chargementsParProduit = [];
+            $missionRistournes = [];
+
+            foreach ($ristournesData as $ristourneItem) {
+                $ristourneId = (int) ($ristourneItem['ristourne_id'] ?? 0);
+                $produitId = (int) ($ristourneItem['produit_id'] ?? 0);
+
+                if ($ristourneId <= 0 || $produitId <= 0) continue;
+
+                $ristourne = $this->db->fetch(
+                    "SELECT r.*, c.nom as client_nom, c.zone_id
+                     FROM ristournes r
+                     JOIN clients c ON r.client_id = c.id
+                     WHERE r.id = :id",
+                    ['id' => $ristourneId]
+                );
+
+                if (!$ristourne) {
+                    throw new Exception('Ristourne #' . $ristourneId . ' non trouvée');
+                }
+
+                $produit = (new Produit())->find($produitId);
+                if (!$produit) {
+                    throw new Exception('Produit #' . $produitId . ' non trouvé');
+                }
+
+                $bouteillesParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+                if ($bouteillesParCaisse <= 0) $bouteillesParCaisse = 24;
+
+                $prixCaisse = (float) ($produit['prix_vente_caisses'] ?: (($produit['prix_vente_unitaire'] ?? 0) * $bouteillesParCaisse));
+                if ($prixCaisse <= 0) {
+                    throw new Exception('Le produit ' . ($produit['nom'] ?? '#' . $produitId) . ' doit avoir un prix caisse valide');
+                }
+
+                $montantRistourne = (float) ($ristourne['montant_ristourne'] ?? 0);
+                if ($montantRistourne <= 0) continue;
+
+                $caissesLivrees = (int) floor($montantRistourne / $prixCaisse);
+                if ($caissesLivrees <= 0) continue;
+
+                $montantLivre = round($caissesLivrees * $prixCaisse, 2);
+                $montantRestantAdmin = round(max($montantRistourne - $montantLivre, 0), 2);
+                $quantiteBouteilles = $caissesLivrees * $bouteillesParCaisse;
+
+                $totalMontantRistourne += $montantRistourne;
+                $totalMontantLivre += $montantLivre;
+                $totalMontantRestantAdmin += $montantRestantAdmin;
+
+                // Agréger les caisses par produit
+                if (!isset($chargementsParProduit[$produitId])) {
+                    $chargementsParProduit[$produitId] = [
+                        'produit_id' => $produitId,
+                        'caisses' => 0,
+                        'bouteilles' => 0,
+                        'prix_caisse' => $prixCaisse,
+                        'bouteilles_par_caisse' => $bouteillesParCaisse
+                    ];
+                }
+                $chargementsParProduit[$produitId]['caisses'] += $caissesLivrees;
+                $chargementsParProduit[$produitId]['bouteilles'] += $quantiteBouteilles;
+
+                $missionRistournes[] = [
+                    'ristourne_id' => $ristourneId,
+                    'produit_id' => $produitId,
+                    'client_id' => (int) $ristourne['client_id'],
+                    'montant_ristourne' => $montantRistourne,
+                    'caisses_livrees' => $caissesLivrees,
+                    'montant_livre' => $montantLivre,
+                    'montant_restant_admin' => $montantRestantAdmin
+                ];
             }
 
+            if (empty($chargementsParProduit)) {
+                throw new Exception('Aucune ristourne valide à livrer');
+            }
+
+            // Déterminer la zone (celle de la première ristourne si pas fournie)
+            $zoneId = $data['zone_id'] ?? null;
+            if (!$zoneId && !empty($missionRistournes)) {
+                $firstRistourne = $this->db->fetch(
+                    "SELECT c.zone_id FROM ristournes r JOIN clients c ON r.client_id = c.id WHERE r.id = :id",
+                    ['id' => $missionRistournes[0]['ristourne_id']]
+                );
+                $zoneId = $firstRistourne['zone_id'] ?? null;
+            }
+
+            // Créer la mission
             $missionId = $this->create([
                 'numero_mission' => $data['numero_mission'],
                 'type_mission' => 'ristourne',
                 'vehicule_id' => $data['vehicule_id'],
                 'chauffeur_id' => $data['chauffeur_id'] ?? null,
-                'client_id' => (int) $ristourne['client_id'],
-                'ristourne_id' => (int) $ristourne['id'],
+                'client_id' => null,
+                'ristourne_id' => null,
                 'date_depart' => $data['date_depart'],
                 'date_retour' => null,
-                'zone_id' => $data['zone_id'] ?? ($ristourne['zone_id'] ?? null),
+                'zone_id' => $zoneId,
                 'notes' => $data['notes'] ?? '',
                 'justification_cloture' => null,
                 'statut' => 'en_cours',
                 'montant_encaisse' => 0,
-                'montant_ristourne_initial' => $montantInitial,
-                'montant_livre' => $montantLivre,
-                'montant_restant_admin' => $montantRestantAdmin,
+                'montant_ristourne_initial' => $totalMontantRistourne,
+                'montant_livre' => $totalMontantLivre,
+                'montant_restant_admin' => $totalMontantRestantAdmin,
                 'caisses_vides_retournees' => 0,
                 'created_by' => $data['created_by']
             ]);
 
-            $this->db->insert('mission_chargements', [
-                'mission_id' => $missionId,
-                'produit_id' => (int) $produit['id'],
-                'quantite_caisses' => $caissesLivrees,
-                'caisses_deja_dans_vehicule' => 0,
-                'quantite_chargee' => $quantiteBouteilles,
-                'quantite_retournee' => 0,
-                'quantite_vendue' => 0,
-                'prix_caisse' => $prixCaisse
-            ]);
+            // Insérer les chargements et mouvements de stock par produit
+            foreach ($chargementsParProduit as $produitId => $chargement) {
+                // Vérifier le stock disponible
+                $stockPrincipal = $stockModel->getStock($produitId, (int) $emplacementPrincipalId);
+                $caissesDisponibles = (int) ($stockPrincipal['caisses_pleine'] ?? floor(((int) ($stockPrincipal['quantite_pleine'] ?? 0)) / $chargement['bouteilles_par_caisse']));
+                if ($caissesDisponibles < $chargement['caisses']) {
+                    throw new Exception('Stock principal insuffisant pour le produit #' . $produitId . ' (disponible: ' . $caissesDisponibles . ' cs, demandé: ' . $chargement['caisses'] . ' cs)');
+                }
 
-            $stockModel = new Stock();
-            $mouvementModel = new MouvementStock();
+                $this->db->insert('mission_chargements', [
+                    'mission_id' => $missionId,
+                    'produit_id' => $produitId,
+                    'quantite_caisses' => $chargement['caisses'],
+                    'caisses_deja_dans_vehicule' => 0,
+                    'quantite_chargee' => $chargement['bouteilles'],
+                    'quantite_retournee' => 0,
+                    'quantite_vendue' => 0,
+                    'prix_caisse' => $chargement['prix_caisse']
+                ]);
 
-            $stockModel->updateOrCreate(
-                (int) $produit['id'],
-                $emplacementPrincipalId,
-                [
-                    'quantite_pleine' => -$quantiteBouteilles,
-                    'caisses_pleine' => -$caissesLivrees
-                ]
-            );
+                $stockModel->updateOrCreate(
+                    $produitId,
+                    $emplacementPrincipalId,
+                    [
+                        'quantite_pleine' => -$chargement['bouteilles'],
+                        'caisses_pleine' => -$chargement['caisses']
+                    ]
+                );
 
-            $stockModel->updateOrCreate(
-                (int) $produit['id'],
-                $emplacementVehicule,
-                [
-                    'quantite_pleine' => $quantiteBouteilles,
-                    'caisses_pleine' => $caissesLivrees
-                ]
-            );
+                $stockModel->updateOrCreate(
+                    $produitId,
+                    $emplacementVehicule,
+                    [
+                        'quantite_pleine' => $chargement['bouteilles'],
+                        'caisses_pleine' => $chargement['caisses']
+                    ]
+                );
 
-            $mouvementModel->create([
-                'produit_id' => (int) $produit['id'],
-                'emplacement_id' => $emplacementPrincipalId,
-                'type_mouvement' => 'transfert',
-                'quantite' => -$quantiteBouteilles,
-                'quantite_avant' => 0,
-                'quantite_apres' => 0,
-                'reference_type' => 'mission',
-                'reference_id' => $missionId,
-                'motif' => 'Mission de ristourne ' . $data['numero_mission'],
-                'created_by' => $data['created_by']
-            ]);
+                $mouvementModel->create([
+                    'produit_id' => $produitId,
+                    'emplacement_id' => $emplacementPrincipalId,
+                    'type_mouvement' => 'transfert',
+                    'quantite' => -$chargement['bouteilles'],
+                    'quantite_avant' => 0,
+                    'quantite_apres' => 0,
+                    'reference_type' => 'mission',
+                    'reference_id' => $missionId,
+                    'motif' => 'Mission de ristourne ' . $data['numero_mission'],
+                    'created_by' => $data['created_by']
+                ]);
+            }
+
+            // Insérer les liaisons mission_ristournes
+            foreach ($missionRistournes as $mr) {
+                $mr['mission_id'] = $missionId;
+                $this->db->insert('mission_ristournes', $mr);
+            }
+
+            // Marquer les ristournes comme payees
+            foreach ($missionRistournes as $mr) {
+                $this->db->query(
+                    "UPDATE ristournes SET statut = 'payee', date_paiement = CURDATE() WHERE id = :id",
+                    ['id' => $mr['ristourne_id']]
+                );
+            }
 
             $this->db->commit();
-            return ['success' => true, 'id' => $missionId, 'caisses_livrees' => $caissesLivrees, 'montant_livre' => $montantLivre, 'montant_restant_admin' => $montantRestantAdmin];
+            return [
+                'success' => true,
+                'id' => $missionId,
+                'nb_ristournes' => count($missionRistournes),
+                'montant_livre' => $totalMontantLivre,
+                'montant_restant_admin' => $totalMontantRestantAdmin
+            ];
         } catch (Exception $e) {
             $this->db->rollBack();
             return ['success' => false, 'message' => $e->getMessage()];
@@ -1178,6 +1294,21 @@ class Mission extends Model
 
             // Supprimer les chargements
             $this->db->query("DELETE FROM mission_chargements WHERE mission_id = :mission_id", ['mission_id' => $id]);
+
+            // Rétablir les ristournes liées en statut calculee
+            $ristournesIds = $this->db->fetchAll(
+                "SELECT ristourne_id FROM mission_ristournes WHERE mission_id = :mission_id",
+                ['mission_id' => $id]
+            );
+            foreach ($ristournesIds as $row) {
+                $this->db->query(
+                    "UPDATE ristournes SET statut = 'calculee', date_paiement = NULL WHERE id = :id",
+                    ['id' => (int) $row['ristourne_id']]
+                );
+            }
+
+            // Supprimer les liaisons mission_ristournes
+            $this->db->query("DELETE FROM mission_ristournes WHERE mission_id = :mission_id", ['mission_id' => $id]);
 
             // Marquer la mission comme annulée
             $this->update($id, [

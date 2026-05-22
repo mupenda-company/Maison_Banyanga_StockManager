@@ -30,7 +30,7 @@ class MissionController extends Controller
      */
     public function index()
     {
-        $this->requirePermission('missions.view');
+        $this->requirePermission('missions.voir');
         
         $filters = [
             'statut' => in_array($_GET['statut'] ?? '', ['en_cours', 'terminee', 'annulee'], true) ? $_GET['statut'] : null,
@@ -103,26 +103,24 @@ class MissionController extends Controller
      */
     public function createRestourne()
     {
-        $this->requirePermission('admin.view');
+        $this->requirePermission('admin.voir');
 
         $vehicules = $this->vehiculeModel->getDisponibles();
         $produits = $this->produitModel->getWithStock();
         $zones = $this->zoneModel->getActive();
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
-        $clients = $this->clientModel->getAllWithZone();
         $ristournes = $this->db->fetchAll(
             "SELECT r.*, c.nom as client_nom, c.numero_client
              FROM ristournes r
              JOIN clients c ON r.client_id = c.id
              WHERE r.statut = 'calculee'
-             ORDER BY r.id DESC"
+             ORDER BY c.nom ASC, r.id DESC"
         );
 
         $this->view('missions/ristourne-create', [
             'vehicules' => $vehicules,
             'produits' => $produits,
             'zones' => $zones,
-            'clients' => $clients,
             'ristournes' => $ristournes,
             'emplacementPrincipal' => $emplacementPrincipal,
             'numero_mission' => $this->missionModel->generateNumeroMission('RST')
@@ -134,7 +132,7 @@ class MissionController extends Controller
      */
     public function enCours()
     {
-        $this->requirePermission('missions.view');
+        $this->requirePermission('missions.voir');
         
         $missions = $this->missionModel->getEnCours();
         
@@ -152,7 +150,7 @@ class MissionController extends Controller
      */
     public function create()
     {
-        $this->requirePermission('missions.manage');
+        $this->requirePermission('missions.gerer');
         
         $vehicules = $this->vehiculeModel->getDisponibles();
         $produits = $this->produitModel->getWithStock();
@@ -173,7 +171,7 @@ class MissionController extends Controller
      */
     public function store()
     {
-        $this->requirePermission('missions.manage');
+        $this->requirePermission('missions.gerer');
         
         $data = $this->getJsonInput();
         
@@ -344,44 +342,34 @@ class MissionController extends Controller
     }
 
     /**
-     * Enregistrer une mission de ristourne
+     * Enregistrer une mission de ristourne (plusieurs ristournes)
      */
     public function storeRestourne()
     {
-        $this->requirePermission('admin.view');
+        $this->requirePermission('admin.voir');
 
         $data = $this->getJsonInput();
 
         $errors = $this->validate($data, [
             'vehicule_id' => 'required|numeric',
             'date_depart' => 'required',
-            'client_id' => 'required|numeric',
-            'ristourne_id' => 'required|numeric',
-            'produit_id' => 'required|numeric'
+            'ristournes' => 'required'
         ]);
 
         if (!empty($errors)) {
             return $this->error('Erreurs de validation', 422, $errors);
         }
 
-        $ristourne = $this->db->fetch(
-            "SELECT r.*, c.nom as client_nom, c.zone_id
-             FROM ristournes r
-             JOIN clients c ON r.client_id = c.id
-             WHERE r.id = :id AND r.client_id = :client_id",
-            [
-                'id' => (int) $data['ristourne_id'],
-                'client_id' => (int) $data['client_id']
-            ]
-        );
-
-        if (!$ristourne) {
-            return $this->error('Ristourne introuvable pour ce client', 404);
+        $ristournesData = $data['ristournes'] ?? [];
+        if (empty($ristournesData) || !is_array($ristournesData)) {
+            return $this->error('Sélectionnez au moins une ristourne à livrer', 422);
         }
 
-        $vehicule = $this->vehiculeModel->getWithStock((int) ($data['vehicule_id'] ?? 0));
-        if (!$vehicule) {
-            return $this->error('Véhicule non trouvé', 404);
+        // Valider chaque ristourne
+        foreach ($ristournesData as $i => $ristourneItem) {
+            if (empty($ristourneItem['ristourne_id']) || empty($ristourneItem['produit_id'])) {
+                return $this->error('Chaque ristourne doit avoir un produit sélectionné', 422);
+            }
         }
 
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
@@ -390,31 +378,25 @@ class MissionController extends Controller
             'numero_mission' => $this->missionModel->generateNumeroMission('RST'),
             'vehicule_id' => $data['vehicule_id'],
             'chauffeur_id' => $data['chauffeur_id'] ?? null,
-            'client_id' => $data['client_id'],
-            'ristourne_id' => $data['ristourne_id'],
             'date_depart' => $data['date_depart'],
-            'zone_id' => $data['zone_id'] ?? ($ristourne['zone_id'] ?? null),
+            'zone_id' => $data['zone_id'] ?? null,
             'notes' => $data['notes'] ?? '',
-            'statut' => 'en_cours',
-            'montant_ristourne_initial' => (float) ($data['montant_ristourne_initial'] ?? $ristourne['montant_ristourne'] ?? 0),
             'created_by' => $_SESSION['user_id']
         ];
 
-        $result = $this->missionModel->createWithRestourne(
+        $result = $this->missionModel->createWithMultipleRestournes(
             $missionData,
-            [
-                'produit_id' => (int) $data['produit_id']
-            ],
+            $ristournesData,
             $emplacementPrincipal['id']
         );
 
         if ($result['success']) {
             return $this->success([
                 'id' => $result['id'],
-                'caisses_livrees' => $result['caisses_livrees'] ?? 0,
+                'nb_ristournes' => $result['nb_ristournes'] ?? 0,
                 'montant_livre' => $result['montant_livre'] ?? 0,
                 'montant_restant_admin' => $result['montant_restant_admin'] ?? 0
-            ], 'Mission de ristourne créée avec succès');
+            ], 'Mission de ristourne créée avec succès (' . ($result['nb_ristournes'] ?? 0) . ' ristournes)');
         }
 
         return $this->error($result['message'], 400);
@@ -425,7 +407,7 @@ class MissionController extends Controller
      */
     public function show($id)
     {
-        $this->requirePermission('missions.view');
+        $this->requirePermission('missions.voir');
         
         $mission = $this->missionModel->getWithDetails($id);
         
@@ -447,7 +429,7 @@ class MissionController extends Controller
      */
     public function edit($id)
     {
-        $this->requirePermission('missions.manage');
+        $this->requirePermission('missions.gerer');
 
         $mission = $this->missionModel->getWithDetails($id);
         if (!$mission) {
@@ -498,7 +480,7 @@ class MissionController extends Controller
      */
     public function update($id)
     {
-        $this->requirePermission('missions.manage');
+        $this->requirePermission('missions.gerer');
 
         $mission = $this->missionModel->getWithDetails($id);
         if (!$mission) {
@@ -620,7 +602,7 @@ class MissionController extends Controller
      */
     public function terminer($id)
     {
-        $this->requirePermission('missions.manage');
+        $this->requirePermission('missions.gerer');
 
         $data = $this->getJsonInput();
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
@@ -671,7 +653,7 @@ class MissionController extends Controller
      */
     public function annuler($id)
     {
-        $this->requirePermission('missions.manage');
+        $this->requirePermission('missions.gerer');
 
         $mission = $this->missionModel->getWithDetails($id);
         if (!$mission) {
@@ -697,7 +679,7 @@ class MissionController extends Controller
      */
     public function print($id)
     {
-        $this->requirePermission('missions.view');
+        $this->requirePermission('missions.voir');
         
         $mission = $this->missionModel->getWithDetails($id);
         if (!$mission) {
@@ -717,7 +699,7 @@ class MissionController extends Controller
      */
     public function facture($id)
     {
-        $this->requirePermission('missions.view');
+        $this->requirePermission('missions.voir');
 
         $mission = $this->missionModel->getWithDetails($id);
         if (!$mission) {
@@ -737,7 +719,7 @@ class MissionController extends Controller
      */
     public function synthese()
     {
-        $this->requirePermission('missions.view');
+        $this->requirePermission('missions.voir');
 
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
         $dateFin = $_GET['date_fin'] ?? date('Y-m-d');

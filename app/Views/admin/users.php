@@ -9,7 +9,7 @@ ob_start();
 <div class="card" x-data="usersManager">
     <div class="card-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Liste des utilisateurs</h2>
-        <?php if (can('admin.users')): ?>
+        <?php if (can('admin.utilisateurs')): ?>
         <button @click="openModal()" class="btn btn-primary">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -213,10 +213,14 @@ document.addEventListener('alpine:init', () => {
                 const result = await App.api(url, method, formData);
                 
                 // Sync roles separately
-                if (this.form.role_ids && this.form.role_ids.length > 0) {
+                const userId = result.id || this.editId;
+                if (userId) {
                     try {
-                        await App.api('/api/admin/users/' + (result.data?.id || this.editId) + '/roles', 'PUT', { role_ids: this.form.role_ids });
-                    } catch(e) { /* ignore role sync error */ }
+                        await App.api('/api/admin/users/' + userId + '/roles', 'PUT', { role_ids: this.form.role_ids || [] });
+                    } catch(e) {
+                        console.error('Erreur sync rôles:', e);
+                        App.notify('Erreur lors de l\'assignation des rôles', 'error');
+                    }
                 }
                 
                 if (this.editMode) {

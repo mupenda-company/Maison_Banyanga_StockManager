@@ -20,7 +20,7 @@ class ClientController extends Controller
      */
     public function index()
     {
-        $this->requirePermission('clients.view');
+        $this->requirePermission('clients.voir');
         
         $search = trim((string) ($_GET['q'] ?? ''));
         $zoneId = $_GET['zone_id'] ?? null;
@@ -78,7 +78,7 @@ class ClientController extends Controller
      */
     public function store()
     {
-        $this->requirePermission('clients.create');
+        $this->requirePermission('clients.creer');
         
         $data = $this->getJsonInput();
         
@@ -142,7 +142,7 @@ class ClientController extends Controller
      */
     public function show($id)
     {
-        $this->requirePermission('clients.view');
+        $this->requirePermission('clients.voir');
 
         $dateDebut = $_GET['date_debut'] ?? null;
         $dateFin = $_GET['date_fin'] ?? null;
@@ -212,7 +212,7 @@ class ClientController extends Controller
      */
     public function delete($id)
     {
-        $this->requirePermission('clients.delete');
+        $this->requirePermission('clients.supprimer');
         
         // Vérifier si le client a des ventes
         $hasVentes = $this->db->fetchColumn("SELECT COUNT(*) FROM ventes WHERE client_id = :id", ['id' => $id]);

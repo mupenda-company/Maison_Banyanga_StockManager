@@ -24,7 +24,7 @@ class StockController extends Controller
      */
     public function index()
     {
-        $this->requirePermission('stock.view');
+        $this->requirePermission('stock.voir');
         
         $filters = [
             'produit_id' => $_GET['produit_id'] ?? null,
@@ -64,7 +64,7 @@ class StockController extends Controller
      */
     public function inventaireInitial()
     {
-        $this->requirePermission('stock.manage');
+        $this->requirePermission('stock.gerer');
 
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
         $produits = $this->produitModel->getActive();
@@ -86,7 +86,7 @@ class StockController extends Controller
      */
     public function enregistrerInventaireInitial()
     {
-        $this->requirePermission('stock.manage');
+        $this->requirePermission('stock.gerer');
 
         $data = $this->getJsonInput();
 
@@ -178,7 +178,7 @@ class StockController extends Controller
      */
     public function inventaire()
     {
-        $this->requirePermission('stock.view');
+        $this->requirePermission('stock.voir');
         
         $filters = [
             'emplacement_id' => $_GET['emplacement_id'] ?? null,
@@ -289,7 +289,7 @@ class StockController extends Controller
      */
     public function byEmplacement($emplacementId)
     {
-        $this->requirePermission('stock.view');
+        $this->requirePermission('stock.voir');
         
         $emplacement = $this->emplacementModel->find($emplacementId);
         
@@ -317,7 +317,7 @@ class StockController extends Controller
      */
     public function mouvements()
     {
-        $this->requirePermission('stock.view');
+        $this->requirePermission('stock.voir');
 
         $printMode = isset($_GET['print']) && (string)$_GET['print'] === '1';
 
@@ -471,7 +471,7 @@ class StockController extends Controller
      */
     public function transfert()
     {
-        $this->requirePermission('stock.manage');
+        $this->requirePermission('stock.gerer');
         
         $data = $this->getJsonInput();
         
@@ -543,7 +543,7 @@ class StockController extends Controller
      */
     public function ajustement()
     {
-        $this->requirePermission('stock.manage');
+        $this->requirePermission('stock.gerer');
         
         $data = $this->getJsonInput();
         

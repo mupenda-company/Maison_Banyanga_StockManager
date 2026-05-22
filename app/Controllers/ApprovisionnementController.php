@@ -24,7 +24,7 @@ class ApprovisionnementController extends Controller
      */
     public function index()
     {
-        $this->requirePermission('approvisionnements.view');
+        $this->requirePermission('approvisionnements.voir');
         
         $filters = [
             'date_debut' => $_GET['date_debut'] ?? null,
@@ -90,7 +90,7 @@ class ApprovisionnementController extends Controller
      */
     public function create()
     {
-        $this->requirePermission('approvisionnements.view');
+        $this->requirePermission('approvisionnements.voir');
         
         $produits = $this->produitModel->getActive();
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
@@ -107,7 +107,7 @@ class ApprovisionnementController extends Controller
      */
     public function store()
     {
-        $this->requirePermission('approvisionnements.view');
+        $this->requirePermission('approvisionnements.voir');
         
         $data = $this->getJsonInput();
         
@@ -180,7 +180,7 @@ class ApprovisionnementController extends Controller
      */
     public function show($id)
     {
-        $this->requirePermission('approvisionnements.view');
+        $this->requirePermission('approvisionnements.voir');
         
         $approvisionnement = $this->approvisionnementModel->getWithDetails($id);
         
@@ -215,7 +215,7 @@ class ApprovisionnementController extends Controller
      */
     public function annuler($id)
     {
-        $this->requirePermission('approvisionnements.view');
+        $this->requirePermission('approvisionnements.voir');
         
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
         $result = $this->approvisionnementModel->annuler($id, $emplacementPrincipal['id']);
@@ -232,7 +232,7 @@ class ApprovisionnementController extends Controller
      */
     public function dettes()
     {
-        $this->requirePermission('approvisionnements.view');
+        $this->requirePermission('approvisionnements.voir');
         
         $dettes = $this->detteModel->getWithDetails(['statut' => 'en_cours']);
         $total = $this->detteModel->getTotalEnCours();
@@ -248,7 +248,7 @@ class ApprovisionnementController extends Controller
      */
     public function rembourserDette($id)
     {
-        $this->requirePermission('approvisionnements.view');
+        $this->requirePermission('approvisionnements.voir');
         
         $data = $this->getJsonInput();
         
