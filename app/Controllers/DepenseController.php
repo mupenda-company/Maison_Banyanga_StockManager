@@ -92,4 +92,48 @@ class DepenseController extends Controller
         
         return $this->success(null, 'Dépense supprimée');
     }
+    
+    /**
+     * Afficher le détail d'une dépense pour impression
+     */
+    public function print($id)
+    {
+        $this->requireAuth();
+        $this->requirePermission('depenses.voir');
+        
+        $depense = $this->depenseModel->getWithUser($id);
+        if (!$depense) {
+            throw new Exception("Dépense non trouvée");
+        }
+        
+        $this->view('depenses/print', [
+            'depense' => $depense,
+            'pageTitle' => 'Détail Dépense #' . $id
+        ]);
+    }
+    
+    /**
+     * Afficher toutes les dépenses pour impression
+     */
+    public function printAll()
+    {
+        $this->requireAuth();
+        $this->requirePermission('depenses.voir');
+        
+        $filters = [
+            'categorie' => $_GET['categorie'] ?? null,
+            'date_debut' => $_GET['date_debut'] ?? date('Y-m-01'),
+            'date_fin' => $_GET['date_fin'] ?? date('Y-m-d')
+        ];
+        
+        $depenses = $this->depenseModel->getAllWithFilters($filters);
+        $stats = $this->depenseModel->getStats($filters['date_debut'], $filters['date_fin']);
+        
+        $this->view('depenses/print-all', [
+            'depenses' => $depenses,
+            'filters' => $filters,
+            'stats' => $stats,
+            'pageTitle' => 'Liste des Dépenses'
+        ]);
+    }
 }

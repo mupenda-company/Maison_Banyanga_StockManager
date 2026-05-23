@@ -9,14 +9,24 @@ ob_start();
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Dépenses</h1>
         <p class="text-gray-500 dark:text-gray-400">Gestion des dépenses opérationnelles</p>
     </div>
-    <?php if (can('depenses.creer')): ?>
-    <a href="<?= url('depenses/create') ?>" class="btn btn-primary">
-        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-        </svg>
-        Ajouter une dépense
-    </a>
-    <?php endif; ?>
+    <div class="flex items-center gap-3">
+        <?php if (can('depenses.voir')): ?>
+        <a href="<?= url('depenses/print') ?>?<?= http_build_query($filters ?? []) ?>" class="btn btn-secondary" target="_blank">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2h2a2 2 0 002-2z"/>
+            </svg>
+            Imprimer tout
+        </a>
+        <?php endif; ?>
+        <?php if (can('depenses.creer')): ?>
+        <a href="<?= url('depenses/create') ?>" class="btn btn-primary">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Ajouter une dépense
+        </a>
+        <?php endif; ?>
+    </div>
 </div>
 
 <!-- Stats -->
@@ -130,11 +140,16 @@ ob_start();
                         <td class="py-3 px-4 text-right font-semibold text-red-600 dark:text-red-400"><?= format_money_converted($d['montant']) ?></td>
                         <td class="py-3 px-4 text-gray-600 dark:text-gray-400"><?= htmlspecialchars(($d['created_by_prenom'] ?? '') . ' ' . ($d['created_by_nom'] ?? '')) ?></td>
                         <td class="py-3 px-4 text-center">
-                            <?php if (can('depenses.supprimer')): ?>
-                            <button onclick="deleteDepense(<?= $d['id'] ?>)" class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" title="Supprimer">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                            </button>
-                            <?php endif; ?>
+                            <div class="flex items-center justify-center gap-2">
+                                <a href="<?= url('depenses/' . $d['id'] . '/print') ?>" class="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300" title="Imprimer">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2h2a2 2 0 002-2z"/></svg>
+                                </a>
+                                <?php if (can('depenses.supprimer')): ?>
+                                <button onclick="deleteDepense(<?= $d['id'] ?>)" class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" title="Supprimer">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                </button>
+                                <?php endif; ?>
+                            </div>
                         </td>
                     </tr>
                     <?php endforeach; ?>

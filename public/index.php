@@ -154,6 +154,8 @@ $routes = [
     // Dépenses
     'GET::/depenses' => ['DepenseController', 'index'],
     'GET::/depenses/create' => ['DepenseController', 'create'],
+    'GET::/depenses/print' => ['DepenseController', 'printAll'],
+    'GET::/depenses/(\d+)/print' => ['DepenseController', 'print'],
     'POST::/api/depenses' => ['DepenseController', 'store'],
     'DELETE::/api/depenses/(\d+)' => ['DepenseController', 'delete'],
     
