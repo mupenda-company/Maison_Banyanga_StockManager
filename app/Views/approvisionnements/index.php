@@ -148,10 +148,10 @@ ob_start();
 function getPrixCaisse(produit, typeAchat) {
     if (!produit) return 0;
     if (typeAchat === 'enlever' && produit.prix_achat_enlever > 0) {
-        return produit.prix_achat_enlever * produit.bouteilles_par_caisses;
+        return produit.prix_achat_enlever;
     }
     if (typeAchat === 'deposer' && produit.prix_achat_deposer > 0) {
-        return produit.prix_achat_deposer * produit.bouteilles_par_caisses;
+        return produit.prix_achat_deposer;
     }
     return produit.prix_achat_caisse || (produit.prix_achat_unitaire * produit.bouteilles_par_caisses);
 }

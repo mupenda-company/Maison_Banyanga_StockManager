@@ -35,9 +35,11 @@ ob_start();
                         <th>Code</th>
                         <th>Nom</th>
                         <th>Catégorie</th>
-                        <th>Prix achat caisse</th>
+                        <th>Prix achat Déposer</th>
+                        <th>Prix achat Enlever</th>
                         <th>Prix vente caisse</th>
                         <th>Stock (Caisses)</th>
+                        <th>Caisses/palette</th>
                         <th>Seuil</th>
                         <th>Statut</th>
                         <th class="text-right">Actions</th>
@@ -62,8 +64,13 @@ ob_start();
                             </td>
                             <td><?= htmlspecialchars($produit['categorie'] ?? '-') ?></td>
                             <td>
-                                <span class="font-medium">
-                                    <?= format_money_converted(($produit['prix_achat_unitaire'] ?? 0) * ($produit['bouteilles_par_caisses'] ?? 24)) ?>
+                                <span class="font-medium text-blue-600">
+                                    <?= format_money_converted($produit['prix_achat_deposer'] ?? 0) ?>
+                                </span>
+                            </td>
+                            <td>
+                                <span class="font-medium text-indigo-600">
+                                    <?= format_money_converted($produit['prix_achat_enlever'] ?? 0) ?>
                                 </span>
                             </td>
                             <td>
@@ -82,6 +89,9 @@ ob_start();
                                 <div class="text-xs text-gray-500">
                                     <?= $produit['stock_plein'] ?> bouteilles
                                 </div>
+                            </td>
+                            <td>
+                                <span class="font-medium"><?= $produit['caisses_par_palette'] ?? '-' ?></span>
                             </td>
                             <td><?= $produit['seuil_alerte'] ?></td>
                             <td>
@@ -207,6 +217,10 @@ ob_start();
                                 <input type="number" x-model.number="form.prix_vente_caisses" class="input border-green-300 focus:border-green-500" required step="0.01" min="0">
                             </div>
                             <div>
+                                <label class="label">Caisses par palette</label>
+                                <input type="number" x-model.number="form.caisses_par_palette" class="input" min="0">
+                            </div>
+                            <div>
                                 <label class="label">Seuil d'alerte (en caisses)</label>
                                 <input type="number" x-model.number="form.seuil_alerte" class="input" min="0">
                             </div>
@@ -240,6 +254,7 @@ document.addEventListener('alpine:init', () => {
             description: '',
             categorie: '',
             bouteilles_par_caisses: 24,
+            caisses_par_palette: 0,
             prix_achat_deposer: '',
             prix_achat_enlever: '',
             prix_vente_caisses: '',
@@ -257,6 +272,7 @@ document.addEventListener('alpine:init', () => {
                 description: '',
                 categorie: '',
                 bouteilles_par_caisses: 24,
+                caisses_par_palette: 0,
                 prix_achat_deposer: '',
                 prix_achat_enlever: '',
                 prix_vente_caisses: '',
@@ -288,8 +304,8 @@ document.addEventListener('alpine:init', () => {
             const devise = window.DEVISE || 'CDF';
             const baseDevise = window.BASE_DEVISE || 'CDF';
             const btl = parseInt(produit.bouteilles_par_caisses) || 24;
-            const prixAchatDeposerCaisse = App.convertMoney(parseFloat(produit.prix_achat_deposer || 0) * btl, baseDevise, devise);
-            const prixAchatEnleverCaisse = App.convertMoney(parseFloat(produit.prix_achat_enlever || 0) * btl, baseDevise, devise);
+            const prixAchatDeposerCaisse = App.convertMoney(parseFloat(produit.prix_achat_deposer || 0), baseDevise, devise);
+            const prixAchatEnleverCaisse = App.convertMoney(parseFloat(produit.prix_achat_enlever || 0), baseDevise, devise);
             const prixVenteCaisse = App.convertMoney(parseFloat(produit.prix_vente_caisses || produit.prix_vente_unitaire * btl || 0), baseDevise, devise);
 
             this.form = {
@@ -350,10 +366,10 @@ document.addEventListener('alpine:init', () => {
                 const prixVenteCaisseBase = App.convertMoney(prixVenteCaisseDevise, devise, baseDevise);
 
                 const payload = { ...this.form };
-                payload.prix_achat_unitaire = parseFloat((prixAchatEnleverCaisseBase / btl).toFixed(2));
-                payload.prix_achat_deposer = parseFloat((prixAchatDeposerCaisseBase / btl).toFixed(2));
-                payload.prix_achat_enlever = parseFloat((prixAchatEnleverCaisseBase / btl).toFixed(2));
-                payload.prix_vente_unitaire = parseFloat((prixVenteCaisseBase / btl).toFixed(2));
+                // Keep the price-per-case as provided and send it to the server as source of truth.
+                // Avoid computing and rounding the unit price here to prevent later mismatches.
+                payload.prix_achat_deposer = parseFloat(prixAchatDeposerCaisseBase.toFixed(2));
+                payload.prix_achat_enlever = parseFloat(prixAchatEnleverCaisseBase.toFixed(2));
                 payload.prix_vente_caisses = parseFloat(prixVenteCaisseBase.toFixed(2));
 
                 const result = await App.api(url, method, payload);

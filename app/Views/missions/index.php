@@ -108,6 +108,7 @@ ob_start();
                 </thead>
                 <tbody>
                     <?php foreach ($missions as $mission): ?>
+                    <?php $totalCs = (int) ($mission['total_caisses'] ?? 0); ?>
                     <tr>
                         <td>
                             <?php if (($mission['type_mission'] ?? 'vente') === 'ristourne'): ?>
@@ -130,10 +131,10 @@ ob_start();
                         <td>
                             <?php if (($mission['type_mission'] ?? 'vente') === 'ristourne'): ?>
                                 <div class="font-medium"><?= format_money_converted($mission['montant_ristourne_initial'] ?? 0) ?></div>
-                                <div class="text-xs text-gray-500"><?= number_format((int) ($mission['total_caisses'] ?? 0), 0, '.', ' ') ?> cs livrées</div>
-                                <div class="text-xs text-gray-500">Reste admin: <?= format_money_converted($mission['montant_restant_admin'] ?? 0) ?></div>
+                                <div class="text-xs text-gray-500"><?= number_format($totalCs, 0, '.', ' ') ?> cs <?= $totalCs <= 1 ? 'livrée' : 'livrées' ?></div>
+                                
                             <?php else: ?>
-                                <div class="font-medium"><?= number_format((int) ($mission['total_caisses'] ?? 0), 0, '.', ' ') ?> caisses</div>
+                                <div class="font-medium"><?= number_format($totalCs, 0, '.', ' ') ?> <?= $totalCs <= 1 ? 'caisse' : 'caisses' ?></div>
                                 <div class="text-xs text-gray-500"><?= $mission['nb_clients'] ?? 0 ?> client(s)</div>
                             <?php endif; ?>
                         </td>

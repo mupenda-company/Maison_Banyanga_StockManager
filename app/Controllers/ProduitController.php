@@ -125,10 +125,9 @@ class ProduitController extends Controller
         $errors = $this->validate($data, [
             'code' => 'required|unique:produits,code',
             'nom' => 'required',
-            'prix_achat_unitaire' => 'required|numeric',
             'prix_achat_deposer' => 'numeric',
             'prix_achat_enlever' => 'numeric',
-            'prix_vente_unitaire' => 'required|numeric',
+            'prix_vente_caisses' => 'required|numeric',
             'bouteilles_par_caisses' => 'required|numeric',
             'seuil_alerte' => 'numeric'
         ]);
@@ -137,6 +136,21 @@ class ProduitController extends Controller
             return $this->error('Erreurs de validation', 422, $errors);
         }
         
+        // Compute unit prices server-side based on the provided case prices to avoid client-side rounding issues.
+        $prixAchatEnlever = isset($data['prix_achat_enlever']) ? (float)$data['prix_achat_enlever'] : null; // expected as price per case
+        $prixAchatDeposer = isset($data['prix_achat_deposer']) ? (float)$data['prix_achat_deposer'] : null; // expected as price per case
+        $btl = isset($data['bouteilles_par_caisses']) && $data['bouteilles_par_caisses'] > 0 ? (int)$data['bouteilles_par_caisses'] : 1;
+        $prixVenteCaisses = isset($data['prix_vente_caisses']) ? (float)$data['prix_vente_caisses'] : 0;
+
+        // Derive unit prices from case prices
+        if ($prixAchatEnlever !== null) {
+            $prixAchatUnitaire = $prixAchatEnlever / max(1, $btl);
+        } else {
+            $prixAchatUnitaire = isset($data['prix_achat_unitaire']) ? (float)$data['prix_achat_unitaire'] : 0;
+        }
+
+        $prixVenteUnitaire = isset($data['prix_vente_unitaire']) && $data['prix_vente_unitaire'] > 0 ? (float)$data['prix_vente_unitaire'] : ($btl > 0 ? ($prixVenteCaisses / $btl) : 0);
+
         $id = $this->produitModel->create([
             'code' => $data['code'],
             'nom' => $data['nom'],
@@ -144,11 +158,11 @@ class ProduitController extends Controller
             'categorie' => $data['categorie'] ?? null,
             'unite_base' => $data['unite_base'] ?? 'bouteille',
             'bouteilles_par_caisses' => $data['bouteilles_par_caisses'],
-            'prix_achat_unitaire' => $data['prix_achat_enlever'] ?? $data['prix_achat_unitaire'],
-            'prix_achat_deposer' => $data['prix_achat_deposer'] ?? 0,
-            'prix_achat_enlever' => $data['prix_achat_enlever'] ?? 0,
-            'prix_vente_unitaire' => $data['prix_vente_unitaire'],
-            'prix_vente_caisses' => $data['prix_vente_caisses'] ?? 0,
+            'prix_achat_unitaire' => $prixAchatUnitaire,
+            'prix_achat_deposer' => $prixAchatDeposer ?? 0,
+            'prix_achat_enlever' => $prixAchatEnlever ?? 0,
+            'prix_vente_unitaire' => $prixVenteUnitaire,
+            'prix_vente_caisses' => $prixVenteCaisses,
             'seuil_alerte' => $data['seuil_alerte'] ?? DEFAULT_ALERT_THRESHOLD,
             'actif' => 1
         ]);
@@ -193,7 +207,7 @@ class ProduitController extends Controller
             'prix_achat_unitaire' => 'numeric',
             'prix_achat_deposer' => 'numeric',
             'prix_achat_enlever' => 'numeric',
-            'prix_vente_unitaire' => 'numeric'
+            'prix_vente_caisses' => 'numeric'
         ]);
         
         if (!empty($errors)) {
@@ -214,7 +228,14 @@ class ProduitController extends Controller
         ]));
         
         if (isset($data['prix_achat_enlever'])) {
-            $updateData['prix_achat_unitaire'] = $data['prix_achat_enlever'];
+            $btlUpd = isset($data['bouteilles_par_caisses']) && $data['bouteilles_par_caisses'] > 0 ? (int)$data['bouteilles_par_caisses'] : (int)($produit['bouteilles_par_caisses'] ?? 1);
+            $updateData['prix_achat_unitaire'] = (float)$data['prix_achat_enlever'] / max(1, $btlUpd);
+        }
+
+        // If a case price was provided, compute and store the unit sale price server-side
+        if (isset($data['prix_vente_caisses'])) {
+            $btl = isset($data['bouteilles_par_caisses']) && $data['bouteilles_par_caisses'] > 0 ? (int)$data['bouteilles_par_caisses'] : (int)($produit['bouteilles_par_caisses'] ?? 1);
+            $updateData['prix_vente_unitaire'] = (float)$data['prix_vente_caisses'] / max(1, $btl);
         }
         
         $this->produitModel->update($id, $updateData);

@@ -8,7 +8,8 @@ class Produit extends Model
     protected $table = 'produits';
     protected $fillable = [
         'code', 'nom', 'description', 'categorie', 'unite_base',
-        'bouteilles_par_caisses', 'prix_achat_unitaire', 'prix_achat_deposer', 'prix_achat_enlever',
+        'bouteilles_par_caisses', 'caisses_par_palette',
+        'prix_achat_unitaire', 'prix_achat_deposer', 'prix_achat_enlever',
         'prix_vente_unitaire', 'prix_vente_caisses', 'seuil_alerte', 'actif'
     ];
     

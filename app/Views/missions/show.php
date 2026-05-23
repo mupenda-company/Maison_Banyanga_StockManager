@@ -96,12 +96,7 @@ ob_start();
                             <?= format_money_converted($mission['montant_livre'] ?? 0) ?>
                         </p>
                     </div>
-                    <div>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Reste administration</p>
-                        <p class="font-medium text-gray-900 dark:text-white">
-                            <?= format_money_converted($mission['montant_restant_admin'] ?? 0) ?>
-                        </p>
-                    </div>
+                    
                     <?php endif; ?>
                     <div>
                         <p class="text-sm text-gray-500 dark:text-gray-400">Statut</p>
@@ -129,11 +124,17 @@ ob_start();
                         <div class="flex items-center justify-between py-2 border-b last:border-0">
                             <div>
                                 <p class="font-medium text-gray-900 dark:text-white"><?= htmlspecialchars($mr['client_nom'] ?? 'N/A') ?><?= !empty($mr['numero_client']) ? ' (' . htmlspecialchars($mr['numero_client']) . ')' : '' ?></p>
-                                <p class="text-xs text-gray-500"><?= htmlspecialchars($mr['produit_nom'] ?? 'N/A') ?> — <?= (int) ($mr['caisses_livrees'] ?? 0) ?> cs</p>
+                                <?php
+                                    $btlPerCaseMr = (int)($mr['bouteilles_par_caisses'] ?? 24);
+                                    if ($btlPerCaseMr <= 0) $btlPerCaseMr = 24;
+                                    $totalBtlMr = (int)($mr['bouteilles_livrees'] ?? ((int)($mr['caisses_livrees'] ?? 0) * $btlPerCaseMr));
+                                    $fullCasesMr = (int) ($mr['caisses_livrees'] ?? 0);
+                                    $extraBtlMr = max(0, $totalBtlMr - ($fullCasesMr * $btlPerCaseMr));
+                                ?>
+                                <p class="text-xs text-gray-500"><?= htmlspecialchars($mr['produit_nom'] ?? 'N/A') ?> — <?= $fullCasesMr ?> cs<?= $extraBtlMr > 0 ? ' + ' . $extraBtlMr . ' bt' : '' ?></p>
                             </div>
                             <div class="text-right">
                                 <p class="text-sm font-semibold"><?= format_money_converted($mr['montant_ristourne'] ?? 0) ?></p>
-                                <p class="text-xs text-amber-600">Reste: <?= format_money_converted($mr['montant_restant_admin'] ?? 0) ?></p>
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -226,11 +227,16 @@ ob_start();
                                     <p class="text-sm text-gray-500">Produit: <?= htmlspecialchars($mr['produit_nom'] ?? 'N/A') ?></p>
                                 </div>
                                 <div class="text-right">
-                                    <p class="font-semibold"><?= (int) ($mr['caisses_livrees'] ?? 0) ?> caisses</p>
+                                    <?php
+                                        $btlPerCaseMr2 = (int)($mr['bouteilles_par_caisses'] ?? 24);
+                                        if ($btlPerCaseMr2 <= 0) $btlPerCaseMr2 = 24;
+                                        $totalBtlMr2 = (int)($mr['bouteilles_livrees'] ?? ((int)($mr['caisses_livrees'] ?? 0) * $btlPerCaseMr2));
+                                        $fullCasesMr2 = (int) ($mr['caisses_livrees'] ?? 0);
+                                        $extraBtlMr2 = max(0, $totalBtlMr2 - ($fullCasesMr2 * $btlPerCaseMr2));
+                                    ?>
+                                    <p class="font-semibold"><?= $fullCasesMr2 ?> caisses<?= $extraBtlMr2 > 0 ? ' + ' . $extraBtlMr2 . ' bouteilles' : '' ?></p>
                                     <p class="text-sm text-gray-500"><?= format_money_converted($mr['montant_livre'] ?? 0) ?></p>
-                                    <?php if (($mr['montant_restant_admin'] ?? 0) > 0): ?>
-                                    <p class="text-xs text-amber-600">Reste admin: <?= format_money_converted($mr['montant_restant_admin'] ?? 0) ?></p>
-                                    <?php endif; ?>
+                                    
                                 </div>
                             </div>
                         </div>
@@ -321,12 +327,7 @@ ob_start();
                             <?= format_money_converted($mission['montant_livre'] ?? 0) ?>
                         </p>
                     </div>
-                    <div>
-                        <p class="text-sm text-gray-500">Reste administration</p>
-                        <p class="text-xl font-bold text-amber-600">
-                            <?= format_money_converted($mission['montant_restant_admin'] ?? 0) ?>
-                        </p>
-                    </div>
+                    
                     <?php else: ?>
                     <div>
                         <p class="text-sm text-gray-500">Caisses vendues</p>

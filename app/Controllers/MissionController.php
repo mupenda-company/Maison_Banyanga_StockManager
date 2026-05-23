@@ -66,18 +66,15 @@ class MissionController extends Controller
         
         $missions = $this->db->fetchAll(
             "SELECT m.*, v.immatriculation, u.nom as agent_nom, u.prenom as agent_prenom, z.nom as zone_nom, c.nom as client_nom,
-                    CASE
-                        WHEN COALESCE(m.type_mission, 'vente') = 'ristourne' THEN COALESCE(m.montant_ristourne_initial, 0)
-                        ELSE COALESCE((SELECT SUM(COALESCE(mc.quantite_caisses, 0))
-                                      FROM mission_chargements mc
-                                      WHERE mc.mission_id = m.id), 0)
-                    END as total_caisses,
+                    -- total_caisses should represent actual delivered/loading caisses
+                    COALESCE((SELECT SUM(COALESCE(mc.quantite_caisses, 0)) FROM mission_chargements mc WHERE mc.mission_id = m.id), 0)
+                    + COALESCE((SELECT SUM(COALESCE(mr.caisses_livrees, 0)) FROM mission_ristournes mr WHERE mr.mission_id = m.id), 0)
+                    as total_caisses,
                     COALESCE((SELECT COUNT(DISTINCT v2.client_id)
                               FROM ventes v2
                               WHERE v2.mission_id = m.id AND v2.statut = 'validee' AND COALESCE(m.type_mission, 'vente') = 'vente'), 0) as nb_clients,
                     COALESCE(m.montant_ristourne_initial, 0) as montant_ristourne_initial,
-                    COALESCE(m.montant_livre, 0) as montant_livre,
-                    COALESCE(m.montant_restant_admin, 0) as montant_restant_admin
+                    COALESCE(m.montant_livre, 0) as montant_livre
              FROM missions m
              JOIN vehicules v ON m.vehicule_id = v.id
              LEFT JOIN users u ON v.agent_responsable_id = u.id
@@ -394,8 +391,7 @@ class MissionController extends Controller
             return $this->success([
                 'id' => $result['id'],
                 'nb_ristournes' => $result['nb_ristournes'] ?? 0,
-                'montant_livre' => $result['montant_livre'] ?? 0,
-                'montant_restant_admin' => $result['montant_restant_admin'] ?? 0
+                'montant_livre' => $result['montant_livre'] ?? 0
             ], 'Mission de ristourne créée avec succès (' . ($result['nb_ristournes'] ?? 0) . ' ristournes)');
         }
 

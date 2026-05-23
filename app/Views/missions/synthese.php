@@ -40,10 +40,7 @@ $printMode = $printMode ?? false;
                 <?php if (!empty($params['rccm'])): ?><p class="text-xs text-gray-600">RCCM: <?= htmlspecialchars($params['rccm']) ?></p><?php endif; ?>
                 <?php if (!empty($params['id_nat'])): ?><p class="text-xs text-gray-600">ID NAT: <?= htmlspecialchars($params['id_nat']) ?></p><?php endif; ?>
                 <?php if (!empty($params['nif'])): ?><p class="text-xs text-gray-600">NIF: <?= htmlspecialchars($params['nif']) ?></p><?php endif; ?>
-            </div>
-            <div class="text-center self-center">
-                <h2 class="text-sm font-bold text-blue-600 uppercase">Synthèse des missions</h2>
-                <p class="text-xs text-gray-600 mt-1">
+                    
                     Du <?= date('d/m/Y', strtotime($dateDebut)) ?> au <?= date('d/m/Y', strtotime($dateFin)) ?>
                 </p>
                 <?php if ($statut): ?>
@@ -53,10 +50,7 @@ $printMode = $printMode ?? false;
                 <?php else: ?>
                 <p class="text-xs text-gray-500 mt-1">Toutes les missions</p>
                 <?php endif; ?>
-            </div>
-            <div class="text-right text-xs text-gray-600 self-center">
-                <p class="uppercase font-semibold tracking-wide text-gray-500">Rapport</p>
-                <p class="font-semibold text-gray-900"><?= date('d/m/Y H:i') ?></p>
+                    
             </div>
         </div>
 
@@ -353,10 +347,7 @@ $printMode = $printMode ?? false;
                         <span class="text-gray-500">Montant livré :</span>
                         <span class="font-medium"><?= format_money_converted((float)($mission['montant_livre'] ?? 0)) ?></span>
                     </div>
-                    <div>
-                        <span class="text-gray-500">Reste admin :</span>
-                        <span class="font-medium"><?= format_money_converted((float)($mission['montant_restant_admin'] ?? 0)) ?></span>
-                    </div>
+                    
                 </div>
                 <?php endif; ?>
 

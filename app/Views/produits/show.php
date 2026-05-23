@@ -47,11 +47,11 @@ ob_start();
                     </div>
                     <div>
                         <p class="text-sm text-gray-500 dark:text-gray-400">Prix d'achat à Déposer / Caisse</p>
-                        <p class="font-medium text-blue-600"><?= format_money_converted(($produit['prix_achat_deposer'] ?? 0) * ($produit['bouteilles_par_caisses'] ?? 1)) ?></p>
+                        <p class="font-medium text-blue-600"><?= format_money_converted($produit['prix_achat_deposer'] ?? 0) ?></p>
                     </div>
                     <div>
                         <p class="text-sm text-gray-500 dark:text-gray-400">Prix d'achat à Enlever / Caisse (base)</p>
-                        <p class="font-medium text-indigo-600"><?= format_money_converted(($produit['prix_achat_enlever'] ?? 0) * ($produit['bouteilles_par_caisses'] ?? 1)) ?></p>
+                        <p class="font-medium text-indigo-600"><?= format_money_converted($produit['prix_achat_enlever'] ?? 0) ?></p>
                     </div>
                     <div>
                         <p class="text-sm text-gray-500 dark:text-gray-400">Prix de vente / Caisse</p>
@@ -214,8 +214,8 @@ document.addEventListener('alpine:init', () => {
             code: '<?= addslashes($produit['code']) ?>',
             nom: '<?= addslashes($produit['nom']) ?>',
             description: '<?= addslashes($produit['description'] ?? '') ?>',
-            prix_achat_deposer: <?= ($produit['prix_achat_deposer'] ?? 0) * ($produit['bouteilles_par_caisses'] ?? 1) ?>,
-            prix_achat_enlever: <?= ($produit['prix_achat_enlever'] ?? 0) * ($produit['bouteilles_par_caisses'] ?? 1) ?>,
+            prix_achat_deposer: <?= ($produit['prix_achat_deposer'] ?? 0) ?>,
+            prix_achat_enlever: <?= ($produit['prix_achat_enlever'] ?? 0) ?>,
             prix_vente_caisses: <?= $produit['prix_vente_caisses'] ?? ($produit['prix_vente_unitaire'] * ($produit['bouteilles_par_caisses'] ?? 1)) ?>,
             seuil_alerte: <?= $produit['seuil_alerte'] ?>
         },
@@ -252,10 +252,9 @@ document.addEventListener('alpine:init', () => {
                 const prixAchatDeposerCaisse = App.convertMoney(parseFloat(payload.prix_achat_deposer || 0), devise, baseDevise);
                 const prixAchatEnleverCaisse = App.convertMoney(parseFloat(payload.prix_achat_enlever || 0), devise, baseDevise);
                 const prixVenteCaisse = App.convertMoney(parseFloat(payload.prix_vente_caisses || 0), devise, baseDevise);
-                payload.prix_achat_unitaire = parseFloat((prixAchatEnleverCaisse / btl).toFixed(2));
-                payload.prix_achat_deposer = parseFloat((prixAchatDeposerCaisse / btl).toFixed(2));
-                payload.prix_achat_enlever = parseFloat((prixAchatEnleverCaisse / btl).toFixed(2));
-                payload.prix_vente_unitaire = parseFloat((prixVenteCaisse / btl).toFixed(2));
+                // Send case prices as-is; server will derive unit prices server-side.
+                payload.prix_achat_deposer = parseFloat(prixAchatDeposerCaisse.toFixed(2));
+                payload.prix_achat_enlever = parseFloat(prixAchatEnleverCaisse.toFixed(2));
                 payload.prix_vente_caisses = parseFloat(prixVenteCaisse.toFixed(2));
 
                 const result = await App.api('/api/produits/<?= $produit['id'] ?>', 'PUT', payload);

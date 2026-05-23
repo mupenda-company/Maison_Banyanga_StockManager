@@ -127,6 +127,7 @@ CREATE TABLE IF NOT EXISTS `produits` (
     `prix_achat_enlever` DECIMAL(12,2) NOT NULL DEFAULT 0,
     `prix_vente_unitaire` DECIMAL(12,2) NOT NULL DEFAULT 0,
     `prix_vente_caisses` DECIMAL(12,2) NOT NULL DEFAULT 0,
+    `caisses_par_palette` INT NOT NULL DEFAULT 0 COMMENT 'Nombre de caisses par palette',
     `seuil_alerte` INT NOT NULL DEFAULT 10,
     `actif` TINYINT(1) NOT NULL DEFAULT 1,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -356,40 +357,8 @@ CREATE TABLE IF NOT EXISTS `pertes` (
     FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- --------------------------------------------------------
--- Structure de la table `paliers_ristourne`
--- --------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `paliers_ristourne` (
-    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    `nom` VARCHAR(100) NOT NULL,
-    `ca_min` DECIMAL(15,2) NOT NULL COMMENT 'CA minimum pour ce palier',
-    `ca_max` DECIMAL(15,2) NULL COMMENT 'CA maximum (NULL = sans limite)',
-    `taux_ristourne` DECIMAL(5,2) NOT NULL COMMENT 'Pourcentage de ristourne',
-    `actif` TINYINT(1) NOT NULL DEFAULT 1,
-    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- --------------------------------------------------------
--- Structure de la table `ristournes`
--- --------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `ristournes` (
-    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    `client_id` INT UNSIGNED NOT NULL,
-    `periode_debut` DATE NOT NULL,
-    `periode_fin` DATE NOT NULL,
-    `ca_total` DECIMAL(15,2) NOT NULL,
-    `palier_id` INT UNSIGNED,
-    `taux_applique` DECIMAL(5,2) NOT NULL,
-    `montant_ristourne` DECIMAL(15,2) NOT NULL,
-    `statut` ENUM('calculee', 'payee', 'annulee') NOT NULL DEFAULT 'calculee',
-    `date_paiement` DATE NULL,
-    `notes` TEXT,
-    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON DELETE CASCADE,
-    FOREIGN KEY (`palier_id`) REFERENCES `paliers_ristourne`(`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 -- --------------------------------------------------------
 -- Structure de la table `mouvements_stock`
@@ -458,15 +427,6 @@ ALTER TABLE pertes ADD COLUMN type_stock ENUM('plein', 'vide') NOT NULL DEFAULT 
 -- Ristournes
 -- --------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS `ristourne_paliers` (
-    `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `quantite_min` DECIMAL(15,2) NOT NULL,
-    `quantite_max` DECIMAL(15,2) DEFAULT NULL,
-    `montant_par_caisse` DECIMAL(15,2) NOT NULL,
-    `type_produit` VARCHAR(50) DEFAULT 'tous',
-    `actif` TINYINT(1) DEFAULT 1,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `ristournes` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -483,11 +443,6 @@ CREATE TABLE IF NOT EXISTS `ristournes` (
     FOREIGN KEY (`created_by`) REFERENCES `users`(`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Données par défaut pour les paliers
-INSERT INTO `ristourne_paliers` (`quantite_min`, `quantite_max`, `montant_par_caisse`) VALUES
-(0, 100, 0.10),
-(101, 500, 0.25),
-(501, NULL, 0.50);
 
 -- --------------------------------------------------------
 -- Données initiales
@@ -532,12 +487,7 @@ INSERT INTO `produits` (`id`, `code`, `nom`, `description`, `categorie`, `unite_
 (10, 'PRD-0010', 'ENERGY MALT 33CL', '', 'Alcolisé', 'caisse', 24, 1551.42, 1666.67, 40000.00, 10, 1),
 (11, 'PRD-0011', 'LEGEND 33CL', '', 'Alcolisé', 'caisse', 24, 2026.42, 2166.67, 52000.00, 10, 1);
 
--- Paliers de ristourne par défaut
-INSERT INTO `paliers_ristourne` (`nom`, `ca_min`, `ca_max`, `taux_ristourne`) VALUES
-('Bronze', 0, 500000, 2.00),
-('Argent', 500000, 1000000, 3.00),
-('Or', 1000000, 2500000, 5.00),
-('Platine', 2500000, NULL, 7.00);
+
 
 -- Rôles système
 INSERT INTO `roles` (`nom`, `description`, `is_system`) VALUES

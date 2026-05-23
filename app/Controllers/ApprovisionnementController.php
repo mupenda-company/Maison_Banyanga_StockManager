@@ -139,22 +139,25 @@ class ApprovisionnementController extends Controller
             $produit = $this->produitModel->find($detail['produit_id']);
             $typeAchat = $detail['type_achat'] ?? 'deposer';
             
+            // Determine case price (prix_caisse) based on product fields. These are stored as price per case.
             if ($typeAchat === 'enlever' && $produit['prix_achat_enlever'] > 0) {
-                $prixUnitaire = $produit['prix_achat_enlever'];
+                $prixCaisse = $produit['prix_achat_enlever'];
             } elseif ($typeAchat === 'deposer' && $produit['prix_achat_deposer'] > 0) {
-                $prixUnitaire = $produit['prix_achat_deposer'];
+                $prixCaisse = $produit['prix_achat_deposer'];
             } else {
-                $prixUnitaire = $produit['prix_achat_unitaire'];
+                // Fallback: compute case price from unit price
+                $prixCaisse = $produit['prix_achat_unitaire'] * $produit['bouteilles_par_caisses'];
             }
-            
-            $sousTotal = $detail['quantite_caisses'] * $prixUnitaire * $produit['bouteilles_par_caisses'];
+
+            $sousTotal = $detail['quantite_caisses'] * $prixCaisse;
             $totalHt += $sousTotal;
-            
+
             $details[] = [
                 'produit_id' => $detail['produit_id'],
                 'quantite_caisses' => $detail['quantite_caisses'],
                 'quantite_bouteilles' => $detail['quantite_caisses'] * $produit['bouteilles_par_caisses'],
-                'prix_unitaire' => $prixUnitaire,
+                'prix_unitaire' => $prixCaisse / max(1, $produit['bouteilles_par_caisses']),
+                'prix_caisse' => $prixCaisse,
                 'type_achat' => $typeAchat,
                 'sous_total' => $sousTotal
             ];

@@ -9,7 +9,7 @@ class Mission extends Model
     protected $fillable = [
         'numero_mission', 'type_mission', 'vehicule_id', 'chauffeur_id', 'client_id', 'ristourne_id',
         'date_depart', 'date_retour', 'zone_id', 'notes', 'justification_cloture', 'statut',
-        'montant_encaisse', 'montant_ristourne_initial', 'montant_livre', 'montant_restant_admin',
+        'montant_encaisse', 'montant_ristourne_initial', 'montant_livre',
         'caisses_vides_retournees', 'created_by'
     ];
 
@@ -101,7 +101,6 @@ class Mission extends Model
             'ristourne_id' => "ALTER TABLE missions ADD ristourne_id INT UNSIGNED NULL AFTER client_id",
             'montant_ristourne_initial' => "ALTER TABLE missions ADD montant_ristourne_initial DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER notes",
             'montant_livre' => "ALTER TABLE missions ADD montant_livre DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER montant_ristourne_initial",
-            'montant_restant_admin' => "ALTER TABLE missions ADD montant_restant_admin DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER montant_livre",
         ];
 
         foreach ($columns as $column => $sql) {
@@ -137,8 +136,9 @@ class Mission extends Model
                     `produit_id` INT UNSIGNED NOT NULL,
                     `montant_ristourne` DECIMAL(15,2) NOT NULL DEFAULT 0,
                     `caisses_livrees` INT NOT NULL DEFAULT 0,
+                    `bouteilles_livrees` INT NOT NULL DEFAULT 0,
                     `montant_livre` DECIMAL(15,2) NOT NULL DEFAULT 0,
-                    `montant_restant_admin` DECIMAL(15,2) NOT NULL DEFAULT 0,
+                    `proposition_montant` DECIMAL(15,2) NOT NULL DEFAULT 0,
                     `client_id` INT UNSIGNED NOT NULL,
                     FOREIGN KEY (`mission_id`) REFERENCES `missions`(`id`) ON DELETE CASCADE,
                     FOREIGN KEY (`ristourne_id`) REFERENCES `ristournes`(`id`) ON DELETE CASCADE,
@@ -147,6 +147,22 @@ class Mission extends Model
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
             );
         }
+            else {
+                // If table exists, ensure it has the proposition_montant column
+                $colExists = (bool) $this->db->fetchColumn(
+                    "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mission_ristournes' AND COLUMN_NAME = 'proposition_montant'"
+                );
+                if (!$colExists) {
+                    $this->db->query("ALTER TABLE mission_ristournes ADD COLUMN proposition_montant DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER montant_livre");
+                }
+                // Ensure bouteilles_livrees column exists for older installations
+                $colBtlExists = (bool) $this->db->fetchColumn(
+                    "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mission_ristournes' AND COLUMN_NAME = 'bouteilles_livrees'"
+                );
+                if (!$colBtlExists) {
+                    $this->db->query("ALTER TABLE mission_ristournes ADD COLUMN bouteilles_livrees INT NOT NULL DEFAULT 0 AFTER caisses_livrees");
+                }
+            }
     }
     
     /**
@@ -226,7 +242,7 @@ class Mission extends Model
             $mission['ristournes'] = [];
             if (($mission['type_mission'] ?? 'vente') === 'ristourne') {
                 $mission['ristournes'] = $this->db->fetchAll(
-                    "SELECT mr.*, c.nom as client_nom, c.numero_client, p.nom as produit_nom, p.code as produit_code
+                    "SELECT mr.*, c.nom as client_nom, c.numero_client, p.nom as produit_nom, p.code as produit_code, p.bouteilles_par_caisses
                      FROM mission_ristournes mr
                      JOIN clients c ON mr.client_id = c.id
                      JOIN produits p ON mr.produit_id = p.id
@@ -816,7 +832,6 @@ class Mission extends Model
             $mouvementModel = new MouvementStock();
             $totalMontantRistourne = 0;
             $totalMontantLivre = 0;
-            $totalMontantRestantAdmin = 0;
             $chargementsParProduit = [];
             $missionRistournes = [];
 
@@ -854,16 +869,23 @@ class Mission extends Model
                 $montantRistourne = (float) ($ristourne['montant_ristourne'] ?? 0);
                 if ($montantRistourne <= 0) continue;
 
-                $caissesLivrees = (int) floor($montantRistourne / $prixCaisse);
-                if ($caissesLivrees <= 0) continue;
+                $prixUnitaire = $prixCaisse / $bouteillesParCaisse;
 
-                $montantLivre = round($caissesLivrees * $prixCaisse, 2);
-                $montantRestantAdmin = round(max($montantRistourne - $montantLivre, 0), 2);
-                $quantiteBouteilles = $caissesLivrees * $bouteillesParCaisse;
+                $caissesLivrees = (int) floor($montantRistourne / $prixCaisse);
+                $resteApresCaisses = $montantRistourne - ($caissesLivrees * $prixCaisse);
+
+                // Permettre la livraison en bouteilles pour la partie restante
+                $bouteillesSupplementaires = (int) floor($resteApresCaisses / $prixUnitaire);
+
+                $quantiteBouteilles = $caissesLivrees * $bouteillesParCaisse + $bouteillesSupplementaires;
+
+                $montantLivre = round(($caissesLivrees * $prixCaisse) + ($bouteillesSupplementaires * $prixUnitaire), 2);
+                // Do not allocate any remainder to administration; deliver as much as possible
+                $montantRestantAdmin = 0.00;
 
                 $totalMontantRistourne += $montantRistourne;
                 $totalMontantLivre += $montantLivre;
-                $totalMontantRestantAdmin += $montantRestantAdmin;
+                
 
                 // Agréger les caisses par produit
                 if (!isset($chargementsParProduit[$produitId])) {
@@ -884,8 +906,9 @@ class Mission extends Model
                     'client_id' => (int) $ristourne['client_id'],
                     'montant_ristourne' => $montantRistourne,
                     'caisses_livrees' => $caissesLivrees,
+                    'bouteilles_livrees' => $quantiteBouteilles,
                     'montant_livre' => $montantLivre,
-                    'montant_restant_admin' => $montantRestantAdmin
+                    'proposition_montant' => isset($ristourneItem['proposition_montant']) ? (float)$ristourneItem['proposition_montant'] : 0
                 ];
             }
 
@@ -920,7 +943,6 @@ class Mission extends Model
                 'montant_encaisse' => 0,
                 'montant_ristourne_initial' => $totalMontantRistourne,
                 'montant_livre' => $totalMontantLivre,
-                'montant_restant_admin' => $totalMontantRestantAdmin,
                 'caisses_vides_retournees' => 0,
                 'created_by' => $data['created_by']
             ]);
@@ -932,6 +954,11 @@ class Mission extends Model
                 $caissesDisponibles = (int) ($stockPrincipal['caisses_pleine'] ?? floor(((int) ($stockPrincipal['quantite_pleine'] ?? 0)) / $chargement['bouteilles_par_caisse']));
                 if ($caissesDisponibles < $chargement['caisses']) {
                     throw new Exception('Stock principal insuffisant pour le produit #' . $produitId . ' (disponible: ' . $caissesDisponibles . ' cs, demandé: ' . $chargement['caisses'] . ' cs)');
+                }
+                // Vérifier aussi les bouteilles totales disponibles
+                $bouteillesDisponibles = (int) ($stockPrincipal['quantite_pleine'] ?? 0);
+                if ($bouteillesDisponibles < $chargement['bouteilles']) {
+                    throw new Exception('Stock principal insuffisant pour le produit #' . $produitId . ' (bouteilles disponible: ' . $bouteillesDisponibles . ', demandé: ' . $chargement['bouteilles'] . ')');
                 }
 
                 $this->db->insert('mission_chargements', [
@@ -996,8 +1023,7 @@ class Mission extends Model
                 'success' => true,
                 'id' => $missionId,
                 'nb_ristournes' => count($missionRistournes),
-                'montant_livre' => $totalMontantLivre,
-                'montant_restant_admin' => $totalMontantRestantAdmin
+                'montant_livre' => $totalMontantLivre
             ];
         } catch (Exception $e) {
             $this->db->rollBack();
@@ -1025,7 +1051,7 @@ class Mission extends Model
 
                 if (!empty($mission['montant_ristourne_initial']) && empty($mission['montant_livre'])) {
                     $updateData['montant_livre'] = $mission['montant_ristourne_initial'];
-                    $updateData['montant_restant_admin'] = 0;
+                    
                 }
 
                 $this->update($id, $updateData);

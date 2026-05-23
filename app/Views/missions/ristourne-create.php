@@ -25,12 +25,15 @@ ob_start();
                     ristournes: <?= htmlspecialchars(json_encode($ristournes ?? []), ENT_QUOTES, 'UTF-8') ?>,
                     produits: <?= htmlspecialchars(json_encode($produits ?? []), ENT_QUOTES, 'UTF-8') ?>,
                     zones: <?= htmlspecialchars(json_encode($zones ?? []), ENT_QUOTES, 'UTF-8') ?>,
+                    globalProduit: '',
                     selected: {},
                     produitParRistourne: {},
+                    proposalMontant: {},
                     init() {
                         this.ristournes.forEach(r => {
                             this.selected[r.id] = false;
                             this.produitParRistourne[r.id] = '';
+                            this.proposalMontant[r.id] = 0;
                         });
                     },
                     toggleAll() {
@@ -38,9 +41,11 @@ ob_start();
                         this.ristournes.forEach(r => {
                             this.selected[r.id] = val;
                         });
+                        // Propager produit global aux sélectionnés
+                        this.applyGlobalToSelected();
                     },
                     getSelectedRistournes() {
-                        return this.ristournes.filter(r => this.selected[r.id] && this.produitParRistourne[r.id]);
+                        return this.ristournes.filter(r => this.selected[r.id]);
                     },
                     getPrixCaisse(produitId) {
                         const p = this.produits.find(item => String(item.id) === String(produitId));
@@ -60,6 +65,42 @@ ob_start();
                         if (prix <= 0) return 0;
                         return Math.floor(montant / prix);
                     },
+                    getManquePourAtteindre(ristourneId) {
+                        const r = this.ristournes.find(item => item.id === ristourneId);
+                        if (!r) return 0;
+                        const montant = parseFloat(r.montant_ristourne || 0);
+                        const produitId = this.produitParRistourne[ristourneId];
+                        if (!produitId) return 0;
+                        const prix = this.getPrixCaisse(produitId) || 0;
+                        if (prix <= 0) return 0;
+                        const caisses = this.getCaissesLivrables(ristourneId);
+                        const besoin = Math.max(prix * (caisses + 1) - montant, 0);
+                        return besoin;
+                    },
+                    anyManqueSelected() {
+                        return this.getSelectedRistournes().some(r => this.getManquePourAtteindre(r.id) > 0);
+                    },
+                    getProduitName(produitId) {
+                        if (!produitId) return '';
+                        const p = this.produits.find(item => String(item.id) === String(produitId));
+                        return p ? (p.nom + (p.code ? ' (' + p.code + ')' : '')) : '';
+                    },
+                    applyGlobalToSelected() {
+                        if (!this.globalProduit) return;
+                        this.getSelectedRistournes().forEach(r => {
+                            this.produitParRistourne[r.id] = this.globalProduit;
+                        });
+                    },
+                    applyGlobalProduit() {
+                        if (!this.globalProduit) return;
+                        this.getSelectedRistournes().forEach(r => {
+                            this.produitParRistourne[r.id] = this.globalProduit;
+                        });
+                    },
+                    proposeMontant(ristourneId) {
+                        const manque = this.getManquePourAtteindre(ristourneId) || 0;
+                        this.proposalMontant[ristourneId] = Math.max(0, parseFloat(manque.toFixed ? manque.toFixed(2) : manque));
+                    },
                     getTotalMontantRistourne() {
                         return this.getSelectedRistournes().reduce((sum, r) => sum + parseFloat(r.montant_ristourne || 0), 0);
                     },
@@ -71,14 +112,19 @@ ob_start();
                             return sum + this.getCaissesLivrables(r.id) * this.getPrixCaisse(this.produitParRistourne[r.id]);
                         }, 0);
                     },
-                    getTotalRestantAdmin() {
-                        return Math.max(this.getTotalMontantRistourne() - this.getTotalMontantLivre(), 0);
+                    
+                    proposeAllMissing() {
+                        this.getSelectedRistournes().forEach(r => {
+                            if (this.getManquePourAtteindre(r.id) > 0) this.proposeMontant(r.id);
+                        });
                     },
                     async submit() {
                         if (!this.vehicule_id) {
                             App.notify('Sélectionnez un véhicule', 'error');
                             return;
                         }
+                        // Ensure global product is applied to selected ristournes before validation
+                        this.applyGlobalToSelected();
                         const selectedRistournes = this.getSelectedRistournes();
                         if (selectedRistournes.length === 0) {
                             App.notify('Sélectionnez au moins une ristourne avec un produit', 'error');
@@ -95,7 +141,8 @@ ob_start();
                         try {
                             const ristournesPayload = selectedRistournes.map(r => ({
                                 ristourne_id: parseInt(r.id),
-                                produit_id: parseInt(this.produitParRistourne[r.id])
+                                produit_id: parseInt(this.produitParRistourne[r.id]),
+                                proposition_montant: parseFloat(this.proposalMontant[r.id] || 0)
                             }));
 
                             await App.api('/api/missions/ristourne', 'POST', {
@@ -146,6 +193,21 @@ ob_start();
                     </select>
                 </div>
 
+                <!-- Produit global pour toutes les ristournes sélectionnées -->
+                <div class="mb-6">
+                    <label class="label">Produit à livrer pour les ristournes sélectionnées</label>
+                    <div class="flex gap-2">
+                        <select class="input" x-model="globalProduit" @change="applyGlobalToSelected()">
+                            <option value="">Sélectionner un produit (optionnel)</option>
+                            <template x-for="produit in produits" :key="produit.id">
+                                <option :value="produit.id" x-text="produit.nom + ' (' + produit.code + ')'">
+                                </option>
+                            </template>
+                        </select>
+                        <button type="button" @click="applyGlobalProduit()" class="btn btn-secondary">Appliquer aux sélectionnés</button>
+                    </div>
+                </div>
+
                 <!-- Résumé global -->
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     <div class="p-4 rounded-lg border bg-blue-50 border-blue-100">
@@ -160,9 +222,13 @@ ob_start();
                         <p class="text-xs uppercase tracking-wider text-gray-500">Montant livré</p>
                         <p class="text-xl font-bold text-purple-700" x-text="App.formatMoneyConverted(getTotalMontantLivre(), window.BASE_DEVISE, window.DEVISE)"></p>
                     </div>
-                    <div class="p-4 rounded-lg border bg-amber-50 border-amber-100">
-                        <p class="text-xs uppercase tracking-wider text-gray-500">Reste admin</p>
-                        <p class="text-xl font-bold text-amber-700" x-text="App.formatMoneyConverted(getTotalRestantAdmin(), window.BASE_DEVISE, window.DEVISE)"></p>
+                    
+                </div>
+
+                <div x-show="anyManqueSelected()" class="mb-4 p-3 rounded border bg-amber-50 border-amber-200 flex items-center justify-between">
+                    <div class="text-sm text-amber-800">Certaines ristournes sélectionnées ont un manque pour atteindre la caisse suivante. Vous pouvez proposer le montant manquant pour chaque ristourne.</div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" @click="proposeAllMissing()" class="btn-secondary">Proposer tout</button>
                     </div>
                 </div>
 
@@ -188,29 +254,36 @@ ob_start();
                                     <th class="p-3 text-left">Produit à livrer</th>
                                     <th class="p-3 text-right">Caisses</th>
                                     <th class="p-3 text-right">Montant livré</th>
-                                    <th class="p-3 text-right">Reste admin</th>
+                                    <th class="p-3 text-right">Manque</th>
+                                    <th class="p-3 text-right">Proposer</th>
+                                    
                                 </tr>
                             </thead>
                             <tbody>
                                 <template x-for="ristourne in ristournes" :key="ristourne.id">
                                     <tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-800/50" :class="selected[ristourne.id] ? 'bg-blue-50 dark:bg-blue-900/20' : ''">
                                         <td class="p-3">
-                                            <input type="checkbox" x-model="selected[ristourne.id]" class="rounded border-gray-300">
+                                            <input type="checkbox" x-model="selected[ristourne.id]" @change="if(globalProduit && selected[ristourne.id]) produitParRistourne[ristourne.id]=globalProduit" class="rounded border-gray-300">
                                         </td>
                                         <td class="p-3 font-medium" x-text="ristourne.client_nom + (ristourne.numero_client ? ' (' + ristourne.numero_client + ')' : '')"></td>
                                         <td class="p-3" x-text="App.formatMoneyConverted(parseFloat(ristourne.montant_ristourne || 0), window.BASE_DEVISE, window.DEVISE)"></td>
                                         <td class="p-3 text-xs text-gray-500" x-text="(ristourne.periode_debut || '') + ' → ' + (ristourne.periode_fin || '')"></td>
                                         <td class="p-3">
-                                            <select class="input py-1 text-sm" x-model="produitParRistourne[ristourne.id]" :disabled="!selected[ristourne.id]">
-                                                <option value="">Choisir produit</option>
-                                                <template x-for="produit in produits" :key="produit.id">
-                                                    <option :value="produit.id" x-text="produit.nom + ' (' + produit.code + ')'"></option>
-                                                </template>
-                                            </select>
+                                            <div x-text="produitParRistourne[ristourne.id] ? getProduitName(produitParRistourne[ristourne.id]) : (globalProduit ? getProduitName(globalProduit) : '—')"></div>
                                         </td>
                                         <td class="p-3 text-right font-semibold" x-text="selected[ristourne.id] && produitParRistourne[ristourne.id] ? getCaissesLivrables(ristourne.id) + ' cs' : '—'"></td>
                                         <td class="p-3 text-right" x-text="selected[ristourne.id] && produitParRistourne[ristourne.id] ? App.formatMoneyConverted(getCaissesLivrables(ristourne.id) * getPrixCaisse(produitParRistourne[ristourne.id]), window.BASE_DEVISE, window.DEVISE) : '—'"></td>
-                                        <td class="p-3 text-right text-amber-600" x-text="selected[ristourne.id] && produitParRistourne[ristourne.id] ? App.formatMoneyConverted(Math.max(parseFloat(ristourne.montant_ristourne || 0) - getCaissesLivrables(ristourne.id) * getPrixCaisse(produitParRistourne[ristourne.id]), 0), window.BASE_DEVISE, window.DEVISE) : '—'"></td>
+                                        <td class="p-3 text-right text-red-600" x-text="selected[ristourne.id] && produitParRistourne[ristourne.id] ? App.formatMoneyConverted(getManquePourAtteindre(ristourne.id), window.BASE_DEVISE, window.DEVISE) : '—'"></td>
+                                        <td class="p-3 text-right">
+                                            <template x-if="selected[ristourne.id] && produitParRistourne[ristourne.id]">
+                                                <div class="flex items-center justify-end gap-2">
+                                                    <button type="button" @click="proposeMontant(ristourne.id)" class="btn-secondary btn-sm">Proposer</button>
+                                                    <input type="number" step="0.01" class="input w-28" x-model.number="proposalMontant[ristourne.id]">
+                                                </div>
+                                            </template>
+                                            <span x-show="!selected[ristourne.id] || !produitParRistourne[ristourne.id]">—</span>
+                                        </td>
+                                        
                                     </tr>
                                 </template>
                             </tbody>
