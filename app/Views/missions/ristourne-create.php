@@ -61,21 +61,21 @@ ob_start();
                         const produitId = this.produitParRistourne[ristourneId];
                         if (!produitId) return 0;
                         const prix = this.getPrixCaisse(produitId);
-                        const montant = parseFloat(r.montant_ristourne || 0);
-                        if (prix <= 0) return 0;
-                        return Math.floor(montant / prix);
+                        const montant = parseFloat(r.montant_ristourne || 0) + parseFloat(this.proposalMontant[ristourneId] || 0);
+                        if (prix <= 0 || montant <= 0) return 0;
+                        return Math.ceil(montant / prix);
                     },
                     getManquePourAtteindre(ristourneId) {
                         const r = this.ristournes.find(item => item.id === ristourneId);
                         if (!r) return 0;
-                        const montant = parseFloat(r.montant_ristourne || 0);
                         const produitId = this.produitParRistourne[ristourneId];
                         if (!produitId) return 0;
                         const prix = this.getPrixCaisse(produitId) || 0;
                         if (prix <= 0) return 0;
+                        const montant = parseFloat(r.montant_ristourne || 0) + parseFloat(this.proposalMontant[ristourneId] || 0);
                         const caisses = this.getCaissesLivrables(ristourneId);
-                        const besoin = Math.max(prix * (caisses + 1) - montant, 0);
-                        return besoin;
+                        const manque = Math.max(caisses * prix - montant, 0);
+                        return manque;
                     },
                     anyManqueSelected() {
                         return this.getSelectedRistournes().some(r => this.getManquePourAtteindre(r.id) > 0);
@@ -110,6 +110,11 @@ ob_start();
                     getTotalMontantLivre() {
                         return this.getSelectedRistournes().reduce((sum, r) => {
                             return sum + this.getCaissesLivrables(r.id) * this.getPrixCaisse(this.produitParRistourne[r.id]);
+                        }, 0);
+                    },
+                    getTotalComplement() {
+                        return this.getSelectedRistournes().reduce((sum, r) => {
+                            return sum + parseFloat(this.proposalMontant[r.id] || 0);
                         }, 0);
                     },
                     
@@ -209,7 +214,7 @@ ob_start();
                 </div>
 
                 <!-- Résumé global -->
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                     <div class="p-4 rounded-lg border bg-blue-50 border-blue-100">
                         <p class="text-xs uppercase tracking-wider text-gray-500">Total ristournes</p>
                         <p class="text-xl font-bold text-blue-700" x-text="App.formatMoneyConverted(getTotalMontantRistourne(), window.BASE_DEVISE, window.DEVISE)"></p>
@@ -219,14 +224,18 @@ ob_start();
                         <p class="text-xl font-bold text-green-700" x-text="getTotalCaisses() + ' cs'"></p>
                     </div>
                     <div class="p-4 rounded-lg border bg-purple-50 border-purple-100">
-                        <p class="text-xs uppercase tracking-wider text-gray-500">Montant livré</p>
+                        <p class="text-xs uppercase tracking-wider text-gray-500">Montant prévu</p>
                         <p class="text-xl font-bold text-purple-700" x-text="App.formatMoneyConverted(getTotalMontantLivre(), window.BASE_DEVISE, window.DEVISE)"></p>
+                    </div>
+                    <div class="p-4 rounded-lg border bg-amber-50 border-amber-100">
+                        <p class="text-xs uppercase tracking-wider text-gray-500">Total compléments</p>
+                        <p class="text-xl font-bold text-amber-700" x-text="App.formatMoneyConverted(getTotalComplement(), window.BASE_DEVISE, window.DEVISE)"></p>
                     </div>
                     
                 </div>
 
                 <div x-show="anyManqueSelected()" class="mb-4 p-3 rounded border bg-amber-50 border-amber-200 flex items-center justify-between">
-                    <div class="text-sm text-amber-800">Certaines ristournes sélectionnées ont un manque pour atteindre la caisse suivante. Vous pouvez proposer le montant manquant pour chaque ristourne.</div>
+                    <div class="text-sm text-amber-800">Certains clients n'ont pas assez de ristourne pour une caisse complète. Le complément proposé permet de leur donner des caisses entières (le client paiera la différence).</div>
                     <div class="flex items-center gap-2">
                         <button type="button" @click="proposeAllMissing()" class="btn-secondary">Proposer tout</button>
                     </div>
@@ -252,10 +261,10 @@ ob_start();
                                     <th class="p-3 text-left">Montant ristourne</th>
                                     <th class="p-3 text-left">Période</th>
                                     <th class="p-3 text-left">Produit à livrer</th>
-                                    <th class="p-3 text-right">Caisses</th>
-                                    <th class="p-3 text-right">Montant livré</th>
-                                    <th class="p-3 text-right">Manque</th>
-                                    <th class="p-3 text-right">Proposer</th>
+                                    <th class="p-3 text-right">Caisses prévues</th>
+                                    <th class="p-3 text-right">Montant prévu</th>
+                                    <th class="p-3 text-right">Manque (complément)</th>
+                                    <th class="p-3 text-right">Complément proposé</th>
                                     
                                 </tr>
                             </thead>
@@ -277,8 +286,8 @@ ob_start();
                                         <td class="p-3 text-right">
                                             <template x-if="selected[ristourne.id] && produitParRistourne[ristourne.id]">
                                                 <div class="flex items-center justify-end gap-2">
-                                                    <button type="button" @click="proposeMontant(ristourne.id)" class="btn-secondary btn-sm">Proposer</button>
-                                                    <input type="number" step="0.01" class="input w-28" x-model.number="proposalMontant[ristourne.id]">
+                                                    <button type="button" @click="proposeMontant(ristourne.id)" class="btn-secondary btn-sm" title="Remplir automatiquement le montant manquant">Auto</button>
+                                                    <input type="number" step="0.01" class="input w-28" x-model.number="proposalMontant[ristourne.id]" placeholder="Complément">
                                                 </div>
                                             </template>
                                             <span x-show="!selected[ristourne.id] || !produitParRistourne[ristourne.id]">—</span>

@@ -109,6 +109,7 @@ ob_start();
                 <tbody>
                     <?php foreach ($missions as $mission): ?>
                     <?php $totalCs = (int) ($mission['total_caisses'] ?? 0); ?>
+                    <?php $csLivrees = (int) ($mission['caisses_livrees_total'] ?? 0); ?>
                     <tr>
                         <td>
                             <?php if (($mission['type_mission'] ?? 'vente') === 'ristourne'): ?>
@@ -131,7 +132,11 @@ ob_start();
                         <td>
                             <?php if (($mission['type_mission'] ?? 'vente') === 'ristourne'): ?>
                                 <div class="font-medium"><?= format_money_converted($mission['montant_ristourne_initial'] ?? 0) ?></div>
-                                <div class="text-xs text-gray-500"><?= number_format($totalCs, 0, '.', ' ') ?> cs <?= $totalCs <= 1 ? 'livrée' : 'livrées' ?></div>
+                                <?php if ($mission['statut'] === 'en_cours'): ?>
+                                <div class="text-xs text-gray-500"><?= number_format($totalCs, 0, '.', ' ') ?> cs à livrer · <?= $csLivrees ?> cs livrée<?= $csLivrees > 1 ? 's' : '' ?></div>
+                                <?php else: ?>
+                                <div class="text-xs text-gray-500"><?= number_format($csLivrees, 0, '.', ' ') ?> cs livrée<?= $csLivrees > 1 ? 's' : '' ?> · Montant livré: <?= format_money_converted($mission['montant_livre'] ?? 0) ?></div>
+                                <?php endif; ?>
                                 
                             <?php else: ?>
                                 <div class="font-medium"><?= number_format($totalCs, 0, '.', ' ') ?> <?= $totalCs <= 1 ? 'caisse' : 'caisses' ?></div>

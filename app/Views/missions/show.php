@@ -96,7 +96,47 @@ ob_start();
                             <?= format_money_converted($mission['montant_livre'] ?? 0) ?>
                         </p>
                     </div>
-                    
+                    <?php
+                        // Calculer le total des compléments récoltés (montant_ajoute)
+                        $totalMontantAjoute = 0;
+                        $totalCaissesLivrees = 0;
+                        $totalCaissesPrevues = 0;
+                        $totalVidesRecues = 0;
+                        foreach ($mission['ristournes'] ?? [] as $mrItem) {
+                            $csLiv = (int)($mrItem['caisses_livrees'] ?? 0);
+                            $csPrev = (int)($mrItem['caisses_prevues'] ?? 0);
+                            $totalCaissesLivrees += $csLiv;
+                            $totalCaissesPrevues += $csPrev;
+                            $totalVidesRecues += (int)($mrItem['caisses_vides_recues'] ?? 0);
+                            if (!empty($mrItem['complement_confirme']) && $csLiv > 0) {
+                                $btlPerCs = (int)($mrItem['bouteilles_par_caisses'] ?? 24);
+                                if ($btlPerCs <= 0) $btlPerCs = 24;
+                                $prixCS = (float)($mrItem['prix_vente_caisses'] ?? 0);
+                                if ($prixCS <= 0) $prixCS = (float)($mrItem['prix_vente_unitaire'] ?? 0) * $btlPerCs;
+                                $totalMontantAjoute += max(0, round($csLiv * $prixCS - (float)($mrItem['montant_ristourne'] ?? 0), 2));
+                            }
+                        }
+                    ?>
+                    <?php if ($totalMontantAjoute > 0): ?>
+                    <div>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Montant récolté (compléments)</p>
+                        <p class="font-medium text-green-600 dark:text-green-400">
+                            <?= format_money_converted($totalMontantAjoute) ?>
+                        </p>
+                    </div>
+                    <?php endif; ?>
+                    <div>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Caisses livrées / prévues</p>
+                        <p class="font-medium text-gray-900 dark:text-white">
+                            <?= $totalCaissesLivrees ?> / <?= $totalCaissesPrevues ?> cs
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Caisses vides reçues</p>
+                        <p class="font-medium text-gray-900 dark:text-white">
+                            <?= $totalVidesRecues ?> cs
+                        </p>
+                    </div>
                     <?php endif; ?>
                     <div>
                         <p class="text-sm text-gray-500 dark:text-gray-400">Statut</p>
@@ -123,18 +163,46 @@ ob_start();
                     <?php foreach ($mission['ristournes'] as $mr): ?>
                         <div class="flex items-center justify-between py-2 border-b last:border-0">
                             <div>
-                                <p class="font-medium text-gray-900 dark:text-white"><?= htmlspecialchars($mr['client_nom'] ?? 'N/A') ?><?= !empty($mr['numero_client']) ? ' (' . htmlspecialchars($mr['numero_client']) . ')' : '' ?></p>
+                                <p class="font-medium text-gray-900 dark:text-white"><?= htmlspecialchars($mr['client_nom'] ?? 'N/A') ?><?= !empty($mr['numero_client']) ? ' (' . htmlspecialchars($mr['numero_client']) . ')' : '' ?>
+                                <?php
+                                    $mrStatut = $mr['statut'] ?? 'en_attente';
+                                    if ($mrStatut === 'livree'): ?>
+                                        <span class="badge-success text-[10px] ml-1">Livrée</span>
+                                    <?php elseif ($mrStatut === 'non_livree'): ?>
+                                        <span class="badge-danger text-[10px] ml-1">Non livrée</span>
+                                    <?php else: ?>
+                                        <span class="badge-warning text-[10px] ml-1">En attente</span>
+                                    <?php endif; ?>
+                                </p>
                                 <?php
                                     $btlPerCaseMr = (int)($mr['bouteilles_par_caisses'] ?? 24);
                                     if ($btlPerCaseMr <= 0) $btlPerCaseMr = 24;
-                                    $totalBtlMr = (int)($mr['bouteilles_livrees'] ?? ((int)($mr['caisses_livrees'] ?? 0) * $btlPerCaseMr));
-                                    $fullCasesMr = (int) ($mr['caisses_livrees'] ?? 0);
-                                    $extraBtlMr = max(0, $totalBtlMr - ($fullCasesMr * $btlPerCaseMr));
+                                    $caissesPrevuesMr = (int)($mr['caisses_prevues'] ?? $mr['caisses_livrees'] ?? 0);
+                                    $caissesLivreesMr = (int)($mr['caisses_livrees'] ?? 0);
                                 ?>
-                                <p class="text-xs text-gray-500"><?= htmlspecialchars($mr['produit_nom'] ?? 'N/A') ?> — <?= $fullCasesMr ?> cs<?= $extraBtlMr > 0 ? ' + ' . $extraBtlMr . ' bt' : '' ?></p>
+                                <p class="text-xs text-gray-500"><?= htmlspecialchars($mr['produit_nom'] ?? 'N/A') ?> — Prévu: <?= $caissesPrevuesMr ?> cs · Livré: <?= $caissesLivreesMr ?> cs · Vides reçues: <?= (int)($mr['caisses_vides_recues'] ?? 0) ?></p>
+                                <?php if (!empty($mr['proposition_montant']) && (float)$mr['proposition_montant'] > 0): ?>
+                                <p class="text-xs text-blue-500">Complément: <?= format_money_converted($mr['proposition_montant']) ?><?php if (!empty($mr['complement_confirme'])): ?> <span class="text-green-600 font-semibold">✓ Confirmé</span><?php else: ?> <span class="text-orange-500">(en attente)</span><?php endif; ?></p>
+                                <?php endif; ?>
+                                <?php
+                                    $montantAjoute = 0;
+                                    if (!empty($mr['complement_confirme']) && $caissesLivreesMr > 0) {
+                                        $prixCaisseMr = (float)($mr['prix_vente_caisses'] ?? 0);
+                                        if ($prixCaisseMr <= 0) {
+                                            $prixCaisseMr = (float)($mr['prix_vente_unitaire'] ?? 0) * $btlPerCaseMr;
+                                        }
+                                        $montantAjoute = max(0, round($caissesLivreesMr * $prixCaisseMr - (float)($mr['montant_ristourne'] ?? 0), 2));
+                                    }
+                                    if ($montantAjoute > 0):
+                                ?>
+                                <p class="text-xs text-green-600">Montant ajouté par le client: <?= format_money_converted($montantAjoute) ?></p>
+                                <?php endif; ?>
                             </div>
                             <div class="text-right">
                                 <p class="text-sm font-semibold"><?= format_money_converted($mr['montant_ristourne'] ?? 0) ?></p>
+                                <?php if ((float)($mr['montant_livre'] ?? 0) > 0): ?>
+                                <p class="text-xs text-green-600">Livré: <?= format_money_converted($mr['montant_livre']) ?></p>
+                                <?php endif; ?>
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -223,20 +291,45 @@ ob_start();
                         <div class="rounded-xl border bg-gray-50 dark:bg-gray-900/50 p-4">
                             <div class="flex items-center justify-between gap-4">
                                 <div>
-                                    <p class="font-medium text-gray-900 dark:text-white"><?= htmlspecialchars($mr['client_nom'] ?? 'Client') ?><?= !empty($mr['numero_client']) ? ' (' . htmlspecialchars($mr['numero_client']) . ')' : '' ?></p>
+                                    <p class="font-medium text-gray-900 dark:text-white"><?= htmlspecialchars($mr['client_nom'] ?? 'Client') ?><?= !empty($mr['numero_client']) ? ' (' . htmlspecialchars($mr['numero_client']) . ')' : '' ?>
+                                    <?php
+                                        $mrStatut2 = $mr['statut'] ?? 'en_attente';
+                                        if ($mrStatut2 === 'livree'): ?>
+                                            <span class="badge-success text-[10px] ml-1">Livrée</span>
+                                        <?php elseif ($mrStatut2 === 'non_livree'): ?>
+                                            <span class="badge-danger text-[10px] ml-1">Non livrée</span>
+                                        <?php else: ?>
+                                            <span class="badge-warning text-[10px] ml-1">En attente</span>
+                                        <?php endif; ?>
+                                    </p>
                                     <p class="text-sm text-gray-500">Produit: <?= htmlspecialchars($mr['produit_nom'] ?? 'N/A') ?></p>
+                                    <?php
+                                        $caissesPrevuesMr2 = (int)($mr['caisses_prevues'] ?? $mr['caisses_livrees'] ?? 0);
+                                        $caissesLivreesMr2 = (int)($mr['caisses_livrees'] ?? 0);
+                                    ?>
+                                    <p class="text-sm">Prévu: <strong><?= $caissesPrevuesMr2 ?> cs</strong> · Livré: <strong><?= $caissesLivreesMr2 ?> cs</strong> · Vides: <strong><?= (int)($mr['caisses_vides_recues'] ?? 0) ?> cs</strong></p>
+                                    <?php if (!empty($mr['proposition_montant']) && (float)$mr['proposition_montant'] > 0): ?>
+                                    <p class="text-xs text-blue-500">Complément: <?= format_money_converted($mr['proposition_montant']) ?><?php if (!empty($mr['complement_confirme'])): ?> <span class="text-green-600 font-semibold">✓ Confirmé</span><?php else: ?> <span class="text-orange-500">(en attente)</span><?php endif; ?></p>
+                                    <?php endif; ?>
+                                    <?php
+                                        $montantAjouteMr2 = 0;
+                                        if (!empty($mr['complement_confirme']) && $caissesLivreesMr2 > 0) {
+                                            $btlPerCaseMr2 = (int)($mr['bouteilles_par_caisses'] ?? 24);
+                                            if ($btlPerCaseMr2 <= 0) $btlPerCaseMr2 = 24;
+                                            $prixCaisseMr2 = (float)($mr['prix_vente_caisses'] ?? 0);
+                                            if ($prixCaisseMr2 <= 0) $prixCaisseMr2 = (float)($mr['prix_vente_unitaire'] ?? 0) * $btlPerCaseMr2;
+                                            $montantAjouteMr2 = max(0, round($caissesLivreesMr2 * $prixCaisseMr2 - (float)($mr['montant_ristourne'] ?? 0), 2));
+                                        }
+                                        if ($montantAjouteMr2 > 0):
+                                    ?>
+                                    <p class="text-xs text-green-600 font-semibold">Montant récolté: <?= format_money_converted($montantAjouteMr2) ?></p>
+                                    <?php endif; ?>
                                 </div>
                                 <div class="text-right">
-                                    <?php
-                                        $btlPerCaseMr2 = (int)($mr['bouteilles_par_caisses'] ?? 24);
-                                        if ($btlPerCaseMr2 <= 0) $btlPerCaseMr2 = 24;
-                                        $totalBtlMr2 = (int)($mr['bouteilles_livrees'] ?? ((int)($mr['caisses_livrees'] ?? 0) * $btlPerCaseMr2));
-                                        $fullCasesMr2 = (int) ($mr['caisses_livrees'] ?? 0);
-                                        $extraBtlMr2 = max(0, $totalBtlMr2 - ($fullCasesMr2 * $btlPerCaseMr2));
-                                    ?>
-                                    <p class="font-semibold"><?= $fullCasesMr2 ?> caisses<?= $extraBtlMr2 > 0 ? ' + ' . $extraBtlMr2 . ' bouteilles' : '' ?></p>
-                                    <p class="text-sm text-gray-500"><?= format_money_converted($mr['montant_livre'] ?? 0) ?></p>
-                                    
+                                    <p class="text-sm font-semibold"><?= format_money_converted($mr['montant_ristourne'] ?? 0) ?></p>
+                                    <?php if ((float)($mr['montant_livre'] ?? 0) > 0): ?>
+                                    <p class="text-xs text-green-600">Livré: <?= format_money_converted($mr['montant_livre']) ?></p>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
@@ -294,7 +387,7 @@ ob_start();
                     <?= $isRestourne ? 'Caisses livrées' : 'Caisses pleines restantes' ?>
                 </p>
                 <p class="text-3xl font-bold text-primary-600">
-                    <?= $isRestourne ? (int) ($firstChargement['quantite_caisses'] ?? 0) : ($mission['total_caisses'] ?? 0) ?>
+                    <?= $isRestourne ? (int) ($mission['total_caisses'] ?? 0) : ($mission['total_caisses'] ?? 0) ?>
                 </p>
                 <p class="text-sm text-gray-500 mt-2"><?= $isRestourne ? 'Mission de ristourne' : count($mission['clients'] ?? []) . ' client(s) servis' ?></p>
             </div>
@@ -310,15 +403,15 @@ ob_start();
                 <div class="space-y-4">
                     <?php if ($isRestourne): ?>
                     <div>
-                        <p class="text-sm text-gray-500">Produit livré</p>
+                        <p class="text-sm text-gray-500">Produit(s) livré(s)</p>
                         <p class="text-xl font-bold text-green-600">
-                            <?= htmlspecialchars($firstChargement['produit_nom'] ?? 'N/A') ?>
+                            <?= count($mission['chargements'] ?? []) ?> produit(s)
                         </p>
                     </div>
                     <div>
                         <p class="text-sm text-gray-500">Caisses livrées</p>
                         <p class="text-xl font-bold text-primary-600">
-                            <?= number_format((int) ($firstChargement['quantite_caisses'] ?? 0), 0, '.', ' ') ?> caisses
+                            <?= number_format((int) ($mission['total_caisses'] ?? 0), 0, '.', ' ') ?> caisses
                         </p>
                     </div>
                     <div>
@@ -430,6 +523,24 @@ ob_start();
                             </div>
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <?php if ($isRestourne): ?>
+                                <div class="p-4 border rounded-lg bg-white dark:bg-gray-800">
+                                    <p class="text-[11px] uppercase text-gray-500">Caisses livrées</p>
+                                    <p class="text-lg font-bold text-primary-600"><?= (int) ($mission['total_caisses'] ?? 0) ?> cs</p>
+                                </div>
+                                <div class="p-4 border rounded-lg bg-white dark:bg-gray-800">
+                                    <p class="text-[11px] uppercase text-gray-500">Nb ristournes</p>
+                                    <p class="text-lg font-bold text-green-600"><?= count($mission['ristournes'] ?? []) ?></p>
+                                </div>
+                                <div class="p-4 border rounded-lg bg-white dark:bg-gray-800">
+                                    <p class="text-[11px] uppercase text-gray-500">Montant ristourne</p>
+                                    <p class="text-lg font-bold text-orange-500"><?= format_money_converted($mission['montant_ristourne_initial'] ?? 0) ?></p>
+                                </div>
+                                <div class="p-4 border rounded-lg bg-white dark:bg-gray-800">
+                                    <p class="text-[11px] uppercase text-gray-500">Montant livré</p>
+                                    <p class="text-lg font-bold text-purple-600"><?= format_money_converted($mission['montant_livre'] ?? 0) ?></p>
+                                </div>
+                                <?php else: ?>
                                 <div class="p-4 border rounded-lg bg-white dark:bg-gray-800">
                                     <p class="text-[11px] uppercase text-gray-500">Total chargé</p>
                                     <p class="text-lg font-bold text-primary-600"><?= (int) ($mission['total_caisses'] ?? 0) ?> cs</p>
@@ -450,8 +561,10 @@ ob_start();
                                     <p class="text-[11px] uppercase text-gray-500">Montant attendu</p>
                                     <p class="text-lg font-bold text-primary-600"><?= number_format((float) ($mission['montant_attendu'] ?? 0), 2, ',', ' ') ?> <?= htmlspecialchars($mission['devise_base'] ?? 'CDF') ?></p>
                                 </div>
+                                <?php endif; ?>
                             </div>
 
+                            <?php if (!$isRestourne): ?>
                             <div class="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                                 <div class="px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
                                     <p class="text-sm font-semibold text-gray-900 dark:text-white">Détail automatique par gamme</p>
@@ -491,6 +604,7 @@ ob_start();
                                     </table>
                                 </div>
                             </div>
+                            <?php endif; ?>
 
                             <div>
                                 <label class="label">Justification de clôture</label>

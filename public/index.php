@@ -143,6 +143,8 @@ $routes = [
     'GET::/api/mobile/clients' => ['ClientController', 'apiList'],
     'GET::/api/mobile/ventes' => ['MobileController', 'listVentes'],
     'GET::/api/mobile/ventes-par-agent' => ['MobileController', 'ventesParAgent'],
+    'POST::/api/mobile/ristournes/(\d+)/payer' => ['MobileController', 'payerRistourne'],
+        'POST::/api/mobile/mission_ristournes/(\d+)/encaisser' => ['MobileController', 'encaisserMissionRistourne'],
     
     // Pertes
     'GET::/pertes' => ['PerteController', 'index'],

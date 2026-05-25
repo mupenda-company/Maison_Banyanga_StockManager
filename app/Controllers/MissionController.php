@@ -66,10 +66,12 @@ class MissionController extends Controller
         
         $missions = $this->db->fetchAll(
             "SELECT m.*, v.immatriculation, u.nom as agent_nom, u.prenom as agent_prenom, z.nom as zone_nom, c.nom as client_nom,
-                    -- total_caisses should represent actual delivered/loading caisses
-                    COALESCE((SELECT SUM(COALESCE(mc.quantite_caisses, 0)) FROM mission_chargements mc WHERE mc.mission_id = m.id), 0)
-                    + COALESCE((SELECT SUM(COALESCE(mr.caisses_livrees, 0)) FROM mission_ristournes mr WHERE mr.mission_id = m.id), 0)
-                    as total_caisses,
+                    CASE WHEN COALESCE(m.type_mission, 'vente') = 'ristourne'
+                        THEN COALESCE((SELECT SUM(COALESCE(mr2.caisses_prevues, 0)) FROM mission_ristournes mr2 WHERE mr2.mission_id = m.id), 0)
+                        ELSE COALESCE((SELECT SUM(COALESCE(mc.quantite_caisses, 0)) FROM mission_chargements mc WHERE mc.mission_id = m.id), 0)
+                    END as total_caisses,
+                    COALESCE((SELECT SUM(COALESCE(mr.caisses_livrees, 0)) FROM mission_ristournes mr WHERE mr.mission_id = m.id), 0)
+                    as caisses_livrees_total,
                     COALESCE((SELECT COUNT(DISTINCT v2.client_id)
                               FROM ventes v2
                               WHERE v2.mission_id = m.id AND v2.statut = 'validee' AND COALESCE(m.type_mission, 'vente') = 'vente'), 0) as nb_clients,

@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bon de sortie <?= htmlspecialchars($mission['numero_mission'] ?? '') ?> - <?= htmlspecialchars($params['nom_entreprise'] ?? APP_NAME) ?></title>
+    <?php $isRistourne = (($mission['type_mission'] ?? 'vente') === 'ristourne'); ?>
+    <title><?= $isRistourne ? 'Bon de ristourne' : 'Bon de sortie' ?> <?= htmlspecialchars($mission['numero_mission'] ?? '') ?> - <?= htmlspecialchars($params['nom_entreprise'] ?? APP_NAME) ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @page {
@@ -42,7 +43,7 @@
                 <?php if (!empty($params['numero_compte'])): ?><p class="text-xs text-gray-600">N° compte: <?= htmlspecialchars($params['numero_compte']) ?></p><?php endif; ?>
             </div>
             <div class="text-center self-center">
-                <h2 class="text-lg font-bold text-blue-600 uppercase">BON DE SORTIE</h2>
+                <h2 class="text-lg font-bold text-blue-600 uppercase"><?= $isRistourne ? 'BON DE RISTOURNE' : 'BON DE SORTIE' ?></h2>
                 <p class="text-base font-semibold mt-1"><?= htmlspecialchars($mission['numero_mission']) ?></p>
                 <p class="text-xs text-gray-600 mt-2">
                     Date: <?= date('d/m/Y H:i', strtotime($mission['date_depart'])) ?>
@@ -76,9 +77,57 @@
         </div>
         <?php endif; ?>
         
+        <?php if ($isRistourne && !empty($mission['ristournes'])): ?>
+        <!-- Ristournes à livrer -->
+        <div class="mb-5">
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Ristournes à livrer</h3>
+            <table class="w-full text-xs">
+                <thead>
+                    <tr class="border-b-2 border-gray-200">
+                        <th class="text-left py-2 font-semibold text-gray-500 uppercase">Client</th>
+                        <th class="text-left py-2 font-semibold text-gray-500 uppercase">Produit</th>
+                        <th class="text-right py-2 font-semibold text-gray-500 uppercase">Caisses</th>
+                        <th class="text-right py-2 font-semibold text-gray-500 uppercase">Montant ristourne</th>
+                        <th class="text-right py-2 font-semibold text-gray-500 uppercase">Montant livré</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    <?php $totalCaissesRistourne = 0; $totalMontantRistourne = 0; $totalMontantLivre = 0; ?>
+                    <?php foreach ($mission['ristournes'] as $mr): ?>
+                    <?php
+                        $btlPerCase = (int)($mr['bouteilles_par_caisses'] ?? 24);
+                        if ($btlPerCase <= 0) $btlPerCase = 24;
+                        $fullCases = (int)($mr['caisses_livrees'] ?? 0);
+                        $totalBtl = (int)($mr['bouteilles_livrees'] ?? ($fullCases * $btlPerCase));
+                        $extraBtl = max(0, $totalBtl - ($fullCases * $btlPerCase));
+                        $totalCaissesRistourne += $fullCases;
+                        $totalMontantRistourne += (float)($mr['montant_ristourne'] ?? 0);
+                        $totalMontantLivre += (float)($mr['montant_livre'] ?? 0);
+                    ?>
+                    <tr>
+                        <td class="py-2 font-medium"><?= htmlspecialchars($mr['client_nom'] ?? 'N/A') ?><?= !empty($mr['numero_client']) ? ' (' . htmlspecialchars($mr['numero_client']) . ')' : '' ?></td>
+                        <td class="py-2"><?= htmlspecialchars($mr['produit_nom'] ?? 'N/A') ?></td>
+                        <td class="py-2 text-right font-medium"><?= $fullCases ?> cs<?= $extraBtl > 0 ? ' + ' . $extraBtl . ' bt' : '' ?></td>
+                        <td class="py-2 text-right"><?= format_money_converted($mr['montant_ristourne'] ?? 0) ?></td>
+                        <td class="py-2 text-right font-medium"><?= format_money_converted($mr['montant_livre'] ?? 0) ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+                <tfoot class="border-t-2 border-gray-200">
+                    <tr>
+                        <td class="py-2 font-bold" colspan="2">Total</td>
+                        <td class="py-2 text-right font-bold"><?= $totalCaissesRistourne ?> cs</td>
+                        <td class="py-2 text-right font-bold"><?= format_money_converted($totalMontantRistourne) ?></td>
+                        <td class="py-2 text-right font-bold text-blue-600"><?= format_money_converted($totalMontantLivre) ?></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <?php endif; ?>
+
         <!-- Chargement -->
         <div class="mb-5">
-            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Produits chargés</h3>
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2"><?= $isRistourne ? 'Produits livrés' : 'Produits chargés' ?></h3>
             <?php if (empty($mission['chargements'])): ?>
             <div class="p-4 text-center text-gray-500 border rounded-lg">Aucun chargement</div>
             <?php else: ?>

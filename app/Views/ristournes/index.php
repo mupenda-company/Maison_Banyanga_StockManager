@@ -85,6 +85,8 @@ ob_start();
                                     <?php if ($r['statut'] === 'payee'): ?>
                                         <span class="badge-success">Payé</span>
                                         <div class="text-[10px] text-gray-400"><?= date('d/m/Y', strtotime($r['date_paiement'])) ?></div>
+                                    <?php elseif ($r['statut'] === 'en_livraison'): ?>
+                                        <span class="badge-info">En livraison</span>
                                     <?php else: ?>
                                         <span class="badge-warning">En attente</span>
                                     <?php endif; ?>
@@ -97,6 +99,8 @@ ob_start();
                                             </svg>
                                             Confirmer paiement
                                         </button>
+                                    <?php elseif ($r['statut'] === 'en_livraison'): ?>
+                                        <span class="text-blue-500 italic text-sm">Mission en cours</span>
                                     <?php else: ?>
                                         <span class="text-gray-400 italic text-sm">Déjà réglé</span>
                                     <?php endif; ?>

@@ -53,7 +53,7 @@ class FinanceController extends Controller
             "SELECT COALESCE(SUM(montant_ristourne), 0) as total_ristournes,
                     COUNT(*) as nb_ristournes,
                     COALESCE(SUM(CASE WHEN statut = 'payee' THEN montant_ristourne ELSE 0 END), 0) as ristournes_payees,
-                    COALESCE(SUM(CASE WHEN statut = 'en_attente' THEN montant_ristourne ELSE 0 END), 0) as ristournes_en_attente
+                    COALESCE(SUM(CASE WHEN statut IN ('en_attente', 'calculee', 'en_livraison') THEN montant_ristourne ELSE 0 END), 0) as ristournes_en_attente
              FROM ristournes
              WHERE periode_debut >= :date_debut AND periode_fin <= :date_fin",
             ['date_debut' => $dateDebut, 'date_fin' => $dateFin]

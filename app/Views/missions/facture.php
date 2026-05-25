@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Facture mission <?= htmlspecialchars($mission['numero_mission'] ?? '') ?> - <?= htmlspecialchars($params['nom_entreprise'] ?? APP_NAME) ?></title>
+    <?php $isRistourne = (($mission['type_mission'] ?? 'vente') === 'ristourne'); ?>
+    <title><?= $isRistourne ? 'Facture de ristourne' : 'Facture de mission' ?> <?= htmlspecialchars($mission['numero_mission'] ?? '') ?> - <?= htmlspecialchars($params['nom_entreprise'] ?? APP_NAME) ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @page {
@@ -208,7 +209,7 @@
                 </div>
             </div>
             <div class="text-center leading-tight self-center">
-                <h2 class="text-lg font-bold text-blue-600 uppercase">Facture de fin de mission</h2>
+                <h2 class="text-lg font-bold text-blue-600 uppercase"><?= $isRistourne ? 'Facture de ristourne' : 'Facture de fin de mission' ?></h2>
                 <p class="text-sm font-semibold mt-1"><?= htmlspecialchars($mission['numero_mission'] ?? '') ?></p>
                 <p class="text-xs text-gray-600 mt-1 flex flex-col items-center gap-0.5">
                     <span>Départ: <?= !empty($mission['date_depart']) ? date('d/m/Y H:i', strtotime($mission['date_depart'])) : '-' ?></span>
@@ -236,6 +237,26 @@
             </div>
         </div>
 
+        <?php if ($isRistourne): ?>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-sm">
+            <div class="p-3 bg-gray-50 rounded-lg border flex items-center justify-between gap-3">
+                <p class="text-gray-500 uppercase text-xs">Nb ristournes</p>
+                <p class="text-base font-bold whitespace-nowrap"><?= count($mission['ristournes'] ?? []) ?></p>
+            </div>
+            <div class="p-3 bg-gray-50 rounded-lg border flex items-center justify-between gap-3">
+                <p class="text-gray-500 uppercase text-xs">Caisses livrées</p>
+                <p class="text-base font-bold whitespace-nowrap"><?= number_format((int)($mission['total_caisses'] ?? 0), 0, ',', ' ') ?> cs</p>
+            </div>
+            <div class="p-3 bg-gray-50 rounded-lg border flex items-center justify-between gap-3">
+                <p class="text-gray-500 uppercase text-xs">Montant ristourne</p>
+                <p class="text-base font-bold whitespace-nowrap"><?= format_money_converted($mission['montant_ristourne_initial'] ?? 0) ?></p>
+            </div>
+            <div class="p-3 bg-gray-50 rounded-lg border flex items-center justify-between gap-3">
+                <p class="text-gray-500 uppercase text-xs">Montant livré</p>
+                <p class="text-base font-bold text-green-700 whitespace-nowrap"><?= format_money_converted($mission['montant_livre'] ?? 0) ?></p>
+            </div>
+        </div>
+        <?php else: ?>
         <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-4 text-sm">
             <div class="p-3 bg-gray-50 rounded-lg border flex items-center justify-between gap-3">
                 <p class="text-gray-500 uppercase text-xs">Montant attendu</p>
@@ -283,6 +304,7 @@
                 </div>
             </div>
         </div>
+        <?php endif; ?>
 
         <?php if (empty($chargements)): ?>
         <div class="mission-page">
@@ -293,7 +315,7 @@
         <?php foreach ($chargementsPages as $pageIndex => $pageChargements): ?>
         <div class="mission-page <?= $pageIndex === $pagesCount - 1 ? '' : '' ?>">
             <div class="mb-4 flex items-end justify-between gap-4">
-                <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Bilan des chargements</h3>
+                <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider"><?= $isRistourne ? 'Bilan des livraisons' : 'Bilan des chargements' ?></h3>
                 <?php if ($pagesCount > 1): ?>
                 <p class="text-xs text-gray-500">Page <?= $pageIndex + 1 ?> / <?= $pagesCount ?></p>
                 <?php endif; ?>
@@ -303,7 +325,7 @@
                     <tr class="border-b-2 border-gray-200">
                         <th class="text-left py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Produit</th>
                         <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Chargé</th>
-                        <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Vendu</th>
+                        <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase"><?= $isRistourne ? 'Livré' : 'Vendu' ?></th>
                         <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Restant</th>
                         <th class="text-right py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Valeur estimée</th>
                     </tr>

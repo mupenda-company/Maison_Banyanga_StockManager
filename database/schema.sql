@@ -435,12 +435,39 @@ CREATE TABLE IF NOT EXISTS `ristournes` (
     `periode_annee` INT NOT NULL,
     `quantite_totale` DECIMAL(15,2) NOT NULL, -- en caisses
     `montant_total` DECIMAL(15,2) NOT NULL,
-    `statut` ENUM('calcule', 'paye', 'annule') DEFAULT 'calcule',
+    `statut` ENUM('calculee','en_livraison','payee','annulee') DEFAULT 'calculee',
     `date_paiement` DATETIME DEFAULT NULL,
     `created_by` INT NOT NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`created_by`) REFERENCES `users`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- --------------------------------------------------------
+-- Mission Ristournes (liaison mission <-> ristournes)
+-- --------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS `mission_ristournes` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `mission_id` INT UNSIGNED NOT NULL,
+    `ristourne_id` INT UNSIGNED NOT NULL,
+    `produit_id` INT UNSIGNED NOT NULL,
+    `montant_ristourne` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    `caisses_prevues` INT NOT NULL DEFAULT 0,
+    `bouteilles_prevues` INT NOT NULL DEFAULT 0,
+    `caisses_livrees` INT NOT NULL DEFAULT 0,
+    `bouteilles_livrees` INT NOT NULL DEFAULT 0,
+    `caisses_vides_recues` INT NOT NULL DEFAULT 0,
+    `montant_livre` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    `proposition_montant` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    `complement_confirme` TINYINT(1) NOT NULL DEFAULT 0,
+    `client_id` INT UNSIGNED NOT NULL,
+    `statut` ENUM('en_attente','livree','non_livree') NOT NULL DEFAULT 'en_attente',
+    FOREIGN KEY (`mission_id`) REFERENCES `missions`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`ristourne_id`) REFERENCES `ristournes`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`produit_id`) REFERENCES `produits`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 

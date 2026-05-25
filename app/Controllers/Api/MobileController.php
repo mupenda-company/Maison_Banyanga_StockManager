@@ -219,11 +219,25 @@ class MobileController extends Controller {
             'mission' => [
                 'id' => (int) ($mission['id'] ?? 0),
                 'numero_mission' => $mission['numero_mission'] ?? null,
+                'type_mission' => $mission['type_mission'] ?? 'vente',
                 'statut' => $mission['statut'] ?? null,
                 'date_depart' => $mission['date_depart'] ?? null,
                 'vehicule_immatriculation' => $mission['vehicule_immatriculation'] ?? null,
                 'zone_nom' => $mission['zone_nom'] ?? null,
+                'montant_ristourne_initial' => (float) ($mission['montant_ristourne_initial'] ?? 0),
+                'montant_livre' => (float) ($mission['montant_livre'] ?? 0),
             ],
+            'ristournes' => (function() use ($missionId) {
+                $rows = $this->db->fetchAll(
+                    "SELECT mr.id, mr.ristourne_id, mr.client_id, mr.produit_id, mr.montant_ristourne, mr.caisses_prevues, mr.bouteilles_prevues, mr.caisses_livrees, mr.bouteilles_livrees, mr.caisses_vides_recues, mr.montant_livre, mr.proposition_montant, mr.complement_confirme, mr.statut, p.nom as produit_nom, p.code as produit_code, c.nom as client_nom
+                     FROM mission_ristournes mr
+                     JOIN produits p ON mr.produit_id = p.id
+                     JOIN clients c ON mr.client_id = c.id
+                     WHERE mr.mission_id = :mission_id",
+                    ['mission_id' => $missionId]
+                );
+                return $rows ?: [];
+            })(),
             'chargement' => [
                 'caisses_chargees' => $caissesChargees,
                 'caisses_restantes' => $caissesRestantes,
@@ -284,6 +298,233 @@ class MobileController extends Controller {
         );
 
         return $this->success($rows);
+    }
+
+    /**
+     * Marquer une ristourne comme payée depuis le mobile (agent)
+     */
+    public function payerRistourne($id)
+    {
+        $data = $this->getJsonInput();
+
+        // basic validation: montant payé optional, user_id required
+        $errors = $this->validate($data, [
+            'user_id' => 'required|numeric'
+        ]);
+        if (!empty($errors)) {
+            return $this->error('Erreurs de validation', 422, $errors);
+        }
+
+        $ristourneId = (int) $id;
+        if ($ristourneId <= 0) {
+            return $this->error('Ristourne invalide', 422);
+        }
+
+        $ristourne = $this->db->fetch("SELECT * FROM ristournes WHERE id = :id", ['id' => $ristourneId]);
+        if (!$ristourne) {
+            return $this->error('Ristourne introuvable', 404);
+        }
+
+        // Delegate to Ristourne model's marquerPayee (no admin permission for mobile)
+        $rModel = new Ristourne();
+        $updated = $rModel->marquerPayee($ristourneId);
+        if ($updated) {
+            return $this->success(null, 'Ristourne marquée comme payée');
+        }
+
+        return $this->error('Impossible de marquer la ristourne comme payée', 500);
+    }
+
+    /**
+     * Enregistrer un encaissement pour une ligne mission_ristournes depuis le mobile
+     * Attendu: POST JSON { user_id: int, montant_livre?: number, proposition_montant?: number }
+     */
+    public function encaisserMissionRistourne($id)
+    {
+        $data = $this->getJsonInput();
+
+        $errors = $this->validate($data, [
+            'user_id' => 'required|numeric'
+        ]);
+        if (!empty($errors)) {
+            return $this->error('Erreurs de validation', 422, $errors);
+        }
+
+        $mrId = (int) $id;
+        if ($mrId <= 0) {
+            return $this->error('Mission ristourne invalide', 422);
+        }
+
+        $row = $this->db->fetch("SELECT * FROM mission_ristournes WHERE id = :id", ['id' => $mrId]);
+        if (!$row) {
+            return $this->error('Entrée mission_ristournes introuvable', 404);
+        }
+
+        $updates = [];
+        $params = ['id' => $mrId];
+
+        $montantRistourne = (float) ($row['montant_ristourne'] ?? 0);
+        $produitId = (int) ($row['produit_id'] ?? 0);
+        $caissesPrevues = (int) ($row['caisses_prevues'] ?? 0);
+
+        // Récupérer le prix du produit
+        $prixCaisse = 0;
+        $bouteillesParCaisse = 24;
+        if ($produitId > 0) {
+            $produit = $this->db->fetch("SELECT prix_vente_caisses, prix_vente_unitaire, bouteilles_par_caisses FROM produits WHERE id = :id", ['id' => $produitId]);
+            if ($produit) {
+                $bouteillesParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+                if ($bouteillesParCaisse <= 0) $bouteillesParCaisse = 24;
+                $prixCaisse = (float) ($produit['prix_vente_caisses'] ?: (($produit['prix_vente_unitaire'] ?? 0) * $bouteillesParCaisse));
+            }
+        }
+
+        // Complément confirmé par le client ?
+        $complementConfirme = !empty($data['complement_confirme']) ? 1 : 0;
+        $propositionMontant = (float) ($data['proposition_montant'] ?? $row['proposition_montant'] ?? 0);
+
+        // Déterminer les caisses livrées
+        $caissesLivrees = 0;
+        if (isset($data['caisses_livrees']) && (int) $data['caisses_livrees'] > 0) {
+            // L'agent spécifie explicitement le nombre de caisses livrées
+            $caissesLivrees = (int) $data['caisses_livrees'];
+        } elseif ($prixCaisse > 0) {
+            // Calcul automatique
+            if ($complementConfirme && $propositionMontant > 0) {
+                // Avec complément : ceil((ristourne + complément) / prix)
+                $caissesLivrees = (int) ceil(($montantRistourne + $propositionMontant) / $prixCaisse);
+            } else {
+                // Sans complément : floor(ristourne / prix) — on ne donne que ce que couvre le montant
+                $caissesLivrees = (int) floor($montantRistourne / $prixCaisse);
+            }
+        }
+
+        // Ne pas livrer plus que prévu
+        if ($caissesPrevues > 0 && $caissesLivrees > $caissesPrevues) {
+            $caissesLivrees = $caissesPrevues;
+        }
+
+        $bouteillesLivrees = $caissesLivrees * $bouteillesParCaisse;
+
+        // Caisses vides reçues du client
+        $caissesVidesRecues = isset($data['caisses_vides_recues']) ? (int) $data['caisses_vides_recues'] : 0;
+
+        // Montant livré = caisses_livrees * prix
+        $montantLivre = $caissesLivrees > 0 && $prixCaisse > 0 ? round($caissesLivrees * $prixCaisse, 2) : 0;
+
+        // Montant ajouté par le client (complement effectivement payé)
+        $montantAjoute = 0;
+        if ($complementConfirme && $caissesLivrees > 0 && $prixCaisse > 0) {
+            $montantAjoute = max(0, round($caissesLivrees * $prixCaisse - $montantRistourne, 2));
+        }
+
+        // Construire les updates
+        $updates[] = 'caisses_livrees = :caisses_livrees';
+        $params['caisses_livrees'] = $caissesLivrees;
+        $updates[] = 'bouteilles_livrees = :bouteilles_livrees';
+        $params['bouteilles_livrees'] = $bouteillesLivrees;
+        $updates[] = 'caisses_vides_recues = :caisses_vides_recues';
+        $params['caisses_vides_recues'] = $caissesVidesRecues;
+        $updates[] = 'montant_livre = :montant_livre';
+        $params['montant_livre'] = $montantLivre;
+        $updates[] = 'proposition_montant = :proposition_montant';
+        $params['proposition_montant'] = $propositionMontant;
+        $updates[] = 'complement_confirme = :complement_confirme';
+        $params['complement_confirme'] = $complementConfirme;
+        $updates[] = 'statut = :statut';
+        $params['statut'] = 'livree';
+
+        // Si complément confirmé, recalculer caisses_prevues pour refléter le ceil
+        if ($complementConfirme && $propositionMontant > 0 && $prixCaisse > 0) {
+            $newPrevues = (int) ceil(($montantRistourne + $propositionMontant) / $prixCaisse);
+            if ($newPrevues != $caissesPrevues) {
+                $updates[] = 'caisses_prevues = :new_caisses_prevues';
+                $params['new_caisses_prevues'] = $newPrevues;
+                $updates[] = 'bouteilles_prevues = :new_bouteilles_prevues';
+                $params['new_bouteilles_prevues'] = $newPrevues * $bouteillesParCaisse;
+            }
+        }
+
+        $sql = "UPDATE mission_ristournes SET " . implode(', ', $updates) . " WHERE id = :id";
+        $ok = $this->db->query($sql, $params);
+
+        if ($ok) {
+            // Mettre à jour le montant_livre total de la mission
+            $missionId = (int) ($row['mission_id'] ?? 0);
+            if ($missionId > 0) {
+                $total = $this->db->fetchColumn(
+                    "SELECT COALESCE(SUM(montant_livre), 0) FROM mission_ristournes WHERE mission_id = :mid AND statut = 'livree'",
+                    ['mid' => $missionId]
+                );
+                $this->db->query(
+                    "UPDATE missions SET montant_livre = :ml WHERE id = :mid",
+                    ['ml' => (float) $total, 'mid' => $missionId]
+                );
+            }
+
+            // Mettre à jour le stock du véhicule : retirer les pleines livrées, ajouter les vides reçues
+            if ($missionId > 0 && $produitId > 0) {
+                $mission = $this->db->fetch("SELECT vehicule_id FROM missions WHERE id = :id", ['id' => $missionId]);
+                $vehiculeId = (int) ($mission['vehicule_id'] ?? 0);
+                if ($vehiculeId > 0) {
+                    $vehicule = $this->db->fetch("SELECT emplacement_id FROM vehicules WHERE id = :id", ['id' => $vehiculeId]);
+                    $emplacementVehiculeId = (int) ($vehicule['emplacement_id'] ?? 0);
+
+                    if ($emplacementVehiculeId > 0) {
+                        $stockModel = new Stock();
+                        $mouvementModel = new MouvementStock();
+
+                        // Retirer les caisses pleines livrées du stock véhicule
+                        if ($caissesLivrees > 0) {
+                            $stockModel->updateOrCreate($produitId, $emplacementVehiculeId, [
+                                'quantite_pleine' => -$bouteillesLivrees,
+                                'caisses_pleine' => -$caissesLivrees,
+                            ]);
+                            $mouvementModel->create([
+                                'produit_id' => $produitId,
+                                'emplacement_id' => $emplacementVehiculeId,
+                                'type_mouvement' => 'sortie',
+                                'quantite' => -$bouteillesLivrees,
+                                'reference_type' => 'ristourne',
+                                'reference_id' => $mrId,
+                                'motif' => 'Livraison ristourne',
+                                'created_by' => (int) ($data['user_id'] ?? 0),
+                            ]);
+                        }
+
+                        // Ajouter les caisses vides reçues du client au stock véhicule
+                        if ($caissesVidesRecues > 0) {
+                            $stockModel->updateOrCreate($produitId, $emplacementVehiculeId, [
+                                'quantite_vide' => $caissesVidesRecues * $bouteillesParCaisse,
+                                'caisses_vide' => $caissesVidesRecues,
+                            ]);
+                            $mouvementModel->create([
+                                'produit_id' => $produitId,
+                                'emplacement_id' => $emplacementVehiculeId,
+                                'type_mouvement' => 'entree',
+                                'quantite' => $caissesVidesRecues * $bouteillesParCaisse,
+                                'reference_type' => 'ristourne',
+                                'reference_id' => $mrId,
+                                'motif' => 'Caisses vides reçues ristourne',
+                                'created_by' => (int) ($data['user_id'] ?? 0),
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            // Retourner les infos calculées
+            return $this->success([
+                'caisses_livrees' => $caissesLivrees,
+                'caisses_vides_recues' => $caissesVidesRecues,
+                'montant_livre' => $montantLivre,
+                'montant_ajoute' => $montantAjoute,
+                'complement_confirme' => $complementConfirme,
+                'reste_ristourne' => max(0, $montantRistourne - ($caissesLivrees > 0 ? round($caissesLivrees * $prixCaisse, 2) : 0)),
+            ], 'Ristourne livrée et encaissement enregistré');
+        }
+
+        return $this->error('Impossible d\'enregistrer l\'encaissement', 500);
     }
 
     /**
@@ -447,6 +688,11 @@ class MobileController extends Controller {
             if (($mission['statut'] ?? null) !== 'en_cours') {
                 $this->db->rollBack();
                 return $this->error('Mission non en cours', 422);
+            }
+
+            if (($mission['type_mission'] ?? 'vente') === 'ristourne') {
+                $this->db->rollBack();
+                return $this->error('Impossible d\'enregistrer une vente sur une mission de ristourne', 422);
             }
 
             $vehicule = $this->db->fetch(
