@@ -86,29 +86,37 @@
                     <tr class="border-b-2 border-gray-200">
                         <th class="text-left py-2 font-semibold text-gray-500 uppercase">Client</th>
                         <th class="text-left py-2 font-semibold text-gray-500 uppercase">Produit</th>
-                        <th class="text-right py-2 font-semibold text-gray-500 uppercase">Caisses</th>
+                        <th class="text-right py-2 font-semibold text-gray-500 uppercase">Caisses prévues</th>
+                        <th class="text-right py-2 font-semibold text-gray-500 uppercase">Caisses à livrer</th>
                         <th class="text-right py-2 font-semibold text-gray-500 uppercase">Montant ristourne</th>
+                        <th class="text-right py-2 font-semibold text-gray-500 uppercase">Complément à ajouter</th>
                         <th class="text-right py-2 font-semibold text-gray-500 uppercase">Montant livré</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
-                    <?php $totalCaissesRistourne = 0; $totalMontantRistourne = 0; $totalMontantLivre = 0; ?>
+                    <?php $totalCaissesPrevues = 0; $totalCaissesRistourne = 0; $totalMontantRistourne = 0; $totalComplement = 0; $totalMontantLivre = 0; ?>
                     <?php foreach ($mission['ristournes'] as $mr): ?>
                     <?php
                         $btlPerCase = (int)($mr['bouteilles_par_caisses'] ?? 24);
                         if ($btlPerCase <= 0) $btlPerCase = 24;
+                        $caissesPrevues = (int)($mr['caisses_prevues'] ?? 0);
                         $fullCases = (int)($mr['caisses_livrees'] ?? 0);
                         $totalBtl = (int)($mr['bouteilles_livrees'] ?? ($fullCases * $btlPerCase));
                         $extraBtl = max(0, $totalBtl - ($fullCases * $btlPerCase));
+                        $complement = (float)($mr['proposition_montant'] ?? 0);
+                        $totalCaissesPrevues += $caissesPrevues;
                         $totalCaissesRistourne += $fullCases;
                         $totalMontantRistourne += (float)($mr['montant_ristourne'] ?? 0);
+                        $totalComplement += $complement;
                         $totalMontantLivre += (float)($mr['montant_livre'] ?? 0);
                     ?>
                     <tr>
                         <td class="py-2 font-medium"><?= htmlspecialchars($mr['client_nom'] ?? 'N/A') ?><?= !empty($mr['numero_client']) ? ' (' . htmlspecialchars($mr['numero_client']) . ')' : '' ?></td>
                         <td class="py-2"><?= htmlspecialchars($mr['produit_nom'] ?? 'N/A') ?></td>
+                        <td class="py-2 text-right"><?= $caissesPrevues ?> cs</td>
                         <td class="py-2 text-right font-medium"><?= $fullCases ?> cs<?= $extraBtl > 0 ? ' + ' . $extraBtl . ' bt' : '' ?></td>
                         <td class="py-2 text-right"><?= format_money_converted($mr['montant_ristourne'] ?? 0) ?></td>
+                        <td class="py-2 text-right<?= $complement > 0 ? ' font-semibold text-red-600' : '' ?>"><?= $complement > 0 ? format_money_converted($complement) : '—' ?></td>
                         <td class="py-2 text-right font-medium"><?= format_money_converted($mr['montant_livre'] ?? 0) ?></td>
                     </tr>
                     <?php endforeach; ?>
@@ -116,8 +124,10 @@
                 <tfoot class="border-t-2 border-gray-200">
                     <tr>
                         <td class="py-2 font-bold" colspan="2">Total</td>
+                        <td class="py-2 text-right font-bold"><?= $totalCaissesPrevues ?> cs</td>
                         <td class="py-2 text-right font-bold"><?= $totalCaissesRistourne ?> cs</td>
                         <td class="py-2 text-right font-bold"><?= format_money_converted($totalMontantRistourne) ?></td>
+                        <td class="py-2 text-right font-bold text-red-600"><?= $totalComplement > 0 ? format_money_converted($totalComplement) : '—' ?></td>
                         <td class="py-2 text-right font-bold text-blue-600"><?= format_money_converted($totalMontantLivre) ?></td>
                     </tr>
                 </tfoot>

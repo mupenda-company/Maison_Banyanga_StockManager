@@ -335,6 +335,11 @@ ob_start();
                         </div>
                         <?php endforeach; ?>
                     </div>
+                    <?php if ($totalMontantAjoute > 0): ?>
+                    <div class="mt-4 p-4 rounded-xl border bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+                        <p class="font-semibold text-green-800 dark:text-green-300">Total récolté pour les compléments : <?= format_money_converted($totalMontantAjoute) ?></p>
+                    </div>
+                    <?php endif; ?>
                     <?php else: ?>
                     <div class="rounded-xl border bg-gray-50 dark:bg-gray-900/50 p-4">
                         <div class="flex items-center justify-between gap-4">

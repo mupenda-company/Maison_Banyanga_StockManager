@@ -256,6 +256,94 @@
                 <p class="text-base font-bold text-green-700 whitespace-nowrap"><?= format_money_converted($mission['montant_livre'] ?? 0) ?></p>
             </div>
         </div>
+
+        <?php if (!empty($mission['ristournes'])): ?>
+        <div class="mb-4">
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Détail par client</h3>
+            <table class="w-full border-collapse text-xs compact-table">
+                <thead>
+                    <tr class="border-b-2 border-gray-200">
+                        <th class="text-left py-1.5 font-semibold text-gray-500 uppercase">Client</th>
+                        <th class="text-left py-1.5 font-semibold text-gray-500 uppercase">Produit</th>
+                        <th class="text-right py-1.5 font-semibold text-gray-500 uppercase">Cs prévues</th>
+                        <th class="text-right py-1.5 font-semibold text-gray-500 uppercase">Cs livrées</th>
+                        <th class="text-right py-1.5 font-semibold text-gray-500 uppercase">Montant ristourne</th>
+                        <th class="text-right py-1.5 font-semibold text-gray-500 uppercase">Complément ajouté</th>
+                        <th class="text-right py-1.5 font-semibold text-gray-500 uppercase">Montant récolté</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    <?php
+                        $totalCsPrevues = 0; $totalCsLivrees = 0;
+                        $totalMontantRist = 0; $totalComplementAjoute = 0; $totalMontantRecolte = 0;
+                        foreach ($mission['ristournes'] as $mr):
+                            $btlPerCase = (int)($mr['bouteilles_par_caisses'] ?? 24);
+                            if ($btlPerCase <= 0) $btlPerCase = 24;
+                            $csPrev = (int)($mr['caisses_prevues'] ?? 0);
+                            $csLiv = (int)($mr['caisses_livrees'] ?? 0);
+                            $montRist = (float)($mr['montant_ristourne'] ?? 0);
+                            $complement = (float)($mr['proposition_montant'] ?? 0);
+                            $complementConfirme = !empty($mr['complement_confirme']);
+                            // Montant récolté : si complément confirmé → (caisses_livrees * prix_caisse - montant_ristourne)
+                            // Si pas de complément → montant_ristourne (le montant qui est rentré)
+                            $prixCaisseMr = (float)($mr['prix_vente_caisses'] ?? 0);
+                            if ($prixCaisseMr <= 0) $prixCaisseMr = (float)($mr['prix_vente_unitaire'] ?? 0) * $btlPerCase;
+                            $montantRecolte = 0;
+                            if ($complementConfirme && $csLiv > 0) {
+                                $montantRecolte = max(0, round($csLiv * $prixCaisseMr - $montRist, 2));
+                            }
+                            $totalCsPrevues += $csPrev;
+                            $totalCsLivrees += $csLiv;
+                            $totalMontantRist += $montRist;
+                            $totalComplementAjoute += ($complementConfirme && $complement > 0) ? $complement : 0;
+                            $totalMontantRecolte += $montantRecolte;
+                    ?>
+                    <tr>
+                        <td class="py-1.5 font-medium leading-tight"><?= htmlspecialchars($mr['client_nom'] ?? 'N/A') ?><?= !empty($mr['numero_client']) ? ' (' . htmlspecialchars($mr['numero_client']) . ')' : '' ?></td>
+                        <td class="py-1.5 leading-tight"><?= htmlspecialchars($mr['produit_nom'] ?? 'N/A') ?></td>
+                        <td class="py-1.5 text-right whitespace-nowrap"><?= $csPrev ?> cs</td>
+                        <td class="py-1.5 text-right whitespace-nowrap font-medium"><?= $csLiv ?> cs</td>
+                        <td class="py-1.5 text-right whitespace-nowrap"><?= format_money_converted($montRist) ?></td>
+                        <td class="py-1.5 text-right whitespace-nowrap<?= $complementConfirme && $complement > 0 ? ' font-semibold text-red-600' : '' ?>">
+                            <?php if ($complementConfirme && $complement > 0): ?>
+                                <?= format_money_converted($complement) ?> ✓
+                            <?php elseif ($complement > 0): ?>
+                                <?= format_money_converted($complement) ?> <span class="text-orange-500 italic">(en attente)</span>
+                            <?php else: ?>
+                                <span class="text-gray-400">—</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="py-1.5 text-right whitespace-nowrap font-medium">
+                            <?php if ($complementConfirme && $montantRecolte > 0): ?>
+                                <span class="text-green-700"><?= format_money_converted($montantRecolte) ?></span>
+                            <?php elseif (!$complementConfirme && $csLiv > 0): ?>
+                                <span class="text-gray-500 italic" title="Montant ristourne rentré (pas de complément)"><?= format_money_converted($montRist) ?></span>
+                            <?php else: ?>
+                                <span class="text-gray-400">—</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+                <tfoot class="border-t-2 border-gray-200">
+                    <tr>
+                        <td class="py-2 font-bold" colspan="2">Total</td>
+                        <td class="py-2 text-right font-bold whitespace-nowrap"><?= $totalCsPrevues ?> cs</td>
+                        <td class="py-2 text-right font-bold whitespace-nowrap"><?= $totalCsLivrees ?> cs</td>
+                        <td class="py-2 text-right font-bold whitespace-nowrap"><?= format_money_converted($totalMontantRist) ?></td>
+                        <td class="py-2 text-right font-bold whitespace-nowrap text-red-600"><?= $totalComplementAjoute > 0 ? format_money_converted($totalComplementAjoute) : '—' ?></td>
+                        <td class="py-2 text-right font-bold whitespace-nowrap text-green-700"><?= $totalMontantRecolte > 0 ? format_money_converted($totalMontantRecolte) : '—' ?></td>
+                    </tr>
+                </tfoot>
+            </table>
+            <?php if ($totalMontantRecolte > 0): ?>
+            <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded text-sm">
+                <p class="font-semibold text-green-800">Total récolté pour les compléments : <?= format_money_converted($totalMontantRecolte) ?></p>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
         <?php else: ?>
         <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-4 text-sm">
             <div class="p-3 bg-gray-50 rounded-lg border flex items-center justify-between gap-3">

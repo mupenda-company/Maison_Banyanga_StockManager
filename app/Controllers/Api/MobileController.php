@@ -215,6 +215,31 @@ class MobileController extends Controller {
             ['mission_id' => $missionId]
         );
 
+        // Calculer le montant complément récolté pour les ristournes
+        $complementRecolte = 0;
+        $nbClientsRistourne = 0;
+        if (($mission['type_mission'] ?? 'vente') === 'ristourne') {
+            $ristourneRows = $this->db->fetchAll(
+                "SELECT mr.caisses_livrees, mr.montant_ristourne, mr.complement_confirme, mr.proposition_montant,
+                        p.prix_vente_caisses, p.prix_vente_unitaire, p.bouteilles_par_caisses
+                 FROM mission_ristournes mr
+                 JOIN produits p ON mr.produit_id = p.id
+                 WHERE mr.mission_id = :mission_id",
+                ['mission_id' => $missionId]
+            );
+            $nbClientsRistourne = count($ristourneRows);
+            foreach ($ristourneRows as $mrRow) {
+                $csLiv = (int) ($mrRow['caisses_livrees'] ?? 0);
+                if (!empty($mrRow['complement_confirme']) && $csLiv > 0) {
+                    $btlPerCs = (int) ($mrRow['bouteilles_par_caisses'] ?? 24);
+                    if ($btlPerCs <= 0) $btlPerCs = 24;
+                    $prixCS = (float) ($mrRow['prix_vente_caisses'] ?? 0);
+                    if ($prixCS <= 0) $prixCS = (float) ($mrRow['prix_vente_unitaire'] ?? 0) * $btlPerCs;
+                    $complementRecolte += max(0, round($csLiv * $prixCS - (float) ($mrRow['montant_ristourne'] ?? 0), 2));
+                }
+            }
+        }
+
         return $this->success([
             'mission' => [
                 'id' => (int) ($mission['id'] ?? 0),
@@ -226,14 +251,17 @@ class MobileController extends Controller {
                 'zone_nom' => $mission['zone_nom'] ?? null,
                 'montant_ristourne_initial' => (float) ($mission['montant_ristourne_initial'] ?? 0),
                 'montant_livre' => (float) ($mission['montant_livre'] ?? 0),
+                'montant_complement_recolte' => $complementRecolte,
+                'nb_clients_ristourne' => $nbClientsRistourne,
             ],
             'ristournes' => (function() use ($missionId) {
                 $rows = $this->db->fetchAll(
-                    "SELECT mr.id, mr.ristourne_id, mr.client_id, mr.produit_id, mr.montant_ristourne, mr.caisses_prevues, mr.bouteilles_prevues, mr.caisses_livrees, mr.bouteilles_livrees, mr.caisses_vides_recues, mr.montant_livre, mr.proposition_montant, mr.complement_confirme, mr.statut, p.nom as produit_nom, p.code as produit_code, c.nom as client_nom
+                    "SELECT mr.id, mr.ristourne_id, mr.client_id, mr.produit_id, mr.montant_ristourne, mr.caisses_prevues, mr.bouteilles_prevues, mr.caisses_livrees, mr.bouteilles_livrees, mr.caisses_vides_recues, mr.montant_livre, mr.proposition_montant, mr.complement_confirme, mr.statut, p.nom as produit_nom, p.code as produit_code, p.prix_vente_caisses, p.prix_vente_unitaire, p.bouteilles_par_caisses, c.nom as client_nom, c.numero_client
                      FROM mission_ristournes mr
                      JOIN produits p ON mr.produit_id = p.id
                      JOIN clients c ON mr.client_id = c.id
-                     WHERE mr.mission_id = :mission_id",
+                     WHERE mr.mission_id = :mission_id
+                     ORDER BY c.nom ASC",
                     ['mission_id' => $missionId]
                 );
                 return $rows ?: [];
