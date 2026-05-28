@@ -5,6 +5,7 @@ $dateDebut = $dateDebut ?? date('Y-m-d');
 $dateFin = $dateFin ?? $dateDebut;
 $totalCa = (float) ($totalCa ?? 0);
 $totalVentes = (int) ($totalVentes ?? 0);
+$totalCaisses = (float) ($totalCaisses ?? 0);
 $nbAgents = (int) ($nbAgents ?? 0);
 
 $dateDebutLabel = !empty($dateDebut) ? date('d/m/Y', strtotime($dateDebut)) : 'N/A';
@@ -12,6 +13,10 @@ $dateFinLabel = !empty($dateFin) ? date('d/m/Y', strtotime($dateFin)) : 'N/A';
 $periodeLabel = $dateDebut === $dateFin
     ? $dateDebutLabel
     : ($dateDebutLabel . ' au ' . $dateFinLabel);
+$exportUrl = url('rapports/ventes-par-agent/export') . '?' . http_build_query([
+    'date_debut' => $dateDebut,
+    'date_fin' => $dateFin,
+]);
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -51,7 +56,7 @@ $periodeLabel = $dateDebut === $dateFin
         }
         .table-wrap {
             border: 1px solid #e5e7eb;
-            border-radius: 12px;
+            border-radius: 8px;
             overflow: hidden;
         }
         table {
@@ -63,7 +68,7 @@ $periodeLabel = $dateDebut === $dateFin
             color: #ffffff;
         }
         th, td {
-            padding: 8px 10px;
+            padding: 7px 8px;
             border-bottom: 1px solid #e5e7eb;
             vertical-align: top;
         }
@@ -105,13 +110,13 @@ $periodeLabel = $dateDebut === $dateFin
         }
         .summary-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 10px;
             margin-bottom: 16px;
         }
         .summary-card {
             border: 1px solid #e5e7eb;
-            border-radius: 12px;
+            border-radius: 8px;
             background: #f9fafb;
             padding: 10px 12px;
         }
@@ -143,6 +148,23 @@ $periodeLabel = $dateDebut === $dateFin
                 margin: 0;
                 padding: 0;
                 box-shadow: none;
+            }
+            .summary-grid {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 6px;
+            }
+            .summary-card {
+                padding: 7px 8px;
+            }
+            .summary-value {
+                font-size: 13px;
+            }
+            .agent-block {
+                margin-top: 12px;
+            }
+            th, td {
+                padding: 5px 6px;
+                font-size: 10.5px;
             }
             .no-print {
                 display: none !important;
@@ -196,6 +218,7 @@ $periodeLabel = $dateDebut === $dateFin
                 </p>
                 <div class="flex gap-2">
                 <a href="<?= url('rapports') ?>" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 text-sm font-semibold">Retour aux rapports</a>
+                    <a href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-semibold">Exporter Excel</a>
                     <button onclick="window.print()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-semibold">Imprimer le rapport affiché</button>
                 </div>
             </div>
@@ -209,6 +232,10 @@ $periodeLabel = $dateDebut === $dateFin
             <div class="summary-card">
                 <div class="summary-label">Agents concernés</div>
                 <div class="summary-value text-purple-700"><?= number_format($nbAgents, 0, ',', ' ') ?></div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Caisses achetees</div>
+                <div class="summary-value text-amber-700"><?= number_format($totalCaisses, 0, ',', ' ') ?></div>
             </div>
             <div class="summary-card">
                 <div class="summary-label">Chiffre d'affaires TTC</div>
@@ -234,6 +261,7 @@ $periodeLabel = $dateDebut === $dateFin
                         <div class="text-right">
                             <div class="agent-badge"><?= number_format(count($agent['ventes']), 0, ',', ' ') ?> vente(s)</div>
                             <p class="mt-2 text-sm text-gray-500">Total agent</p>
+                            <p class="text-sm font-bold text-amber-700"><?= number_format((float)($agent['total_caisses'] ?? 0), 0, ',', ' ') ?> caisse(s)</p>
                             <p class="text-lg font-bold text-green-700"><?= format_money_converted($agent['total_ca'] ?? 0) ?></p>
                         </div>
                     </div>
@@ -246,6 +274,7 @@ $periodeLabel = $dateDebut === $dateFin
                                     <th>Facture</th>
                                     <th>Client</th>
                                     <th>Emplacement</th>
+                                    <th class="num">Caisses</th>
                                     <th class="num">Total TTC</th>
                                 </tr>
                             </thead>
@@ -258,6 +287,7 @@ $periodeLabel = $dateDebut === $dateFin
                                             <div class="font-medium"><?= htmlspecialchars($vente['client_nom'] ?? 'N/A') ?></div>
                                         </td>
                                         <td><?= htmlspecialchars($vente['emplacement_nom'] ?? 'N/A') ?></td>
+                                        <td class="num font-semibold text-amber-700"><?= number_format((float)($vente['total_caisses'] ?? 0), 0, ',', ' ') ?></td>
                                         <td class="num font-bold text-gray-900"><?= format_money_converted($vente['total_ttc'] ?? 0) ?></td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -265,6 +295,7 @@ $periodeLabel = $dateDebut === $dateFin
                             <tfoot>
                                 <tr>
                                     <td colspan="4" class="text-right font-bold text-gray-700">Sous-total <?= htmlspecialchars($agent['agent_nom']) ?></td>
+                                    <td class="num font-bold text-amber-700"><?= number_format((float)($agent['total_caisses'] ?? 0), 0, ',', ' ') ?></td>
                                     <td class="num font-bold text-green-700"><?= format_money_converted($agent['total_ca'] ?? 0) ?></td>
                                 </tr>
                             </tfoot>
@@ -274,7 +305,7 @@ $periodeLabel = $dateDebut === $dateFin
             <?php endforeach; ?>
         <?php endif; ?>
 
-        <div class="mt-8 pt-4 border-t-2 border-gray-200 grid grid-cols-3 gap-4 text-center text-sm">
+        <div class="mt-8 pt-4 border-t-2 border-gray-200 grid grid-cols-4 gap-4 text-center text-sm">
             <div>
                 <p class="text-gray-500 uppercase font-semibold tracking-wider text-xs">Total ventes</p>
                 <p class="font-bold text-gray-900"><?= number_format($totalVentes, 0, ',', ' ') ?></p>
@@ -282,6 +313,10 @@ $periodeLabel = $dateDebut === $dateFin
             <div>
                 <p class="text-gray-500 uppercase font-semibold tracking-wider text-xs">Agents</p>
                 <p class="font-bold text-gray-900"><?= number_format($nbAgents, 0, ',', ' ') ?></p>
+            </div>
+            <div>
+                <p class="text-gray-500 uppercase font-semibold tracking-wider text-xs">Caisses</p>
+                <p class="font-bold text-amber-700"><?= number_format($totalCaisses, 0, ',', ' ') ?></p>
             </div>
             <div>
                 <p class="text-gray-500 uppercase font-semibold tracking-wider text-xs">CA total</p>
