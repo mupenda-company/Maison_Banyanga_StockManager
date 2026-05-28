@@ -107,35 +107,53 @@ ob_start();
                         <tr>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Produit</th>
                             <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Btl/Caisse</th>
-                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Caisses pleines</th>
-                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Caisses vides</th>
-                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Total</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Ancien plein</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Nouveau plein</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Écart plein</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Ancien vide</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Nouveau vide</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Écart vide</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         <template x-for="(ligne, index) in lignes" :key="ligne.produit_id">
-                            <tr>
+                            <tr x-bind:class="hasEcart(ligne) ? 'bg-yellow-50 dark:bg-yellow-900/10' : ''">
                                 <td class="px-4 py-3">
                                     <div class="font-medium text-gray-900 dark:text-white" x-text="ligne.produit_nom"></div>
                                     <div class="text-xs text-gray-500 font-mono" x-text="ligne.produit_code"></div>
                                 </td>
                                 <td class="px-4 py-3 text-right text-sm text-gray-600 dark:text-gray-300" x-text="ligne.bouteilles_par_caisses"></td>
+                                <td class="px-4 py-3 text-right text-sm text-gray-500 dark:text-gray-400" x-text="ligne.ancien_caisses_pleine"></td>
                                 <td class="px-4 py-3 text-right">
-                                    <input type="number" class="input w-28 text-right" min="0" step="1" x-model.number="ligne.caisses_pleine" @input="sanitizeLine(ligne)">
+                                    <input type="number" class="input w-24 text-right" min="0" step="1" x-model.number="ligne.caisses_pleine" @input="sanitizeLine(ligne)">
                                 </td>
+                                <td class="px-4 py-3 text-right font-semibold" x-bind:class="lineEcartPleine(ligne) > 0 ? 'text-green-600' : (lineEcartPleine(ligne) < 0 ? 'text-red-600' : 'text-gray-400')" x-text="lineEcartPleine(ligne) > 0 ? '+' + lineEcartPleine(ligne) : lineEcartPleine(ligne)"></td>
+                                <td class="px-4 py-3 text-right text-sm text-gray-500 dark:text-gray-400" x-text="ligne.ancien_caisses_vide"></td>
                                 <td class="px-4 py-3 text-right">
-                                    <input type="number" class="input w-28 text-right" min="0" step="1" x-model.number="ligne.caisses_vide" @input="sanitizeLine(ligne)">
+                                    <input type="number" class="input w-24 text-right" min="0" step="1" x-model.number="ligne.caisses_vide" @input="sanitizeLine(ligne)">
                                 </td>
-                                <td class="px-4 py-3 text-right font-semibold text-primary-600" x-text="lineTotal(ligne) + ' cs'"></td>
+                                <td class="px-4 py-3 text-right font-semibold" x-bind:class="lineEcartVide(ligne) > 0 ? 'text-green-600' : (lineEcartVide(ligne) < 0 ? 'text-red-600' : 'text-gray-400')" x-text="lineEcartVide(ligne) > 0 ? '+' + lineEcartVide(ligne) : lineEcartVide(ligne)"></td>
                             </tr>
                         </template>
                     </tbody>
                 </table>
             </div>
 
+            <!-- Motif d'ecart -->
+            <div x-show="hasAnyEcart()" x-transition class="mt-4 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-800">
+                <div class="flex items-center gap-2 mb-2">
+                    <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                    <span class="font-semibold text-yellow-700 dark:text-yellow-300">Ecarts detectes</span>
+                    <span class="text-sm text-yellow-600 dark:text-yellow-400" x-text="ecartCount() + ' produit(s) avec ecart(s)'"></span>
+                </div>
+                <label class="label">Motif de l'ecart *</label>
+                <textarea x-model="motif_ecart" class="input" rows="2" placeholder="Expliquez la raison des differences constatees (ex: casse, vol, erreur de comptage...)" :required="hasAnyEcart()"></textarea>
+            </div>
+
             <div class="mt-6 flex items-center justify-between gap-4 flex-wrap">
                 <div class="text-sm text-gray-500">
                     <span class="font-medium text-gray-700 dark:text-gray-200" x-text="lignes.length"></span> produit(s) dans l’inventaire
+                    <span x-show="hasAnyEcart()" class="ml-2 text-yellow-600 font-medium" x-text="'(' + ecartCount() + ' ecart(s))'"></span>
                 </div>
                 <div class="flex gap-3">
                     <button type="button" @click="reloadLines()" class="btn-secondary">Recharger depuis le véhicule</button>
@@ -279,6 +297,7 @@ document.addEventListener('alpine:init', () => {
         vehicules: <?= json_encode($vehicules, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
         produits: <?= json_encode($produits, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
         lignes: [],
+        motif_ecart: '',
 
         init() {
             if (!this.vehicule_id && this.vehicules.length > 0) {
@@ -305,13 +324,17 @@ document.addEventListener('alpine:init', () => {
         reloadLines() {
             this.lignes = (this.produits || []).map((p) => {
                 const stock = this.getStockForProduct(p.id);
+                const ancienPleine = Math.max(0, Math.round(this.parseQty(stock.caisses_pleine || 0)));
+                const ancienVide = Math.max(0, Math.round(this.parseQty(stock.caisses_vide || 0)));
                 return {
                     produit_id: p.id,
                     produit_nom: p.nom,
                     produit_code: p.code,
                     bouteilles_par_caisses: parseInt(p.bouteilles_par_caisses) || 24,
-                    caisses_pleine: Math.max(0, Math.round(this.parseQty(stock.caisses_pleine || 0))),
-                    caisses_vide: Math.max(0, Math.round(this.parseQty(stock.caisses_vide || 0)))
+                    caisses_pleine: ancienPleine,
+                    caisses_vide: ancienVide,
+                    ancien_caisses_pleine: ancienPleine,
+                    ancien_caisses_vide: ancienVide
                 };
             });
         },
@@ -323,6 +346,26 @@ document.addEventListener('alpine:init', () => {
 
         lineTotal(ligne) {
             return Math.max(0, Math.round(this.parseQty(ligne.caisses_pleine || 0) + this.parseQty(ligne.caisses_vide || 0)));
+        },
+
+        lineEcartPleine(ligne) {
+            return this.parseQty(ligne.caisses_pleine || 0) - this.parseQty(ligne.ancien_caisses_pleine || 0);
+        },
+
+        lineEcartVide(ligne) {
+            return this.parseQty(ligne.caisses_vide || 0) - this.parseQty(ligne.ancien_caisses_vide || 0);
+        },
+
+        hasEcart(ligne) {
+            return this.lineEcartPleine(ligne) !== 0 || this.lineEcartVide(ligne) !== 0;
+        },
+
+        hasAnyEcart() {
+            return this.lignes.some(l => this.hasEcart(l));
+        },
+
+        ecartCount() {
+            return this.lignes.filter(l => this.hasEcart(l)).length;
         },
 
         selectedCapacity() {
@@ -357,21 +400,30 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
+            // Vérifier motif si écarts
+            if (this.hasAnyEcart() && !this.motif_ecart.trim()) {
+                App.notify('Veuillez indiquer le motif des écarts constatés', 'error');
+                return;
+            }
+
             const lignes = this.lignes.map((ligne) => ({
                 produit_id: parseInt(ligne.produit_id, 10),
                 caisses_pleine: Math.max(0, Math.round(this.parseQty(ligne.caisses_pleine || 0))),
                 caisses_vide: Math.max(0, Math.round(this.parseQty(ligne.caisses_vide || 0))),
+                ancien_caisses_pleine: Math.max(0, Math.round(this.parseQty(ligne.ancien_caisses_pleine || 0))),
+                ancien_caisses_vide: Math.max(0, Math.round(this.parseQty(ligne.ancien_caisses_vide || 0))),
                 has_existing_stock: true
             }));
 
             try {
                 this.loading = true;
+                const ecartMsg = this.hasAnyEcart() ? ` (${this.ecartCount()} écart(s) détecté(s))` : '';
                 const ok = await App.confirm({
-                    title: 'Initialiser le stock du véhicule ?',
-                    message: `Confirmer l\'enregistrement de l\'inventaire pour ${vehicule.immatriculation || 'ce véhicule'} ?`,
+                    title: 'Enregistrer l\'inventaire du véhicule ?',
+                    message: `Confirmer l\'enregistrement de l\'inventaire pour ${vehicule.immatriculation || 'ce véhicule'}${ecartMsg} ?`,
                     confirmText: 'Enregistrer',
                     cancelText: 'Annuler',
-                    type: 'info'
+                    type: this.hasAnyEcart() ? 'warning' : 'info'
                 });
 
                 if (!ok) {
@@ -380,7 +432,8 @@ document.addEventListener('alpine:init', () => {
 
                 await App.api('/api/stocks/inventaire-initial', 'POST', {
                     emplacement_id: parseInt(vehicule.emplacement_id, 10),
-                    lignes: lignes
+                    lignes: lignes,
+                    motif_ecart: this.motif_ecart.trim()
                 });
 
                 App.notify('Inventaire du véhicule enregistré avec succès', 'success');

@@ -490,6 +490,16 @@ class MobileController extends Controller {
                 );
             }
 
+            // Mettre à jour mission_chargements.quantite_vendue pour que le stock API reflète la livraison
+            if ($missionId > 0 && $produitId > 0 && $bouteillesLivrees > 0) {
+                $this->db->query(
+                    "UPDATE mission_chargements
+                     SET quantite_vendue = IFNULL(quantite_vendue, 0) + :bv
+                     WHERE mission_id = :mid AND produit_id = :pid",
+                    ['bv' => $bouteillesLivrees, 'mid' => $missionId, 'pid' => $produitId]
+                );
+            }
+
             // Mettre à jour le stock du véhicule : retirer les pleines livrées, ajouter les vides reçues
             if ($missionId > 0 && $produitId > 0) {
                 $mission = $this->db->fetch("SELECT vehicule_id FROM missions WHERE id = :id", ['id' => $missionId]);

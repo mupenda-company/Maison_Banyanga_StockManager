@@ -173,7 +173,7 @@
             <?php if (!empty($vente['client_numero'])): ?><div class="info-row">N°: <?= htmlspecialchars($vente['client_numero']) ?></div><?php endif; ?>
             <?php if (!empty($ristourneInfo)): ?>
                 <div class="info-row">Cumulé: <?= number_format((int) ($ristourneInfo['total_caisses'] ?? 0), 0, '.', ' ') ?> cs</div>
-                <div class="info-row">Ristourne: <?= number_format((float) ($ristourneInfo['taux_applique'] ?? 0), 2, '.', ' ') ?>% (<?= format_money_converted($ristourneInfo['montant_ristourne'] ?? 0) ?>)</div>
+                <div class="info-row">Ristourne: <?= number_format((float) ($ristourneInfo['taux_applique'] ?? 0), 2, '.', ' ') ?>% (<?= format_money_converted($ristourneInfo['montant_ristourne_net'] ?? $ristourneInfo['montant_ristourne'] ?? 0) ?>)</div>
             <?php elseif (isset($totalCaissesClient)): ?>
                 <div class="info-row">Cumulé: <?= number_format((int) $totalCaissesClient, 0, '.', ' ') ?> cs</div>
             <?php endif; ?>

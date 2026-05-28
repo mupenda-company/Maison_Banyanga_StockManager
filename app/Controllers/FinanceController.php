@@ -60,6 +60,25 @@ class FinanceController extends Controller
         );
         $ristourneStats = $ristournes[0] ?? ['total_ristournes' => 0, 'nb_ristournes' => 0, 'ristournes_payees' => 0, 'ristournes_en_attente' => 0];
 
+        // Récolte locale (deduction locale sur ristournes de la période)
+        $ristourneModel = new Ristourne();
+        $clientsAvecRistourne = $this->db->fetchAll(
+            "SELECT v.client_id,
+                    COALESCE(SUM(ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0)), 0) as total_caisses
+             FROM ventes v
+             JOIN vente_details vd ON vd.vente_id = v.id
+             JOIN produits p ON vd.produit_id = p.id
+             WHERE v.statut = 'validee'
+             AND v.date_vente BETWEEN :debut AND :fin
+             GROUP BY v.client_id",
+            ['debut' => $debut, 'fin' => $fin]
+        );
+        $totalRecolteLocale = 0;
+        foreach ($clientsAvecRistourne as $cr) {
+            $deduction = $ristourneModel->calculerDeductionLocale((int) $cr['total_caisses']);
+            $totalRecolteLocale += $deduction['deduction_locale'];
+        }
+
         // Dettes emballages (caisses vides)
         $dettesAppro = $this->db->fetch(
             "SELECT COALESCE(SUM(quantite_dette_caisses - quantite_remboursee), 0) as total_dettes,
@@ -129,6 +148,7 @@ class FinanceController extends Controller
             'pertesValeur' => $pertesValeur,
             'benefice' => $benefice,
             'tvaCollectee' => $tvaCollectee,
+            'totalRecolteLocale' => $totalRecolteLocale,
         ]);
     }
 

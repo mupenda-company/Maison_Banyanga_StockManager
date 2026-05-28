@@ -99,15 +99,41 @@ class StockController extends Controller
             return $this->error('Erreurs de validation', 422, $errors);
         }
 
+        $emplacementId = (int) $data['emplacement_id'];
+        $motifEcart = trim($data['motif_ecart'] ?? '');
+        $userId = (int) ($_SESSION['user_id'] ?? 0);
+        $hasEcart = false;
+
+        // Vérifier s'il y a des écarts et si le motif est requis
+        foreach ($data['lignes'] as $ligne) {
+            $produitId = (int) ($ligne['produit_id'] ?? 0);
+            if ($produitId <= 0) continue;
+            $ancienPleine = (int) ($ligne['ancien_caisses_pleine'] ?? 0);
+            $ancienVide = (int) ($ligne['ancien_caisses_vide'] ?? 0);
+            $nouveauPleine = (int) ($ligne['caisses_pleine'] ?? 0);
+            $nouveauVide = (int) ($ligne['caisses_vide'] ?? 0);
+            if ($nouveauPleine !== $ancienPleine || $nouveauVide !== $ancienVide) {
+                $hasEcart = true;
+                break;
+            }
+        }
+
+        if ($hasEcart && empty($motifEcart)) {
+            return $this->error('Le motif de l\'écart est requis lorsque des différences sont constatées', 422);
+        }
+
         try {
             $this->db->beginTransaction();
 
             $totalProduits = 0;
+            $totalEcarts = 0;
             foreach ($data['lignes'] as $ligne) {
                 $produitId = (int) ($ligne['produit_id'] ?? 0);
                 $caissesPleines = (int) ($ligne['caisses_pleine'] ?? 0);
                 $caissesVides = (int) ($ligne['caisses_vide'] ?? 0);
-                $stockExistant = $this->stockModel->getStock($produitId, (int) $data['emplacement_id']);
+                $ancienPleine = (int) ($ligne['ancien_caisses_pleine'] ?? 0);
+                $ancienVide = (int) ($ligne['ancien_caisses_vide'] ?? 0);
+                $stockExistant = $this->stockModel->getStock($produitId, $emplacementId);
 
                 if ($produitId <= 0) {
                     continue;
@@ -117,18 +143,54 @@ class StockController extends Controller
                     continue;
                 }
 
-                $this->stockModel->setInitialStock($produitId, (int) $data['emplacement_id'], [
+                $this->stockModel->setInitialStock($produitId, $emplacementId, [
                     'caisses_pleine' => $caissesPleines,
                     'caisses_vide' => $caissesVides
                 ]);
+
+                // Enregistrer les mouvements d'inventaire pour les écarts
+                $ecartPleine = $caissesPleines - $ancienPleine;
+                $ecartVide = $caissesVides - $ancienVide;
+                $produit = (new Produit())->find($produitId);
+                $btlParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24) ?: 24;
+
+                if ($ecartPleine !== 0) {
+                    $this->mouvementModel->create([
+                        'produit_id' => $produitId,
+                        'emplacement_id' => $emplacementId,
+                        'type_mouvement' => 'inventaire',
+                        'quantite' => $ecartPleine * $btlParCaisse,
+                        'reference_type' => 'inventaire',
+                        'reference_id' => 0,
+                        'motif' => 'Ecart inventaire pleines: ' . ($ecartPleine > 0 ? '+' : '') . $ecartPleine . ' cs' . ($motifEcart ? ' - ' . $motifEcart : ''),
+                        'created_by' => $userId,
+                    ]);
+                    $totalEcarts++;
+                }
+
+                if ($ecartVide !== 0) {
+                    $this->mouvementModel->create([
+                        'produit_id' => $produitId,
+                        'emplacement_id' => $emplacementId,
+                        'type_mouvement' => 'inventaire',
+                        'quantite' => $ecartVide * $btlParCaisse,
+                        'reference_type' => 'inventaire',
+                        'reference_id' => 0,
+                        'motif' => 'Ecart inventaire vides: ' . ($ecartVide > 0 ? '+' : '') . $ecartVide . ' cs' . ($motifEcart ? ' - ' . $motifEcart : ''),
+                        'created_by' => $userId,
+                    ]);
+                    $totalEcarts++;
+                }
+
                 $totalProduits++;
             }
 
             $this->db->commit();
 
             return $this->success([
-                'total_produits' => $totalProduits
-            ], 'Inventaire initial enregistré avec succès');
+                'total_produits' => $totalProduits,
+                'total_ecarts' => $totalEcarts
+            ], 'Inventaire enregistré avec succès' . ($totalEcarts > 0 ? " ({$totalEcarts} écart(s) enregistré(s))" : ''));
         } catch (Exception $e) {
             $this->db->rollBack();
             return $this->error($e->getMessage(), 400);

@@ -21,6 +21,35 @@ class Ristourne extends Model
     }
 
     /**
+     * Calculer la deduction locale par caisse selon le palier
+     * - < 5 caisses: 0 CDF/caisse
+     * - 5-200 caisses: 100 CDF/caisse
+     * - 201-500 caisses: 200 CDF/caisse
+     * - 501+ caisses: 250 CDF/caisse
+     */
+    public function calculerDeductionLocale($totalCaisses)
+    {
+        $totalCaisses = (int) $totalCaisses;
+        if ($totalCaisses < 5) {
+            return ['taux_local' => 0, 'deduction_locale' => 0, 'palier_local' => 'Aucun'];
+        } elseif ($totalCaisses <= 200) {
+            $taux = 100;
+            $palier = '5-200 cs';
+        } elseif ($totalCaisses <= 500) {
+            $taux = 200;
+            $palier = '201-500 cs';
+        } else {
+            $taux = 250;
+            $palier = '501+ cs';
+        }
+        return [
+            'taux_local' => $taux,
+            'deduction_locale' => $taux * $totalCaisses,
+            'palier_local' => $palier
+        ];
+    }
+
+    /**
      * Calculer la ristourne pour un client sur un mois donné
      */
     public function calculerRistourne($clientId, $mois, $annee)
@@ -59,6 +88,10 @@ class Ristourne extends Model
 
         $palierNom = abs($tauxRistourne - 5.0) < 0.0001 ? 'Standard' : 'Spécial';
 
+        // Deduction locale
+        $deductionLocale = $this->calculerDeductionLocale($totalCaisses);
+        $montantRistourneNet = max(0, $montantRistourne - $deductionLocale['deduction_locale']);
+
         return [
             'client_id' => $clientId,
             'periode_debut' => "$annee-$mois-01",
@@ -68,7 +101,11 @@ class Ristourne extends Model
             'palier_id' => null,
             'palier_nom' => $palierNom,
             'taux_applique' => $tauxRistourne,
-            'montant_ristourne' => $montantRistourne
+            'montant_ristourne' => $montantRistourne,
+            'taux_local' => $deductionLocale['taux_local'],
+            'deduction_locale' => $deductionLocale['deduction_locale'],
+            'palier_local' => $deductionLocale['palier_local'],
+            'montant_ristourne_net' => $montantRistourneNet
         ];
     }
 
