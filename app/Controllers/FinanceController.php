@@ -27,6 +27,74 @@ class FinanceController extends Controller
         $this->requireAuth();
         $this->requirePermission('finance.voir');
 
+        $data = $this->getFinanceData();
+        $this->view('finance/index', $data);
+    }
+
+    public function print()
+    {
+        $this->requireAuth();
+        $this->requirePermission('finance.voir');
+
+        $data = $this->getFinanceData();
+        $this->view('finance/print', $data);
+    }
+
+    public function export()
+    {
+        $this->requireAuth();
+        $this->requirePermission('finance.voir');
+
+        $data = $this->getFinanceData();
+        $filename = 'detail_finance_' . $data['dateDebut'] . '_' . $data['dateFin'] . '.csv';
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename=' . $filename);
+
+        $output = fopen('php://output', 'w');
+        fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+
+        fputcsv($output, ['Detail financier']);
+        fputcsv($output, ['Periode', $data['dateDebut'] . ' au ' . $data['dateFin']]);
+        fputcsv($output, []);
+
+        fputcsv($output, ['Resume', 'Valeur']);
+        fputcsv($output, ["Chiffre d'affaires HT", number_format((float)($data['statsVentes']['total_ht'] ?? 0), 2, '.', '')]);
+        fputcsv($output, ['TVA collectee', number_format((float)$data['tvaCollectee'], 2, '.', '')]);
+        fputcsv($output, ["Chiffre d'affaires TTC", number_format((float)$data['caTotal'], 2, '.', '')]);
+        fputcsv($output, ['Valeur des pertes', number_format((float)$data['pertesValeur'], 2, '.', '')]);
+        fputcsv($output, ['Depenses', number_format((float)$data['totalDepenses'], 2, '.', '')]);
+        fputcsv($output, ['Solde net', number_format((float)$data['benefice'], 2, '.', '')]);
+        fputcsv($output, ['Recolte locale', number_format((float)$data['totalRecolteLocale'], 2, '.', '')]);
+        fputcsv($output, ['Dettes emballages (caisses)', (int)($data['dettesAppro']['total_dettes'] ?? 0)]);
+        fputcsv($output, ['Panier moyen', number_format((float)($data['statsVentes']['moyenne_vente'] ?? 0), 2, '.', '')]);
+        fputcsv($output, []);
+
+        $this->writeCsvSection($output, 'Evolution du CA par jour', ['Jour', 'Nombre de ventes', 'CA', 'TVA'], $data['ventesParJour'], function ($row) {
+            return [$row['jour'] ?? '', $row['nb_ventes'] ?? 0, number_format((float)($row['ca_jour'] ?? 0), 2, '.', ''), number_format((float)($row['tva_jour'] ?? 0), 2, '.', '')];
+        });
+        $this->writeCsvSection($output, 'Ventes par zone', ['Zone', 'Ventes', 'CA'], $data['ventesParZone'], function ($row) {
+            return [$row['zone_nom'] ?? '', $row['nb_ventes'] ?? 0, number_format((float)($row['total_ca'] ?? 0), 2, '.', '')];
+        });
+        $this->writeCsvSection($output, 'Ventes par produit', ['Produit', 'Caisses', 'CA'], $data['ventesParProduit'], function ($row) {
+            return [$row['nom'] ?? '', number_format((float)($row['total_caisses'] ?? 0), 2, '.', ''), number_format((float)($row['total_vente'] ?? 0), 2, '.', '')];
+        });
+        $this->writeCsvSection($output, 'Top clients', ['Client', 'Numero client', 'Ventes', 'CA'], $data['topClients'], function ($row) {
+            return [$row['nom'] ?? '', $row['numero_client'] ?? '', $row['nb_ventes'] ?? 0, number_format((float)($row['total_ca'] ?? 0), 2, '.', '')];
+        });
+        $this->writeCsvSection($output, 'Pertes par type', ['Type', 'Nombre', 'Valeur', 'Caisses'], $data['pertesParType'], function ($row) {
+            return [$row['type_perte'] ?? 'Autre', $row['nb'] ?? 0, number_format((float)($row['valeur'] ?? 0), 2, '.', ''), number_format((float)($row['quantite'] ?? 0), 2, '.', '')];
+        });
+        $this->writeCsvSection($output, 'Depenses par categorie', ['Categorie', 'Nombre', 'Total'], $data['depensesParCategorie'], function ($row) {
+            return [$row['categorie'] ?? '', $row['nb'] ?? 0, number_format((float)($row['total'] ?? 0), 2, '.', '')];
+        });
+
+        fclose($output);
+        exit;
+    }
+
+    private function getFinanceData()
+    {
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
         $dateFin = $_GET['date_fin'] ?? date('Y-m-d');
 
@@ -129,7 +197,7 @@ class FinanceController extends Controller
         // TVA collectée
         $tvaCollectee = (float) ($statsVentes['total_tva'] ?? 0);
 
-        $this->view('finance/index', [
+        return [
             'dateDebut' => $dateDebut,
             'dateFin' => $dateFin,
             'statsVentes' => $statsVentes,
@@ -149,7 +217,25 @@ class FinanceController extends Controller
             'benefice' => $benefice,
             'tvaCollectee' => $tvaCollectee,
             'totalRecolteLocale' => $totalRecolteLocale,
-        ]);
+        ];
+    }
+
+    private function writeCsvSection($output, $title, array $headers, array $rows, callable $mapper)
+    {
+        fputcsv($output, [$title]);
+        fputcsv($output, $headers);
+
+        if (empty($rows)) {
+            fputcsv($output, ['Aucune donnee']);
+            fputcsv($output, []);
+            return;
+        }
+
+        foreach ($rows as $row) {
+            fputcsv($output, $mapper($row));
+        }
+
+        fputcsv($output, []);
     }
 
     /**

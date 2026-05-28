@@ -305,11 +305,19 @@ class Vente extends Model
                     v.statut, v.notes,
                     v.created_by,
                     u.nom as agent_nom, u.prenom as agent_prenom, u.role as agent_role,
-                    c.nom as client_nom, e.nom as emplacement_nom
+                    c.nom as client_nom, e.nom as emplacement_nom,
+                    COALESCE(vd_totaux.total_caisses, 0) as total_caisses
              FROM {$this->table} v
              LEFT JOIN users u ON v.created_by = u.id
              LEFT JOIN clients c ON v.client_id = c.id
              LEFT JOIN emplacements e ON v.emplacement_id = e.id
+             LEFT JOIN (
+                SELECT vd.vente_id,
+                       SUM(COALESCE(vd.quantite_caisses, ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0))) as total_caisses
+                FROM vente_details vd
+                JOIN produits p ON vd.produit_id = p.id
+                GROUP BY vd.vente_id
+             ) vd_totaux ON vd_totaux.vente_id = v.id
              WHERE v.statut = 'validee'
                AND v.date_vente BETWEEN :date_debut AND :date_fin
              ORDER BY COALESCE(u.prenom, ''), COALESCE(u.nom, ''), v.date_vente ASC",

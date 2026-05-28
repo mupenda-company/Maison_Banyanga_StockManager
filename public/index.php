@@ -175,6 +175,8 @@ $routes = [
     
     // Finance
     'GET::/finance' => ['FinanceController', 'index'],
+    'GET::/finance/print' => ['FinanceController', 'print'],
+    'GET::/finance/export' => ['FinanceController', 'export'],
     'GET::/api/finance/stats' => ['FinanceController', 'apiStats'],
     
     // Ristournes
