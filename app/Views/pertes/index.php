@@ -1,14 +1,26 @@
 <?php 
 $pageTitle = 'Pertes';
+$printMode = isset($print_mode) ? (bool) $print_mode : false;
+$baseQuery = [];
+foreach (['type', 'date_debut', 'date_fin', 'produit_id', 'emplacement_id'] as $key) {
+    if (!empty($_GET[$key])) {
+        $baseQuery[$key] = $_GET[$key];
+    }
+}
+$printUrl = '?' . http_build_query(array_merge($baseQuery, ['print' => 1]));
+$exportUrl = '?' . http_build_query(array_merge($baseQuery, ['export' => 'excel']));
 ob_start();
 ?>
 
 <!-- Header -->
-<div class="flex items-center justify-between mb-6">
+<div class="flex items-center justify-between mb-6 no-print">
     <div>
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Pertes</h1>
         <p class="text-gray-500 dark:text-gray-400">Gestion des pertes et casses</p>
     </div>
+    <div class="flex gap-2">
+    <button type="button" onclick="window.open('<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>','_blank')" class="btn btn-secondary">Imprimer</button>
+    <a href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary">Exporter Excel</a>
     <?php if (can('pertes.creer')): ?>
     <a href="<?= url('pertes/create') ?>" class="btn btn-primary">
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -17,10 +29,11 @@ ob_start();
         Déclarer une perte
     </a>
     <?php endif; ?>
+    </div>
 </div>
 
 <!-- Stats -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 no-print">
     <div class="stat-card">
         <p class="stat-label">Pertes ce mois</p>
         <p class="stat-value text-red-600"><?= number_format($stats['total_caisses'] ?? 0, 1, '.', ' ') ?> cs</p>
@@ -36,7 +49,7 @@ ob_start();
 </div>
 
 <!-- Filtres -->
-<div class="card mb-6">
+<div class="card mb-6 no-print">
     <div class="card-body">
         <form method="GET" class="flex flex-wrap gap-4 items-end">
             <div>
@@ -63,6 +76,13 @@ ob_start();
     </div>
 </div>
 
+<?php if ($printMode): ?>
+<div class="print-only mb-6 border-b-2 border-gray-800 pb-4">
+    <h1 class="text-2xl font-bold uppercase"><?= htmlspecialchars((new Parametre())->get('nom_entreprise', APP_NAME)) ?></h1>
+    <p class="text-sm">Pertes - imprime le <?= date('d/m/Y H:i') ?></p>
+</div>
+<?php endif; ?>
+
 <!-- Liste des pertes -->
 <div class="card">
     <div class="card-body p-0">
@@ -86,7 +106,7 @@ ob_start();
                         <th class="text-right">Valeur</th>
                         <th>Emplacement</th>
                         <th>Motif</th>
-                        <th class="text-right">Actions</th>
+                        <th class="text-right no-print">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -117,7 +137,7 @@ ob_start();
                             <span class="badge-secondary">Perte</span>
                             <?php endif; ?>
                         </td>
-                        <td class="text-right">
+                        <td class="text-right no-print">
                             <div class="font-black text-red-600"><?= $caisses ?> cs</div>
                         </td>
                         <td class="text-right font-bold"><?= format_money_converted($perte['valeur_perte'] ?? 0) ?></td>
@@ -162,6 +182,22 @@ async function supprimerPerte(id) {
     }
 }
 </script>
+
+<?php if ($printMode): ?>
+<style>
+@media print {
+    @page { margin: 10mm; }
+    .no-print { display: none !important; }
+    .print-only { display: block !important; }
+    .card { border: none !important; box-shadow: none !important; }
+    .table th, .table td { border: 1px solid #ddd !important; padding: 6px !important; font-size: 10pt !important; }
+}
+</style>
+<script>
+window.addEventListener('load', function () { window.print(); });
+window.addEventListener('afterprint', function () { if (window.opener) window.close(); });
+</script>
+<?php endif; ?>
 
 <?php 
 $content = ob_get_clean();

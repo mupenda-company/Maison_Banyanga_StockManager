@@ -60,7 +60,14 @@ ob_start();
                     </div>
                     <div>
                         <label class="label">Quantité (Caisses) *</label>
-                        <input type="number" x-model.number="form.caisses" class="input" min="0.01" step="0.01" required>
+                        <div class="grid grid-cols-2 gap-2">
+                            <select x-model="form.unite_perte" class="input" required>
+                                <option value="caisse">Caisse</option>
+                                <option value="bouteille">Bouteille</option>
+                            </select>
+                            <input type="number" x-model.number="form.quantite_saisie" class="input" min="0.01" step="0.01" required>
+                        </div>
+                        <p class="text-[10px] text-gray-500 mt-1" x-text="quantiteConvertie"></p>
                     </div>
                     <div>
                         <label class="label">Date de la perte</label>
@@ -101,6 +108,8 @@ document.addEventListener('alpine:init', () => {
             type_perte: 'casse',
             type_stock: 'plein',
             caisses: 1,
+            unite_perte: 'caisse',
+            quantite_saisie: 1,
             date_perte: new Date().toISOString().split('T')[0],
             motif: ''
         },
@@ -109,7 +118,21 @@ document.addEventListener('alpine:init', () => {
         
         get valeurEstimee() {
             if (this.form.type_stock === 'vide') return 0;
-            return (parseFloat(this.form.caisses) || 0) * (parseFloat(this.prixCaisse) || 0);
+            return this.caissesCalculees * (parseFloat(this.prixCaisse) || 0);
+        },
+
+        get caissesCalculees() {
+            const qte = parseFloat(this.form.quantite_saisie) || 0;
+            if (this.form.unite_perte === 'bouteille') {
+                return qte / (parseInt(this.btlParCaisse) || 24);
+            }
+            return qte;
+        },
+
+        get quantiteConvertie() {
+            const caisses = this.caissesCalculees;
+            const rounded = Math.abs(caisses - Math.round(caisses)) < 0.0001 ? Math.round(caisses) : caisses.toFixed(2);
+            return `${rounded} caisse(s) seront deduites du stock.`;
         },
         
         updatePrix() {
@@ -124,8 +147,9 @@ document.addEventListener('alpine:init', () => {
             try {
                 const data = {
                     ...this.form,
-                    quantite: this.form.caisses, // On envoie directement le nombre de CAISSES
-                    valeur_perte: this.form.type_stock === 'plein' ? (this.form.caisses * this.prixCaisse) : 0
+                    quantite: this.form.quantite_saisie,
+                    unite_perte: this.form.unite_perte,
+                    valeur_perte: this.form.type_stock === 'plein' ? (this.caissesCalculees * this.prixCaisse) : 0
                 };
                 
                 await App.api('/api/pertes', 'POST', data);

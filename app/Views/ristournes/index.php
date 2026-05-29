@@ -1,15 +1,26 @@
 <?php 
 $pageTitle = 'Ristournes';
+$printMode = isset($print_mode) ? (bool) $print_mode : false;
+$baseQuery = [];
+foreach (['mois', 'annee', 'client_id'] as $key) {
+    if (!empty($filters[$key])) {
+        $baseQuery[$key] = $filters[$key];
+    }
+}
+$printUrl = '?' . http_build_query(array_merge($baseQuery, ['print' => 1]));
+$exportUrl = '?' . http_build_query(array_merge($baseQuery, ['export' => 'excel']));
 ob_start();
 ?>
 
-<div class="flex items-center justify-between mb-6">
+<div class="flex items-center justify-between mb-6 no-print">
     <div>
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Ristournes</h1>
         <p class="text-gray-500 dark:text-gray-400">Calcul et suivi des remises sur volume</p>
     </div>
     
     <div class="flex gap-3">
+        <button type="button" onclick="window.open('<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>','_blank')" class="btn btn-secondary">Imprimer</button>
+        <a href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary">Exporter Excel</a>
         <?php if (can('admin.voir')): ?>
         <button onclick="calculerRistournes(this)" class="btn btn-primary">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
@@ -21,7 +32,7 @@ ob_start();
 </div>
 
 <!-- Filtres -->
-<div class="card mb-6">
+<div class="card mb-6 no-print">
     <div class="card-body">
         <form method="GET" class="flex flex-wrap items-end gap-4">
             <div class="w-48">
@@ -54,6 +65,13 @@ ob_start();
     </div>
 </div>
 
+<?php if ($printMode): ?>
+<div class="print-only mb-6 border-b-2 border-gray-800 pb-4">
+    <h1 class="text-2xl font-bold uppercase"><?= htmlspecialchars((new Parametre())->get('nom_entreprise', APP_NAME)) ?></h1>
+    <p class="text-sm">Ristournes - <?= htmlspecialchars(($filters['mois'] ?? '') . '/' . ($filters['annee'] ?? '')) ?> - imprime le <?= date('d/m/Y H:i') ?></p>
+</div>
+<?php endif; ?>
+
 <!-- Liste -->
 <div class="card">
     <div class="card-body p-0">
@@ -66,7 +84,7 @@ ob_start();
                         <th class="text-right">Volume (cs)</th>
                         <th class="text-right">Montant</th>
                         <th>Statut</th>
-                        <th class="text-right">Actions</th>
+                        <th class="text-right no-print">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -91,7 +109,7 @@ ob_start();
                                         <span class="badge-warning">En attente</span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="text-right">
+                                <td class="text-right no-print">
                                     <?php if ($r['statut'] === 'calculee'): ?>
                                         <button onclick="payerRistourne(<?= $r['id'] ?>)" class="btn btn-sm btn-success flex items-center gap-2 ml-auto">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -177,6 +195,22 @@ async function payerRistourne(id) {
     }
 }
 </script>
+
+<?php if ($printMode): ?>
+<style>
+@media print {
+    @page { margin: 10mm; }
+    .no-print { display: none !important; }
+    .print-only { display: block !important; }
+    .card { border: none !important; box-shadow: none !important; }
+    .table th, .table td { border: 1px solid #ddd !important; padding: 6px !important; font-size: 10pt !important; }
+}
+</style>
+<script>
+window.addEventListener('load', function () { window.print(); });
+window.addEventListener('afterprint', function () { if (window.opener) window.close(); });
+</script>
+<?php endif; ?>
 
 <?php 
 $content = ob_get_clean();

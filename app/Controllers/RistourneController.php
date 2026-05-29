@@ -30,12 +30,47 @@ class RistourneController extends Controller
 
         $ristournes = $this->ristourneModel->getAllWithDetails($filters);
         $clients = $this->clientModel->all();
+        $printMode = isset($_GET['print']) && (string) $_GET['print'] === '1';
+
+        if (isset($_GET['export']) && $_GET['export'] === 'excel') {
+            $this->exportExcel($ristournes, $filters);
+            return;
+        }
         
         $this->view('ristournes/index', [
             'ristournes' => $ristournes,
             'clients' => $clients,
-            'filters' => $filters
+            'filters' => $filters,
+            'print_mode' => $printMode
         ]);
+    }
+
+    private function exportExcel($ristournes, $filters)
+    {
+        $this->requireAuth();
+
+        $filename = 'ristournes_' . ($filters['mois'] ?? date('n')) . '_' . ($filters['annee'] ?? date('Y')) . '_' . date('Y-m-d_H-i') . '.csv';
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename=' . $filename);
+
+        $output = fopen('php://output', 'w');
+        fprintf($output, chr(0xEF) . chr(0xBB) . chr(0xBF));
+        fputcsv($output, ['Client', 'Periode', 'Chiffre affaires', 'Taux (%)', 'Montant ristourne', 'Statut', 'Date paiement']);
+
+        foreach ($ristournes as $r) {
+            fputcsv($output, [
+                $r['client_nom'] ?? '',
+                !empty($r['periode_debut']) ? date('m/Y', strtotime($r['periode_debut'])) : '',
+                number_format((float) ($r['ca_total'] ?? 0), 2, '.', ''),
+                number_format((float) ($r['taux_applique'] ?? 0), 2, '.', ''),
+                number_format((float) ($r['montant_ristourne'] ?? 0), 2, '.', ''),
+                $r['statut'] ?? '',
+                !empty($r['date_paiement']) ? date('d/m/Y H:i', strtotime($r['date_paiement'])) : ''
+            ]);
+        }
+
+        fclose($output);
+        exit;
     }
 
     /**

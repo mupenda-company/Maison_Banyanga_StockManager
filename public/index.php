@@ -84,6 +84,8 @@ $routes = [
     // Emballages
     'GET::/emballages' => ['EmballageController', 'index'],
     'GET::/emballages/suivi' => ['EmballageController', 'suivi'],
+    'GET::/emballages/emprunts' => ['EmpruntEmballageController', 'index'],
+    'POST::/api/emballages/emprunts' => ['EmpruntEmballageController', 'store'],
     
     // Ventes
     'GET::/ventes' => ['VenteController', 'index'],

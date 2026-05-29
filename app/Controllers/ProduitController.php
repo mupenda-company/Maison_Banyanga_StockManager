@@ -242,6 +242,10 @@ class ProduitController extends Controller
         }
         
         $this->produitModel->update($id, $updateData);
+
+        if (array_key_exists('seuil_alerte', $updateData)) {
+            (new Alerte())->checkStockAlerts();
+        }
         
         return $this->success(null, 'Produit mis à jour avec succès');
     }

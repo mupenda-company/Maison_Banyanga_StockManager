@@ -7,6 +7,11 @@ class Stock extends Model
 {
     protected $table = 'stocks';
     protected $fillable = ['produit_id', 'emplacement_id', 'quantite_pleine', 'quantite_vide', 'caisses_pleine', 'caisses_vide'];
+
+    private function refreshStockAlerts()
+    {
+        (new Alerte())->checkStockAlerts();
+    }
     
     /**
      * Récupérer le stock d'un produit dans un emplacement
@@ -47,9 +52,9 @@ class Stock extends Model
 
         if (!empty($filters['statut'])) {
             if ($filters['statut'] === 'critique') {
-                $where .= " AND s.quantite_pleine <= p.seuil_alerte";
+                $where .= " AND s.caisses_pleine <= p.seuil_alerte";
             } elseif ($filters['statut'] === 'ok') {
-                $where .= " AND s.quantite_pleine > p.seuil_alerte";
+                $where .= " AND s.caisses_pleine > p.seuil_alerte";
             }
         }
         
@@ -64,6 +69,7 @@ class Stock extends Model
         
         $sql = "SELECT s.*, p.nom as produit_nom, p.code as produit_code, p.seuil_alerte,
                        e.nom as emplacement_nom, e.type as emplacement_type,
+                       v.id as vehicule_id,
                        v.immatriculation as vehicule_immatriculation
                 FROM {$this->table} s
                 JOIN produits p ON s.produit_id = p.id
@@ -155,9 +161,10 @@ class Stock extends Model
                     'caisses_vide' => $data['caisses_vide'] ?? 0
                 ]
             );
+            $this->refreshStockAlerts();
             return $existing['id'];
         } else {
-            return $this->create([
+            $id = $this->create([
                 'produit_id' => $produitId,
                 'emplacement_id' => $emplacementId,
                 'quantite_pleine' => $data['quantite_pleine'] ?? 0,
@@ -165,6 +172,8 @@ class Stock extends Model
                 'caisses_pleine' => $data['caisses_pleine'] ?? 0,
                 'caisses_vide' => $data['caisses_vide'] ?? 0
             ]);
+            $this->refreshStockAlerts();
+            return $id;
         }
     }
     
@@ -208,10 +217,11 @@ class Stock extends Model
                 ]
             );
 
+            $this->refreshStockAlerts();
             return $existing['id'];
         }
 
-        return $this->create([
+        $id = $this->create([
             'produit_id' => $produitId,
             'emplacement_id' => $emplacementId,
             'quantite_pleine' => $quantitePleine,
@@ -219,6 +229,8 @@ class Stock extends Model
             'caisses_pleine' => $caissesPleines,
             'caisses_vide' => $caissesVides
         ]);
+        $this->refreshStockAlerts();
+        return $id;
     }
     
     /**
@@ -253,6 +265,8 @@ class Stock extends Model
             ]
         );
         
+        $this->refreshStockAlerts();
+
         return ['success' => true, 'message' => 'Stock déduit avec succès'];
     }
     
@@ -288,6 +302,7 @@ class Stock extends Model
                     p.prix_vente_caisses, p.prix_vente_unitaire, p.bouteilles_par_caisses, 
                     p.categorie, p.seuil_alerte,
                     e.id as emplacement_id, e.nom as emplacement_nom, e.type as emplacement_type,
+                    v.id as vehicule_id,
                     v.immatriculation as vehicule,
                     u.nom as agent_nom, u.prenom as agent_prenom,
                     COALESCE(s.quantite_pleine, 0) as quantite_pleine,

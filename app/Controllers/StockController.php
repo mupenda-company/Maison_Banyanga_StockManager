@@ -218,7 +218,7 @@ class StockController extends Controller
         fputcsv($output, ['Produit', 'Code', 'Emplacement', 'Type', 'Stock Plein (cs)', 'Stock Plein (btl)', 'Stock Vide (cs)', 'Statut']);
         
         foreach ($data as $s) {
-            $statut = ($s['quantite_pleine'] <= ($s['seuil_alerte'] ?? 0)) ? 'CRITIQUE' : 'OK';
+            $statut = ($s['caisses_pleine'] <= ($s['seuil_alerte'] ?? 0)) ? 'CRITIQUE' : 'OK';
             fputcsv($output, [
                 $s['produit_nom'],
                 $s['produit_code'],
@@ -630,20 +630,24 @@ class StockController extends Controller
             $ecart = $data['quantite_reelle'] - $quantiteTheorique;
             
             if ($ecart === 0) {
+                $this->db->commit();
                 return $this->success(null, 'Aucun écart détecté');
             }
             
+            $produit = $this->produitModel->find($data['produit_id']);
+            $btlParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+            if ($btlParCaisse <= 0) {
+                $btlParCaisse = 24;
+            }
+            $caissesReelles = (int) round($data['quantite_reelle'] / $btlParCaisse);
+
             // Mettre à jour le stock
-            $this->db->query(
-                "INSERT INTO stocks (produit_id, emplacement_id, quantite_pleine, quantite_vide, caisses_pleine, caisses_vide)
-                 VALUES (:produit_id, :emplacement_id, :quantite, 0, 0, 0)
-                 ON DUPLICATE KEY UPDATE quantite_pleine = :quantite, updated_at = NOW()",
-                [
-                    'produit_id' => $data['produit_id'],
-                    'emplacement_id' => $data['emplacement_id'],
-                    'quantite' => $data['quantite_reelle']
-                ]
-            );
+            $this->stockModel->setInitialStock($data['produit_id'], $data['emplacement_id'], [
+                'quantite_pleine' => (int) $data['quantite_reelle'],
+                'quantite_vide' => (int) ($stock['quantite_vide'] ?? 0),
+                'caisses_pleine' => $caissesReelles,
+                'caisses_vide' => (int) ($stock['caisses_vide'] ?? 0)
+            ]);
             
             // Enregistrer le mouvement
             $this->mouvementModel->create([

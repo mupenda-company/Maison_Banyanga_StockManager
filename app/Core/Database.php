@@ -46,6 +46,13 @@ class Database
     public function query($sql, $params = [])
     {
         $stmt = $this->pdo->prepare($sql);
+        if (!empty($params) && strpos($sql, '?') === false) {
+            preg_match_all('/:([a-zA-Z_][a-zA-Z0-9_]*)/', $sql, $matches);
+            if (!empty($matches[1])) {
+                $allowed = array_flip(array_unique($matches[1]));
+                $params = array_intersect_key($params, $allowed);
+            }
+        }
         $stmt->execute($params);
         return $stmt;
     }

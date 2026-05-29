@@ -85,6 +85,17 @@ class Perte extends Model
             $btlParCaisse = (int)($produit['bouteilles_par_caisses'] ?? 24);
 
             // Créer la perte
+            $typeStock = $data['type_stock'] ?? 'plein';
+            $unitePerte = $data['unite_perte'] ?? 'caisse';
+            $quantiteSaisie = (float) $data['quantite'];
+            $nbBouteilles = $unitePerte === 'bouteille' ? $quantiteSaisie : ($quantiteSaisie * $btlParCaisse);
+            $nbCaisses = $nbBouteilles / max(1, $btlParCaisse);
+
+            if (abs($nbCaisses - round($nbCaisses)) < 0.0001) {
+                $nbCaisses = (float) round($nbCaisses);
+            }
+
+            $data['quantite'] = $nbCaisses;
             $perteId = $this->create($data);
             
             // Déduire du stock

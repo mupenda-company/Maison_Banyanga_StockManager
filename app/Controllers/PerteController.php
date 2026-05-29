@@ -33,6 +33,13 @@ class PerteController extends Controller
         ];
         
         $pertes = $this->perteModel->getAllWithDetails($filters);
+        $printMode = isset($_GET['print']) && (string) $_GET['print'] === '1';
+
+        if (isset($_GET['export']) && $_GET['export'] === 'excel') {
+            $this->exportExcel($pertes);
+            return;
+        }
+
         $produits = $this->produitModel->getActive();
         $emplacements = $this->emplacementModel->all('type, nom');
         
@@ -44,8 +51,39 @@ class PerteController extends Controller
             'produits' => $produits,
             'emplacements' => $emplacements,
             'filters' => $filters,
-            'stats' => $stats
+            'stats' => $stats,
+            'print_mode' => $printMode
         ]);
+    }
+
+    private function exportExcel($pertes)
+    {
+        $this->requireAuth();
+
+        $filename = 'pertes_' . date('Y-m-d_H-i') . '.csv';
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename=' . $filename);
+
+        $output = fopen('php://output', 'w');
+        fprintf($output, chr(0xEF) . chr(0xBB) . chr(0xBF));
+        fputcsv($output, ['Date', 'Produit', 'Code', 'Type stock', 'Categorie', 'Quantite (cs)', 'Valeur', 'Emplacement', 'Motif']);
+
+        foreach ($pertes as $perte) {
+            fputcsv($output, [
+                !empty($perte['date_perte']) ? date('d/m/Y', strtotime($perte['date_perte'])) : '',
+                $perte['produit_nom'] ?? '',
+                $perte['produit_code'] ?? '',
+                $perte['type_stock'] ?? '',
+                $perte['type_perte'] ?? '',
+                number_format((float) ($perte['quantite'] ?? 0), 4, '.', ''),
+                number_format((float) ($perte['valeur_perte'] ?? 0), 2, '.', ''),
+                $perte['emplacement_nom'] ?? '',
+                $perte['motif'] ?? ''
+            ]);
+        }
+
+        fclose($output);
+        exit;
     }
     
     /**
@@ -90,6 +128,7 @@ class PerteController extends Controller
             'produit_id' => $data['produit_id'],
             'emplacement_id' => $data['emplacement_id'],
             'quantite' => $data['quantite'],
+            'unite_perte' => $data['unite_perte'] ?? 'caisse',
             'type_perte' => $data['type_perte'],
             'type_stock' => $data['type_stock'] ?? 'plein',
             'motif' => $data['motif'] ?? '',

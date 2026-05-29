@@ -11,9 +11,9 @@ ob_start();
 
     <div class="flex items-center gap-3">
         <a href="<?= url('emballages/suivi') ?>" class="btn btn-secondary">Suivi détaillé</a>
-        <?php if (can('emballages.gerer')): ?>
+        <!-- <?php if (can('emballages.gerer')): ?>
         <a href="<?= url('retours-emballages') ?>" class="btn btn-primary">Nouveau retour</a>
-        <?php endif; ?>
+        <?php endif; ?> -->
     </div>
 </div>
 
@@ -63,11 +63,12 @@ ob_start();
                         <th class="text-right">Reçu</th>
                         <th class="text-right">Retourné</th>
                         <th class="text-right">Dette</th>
+                        <th class="text-right">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($clientsEmballage['lignes'] ?? [])): ?>
-                        <tr><td colspan="6" class="text-center p-4 text-gray-500">Aucune dette d'emballage sur la période</td></tr>
+                        <tr><td colspan="7" class="text-center p-4 text-gray-500">Aucune dette d'emballage sur la période</td></tr>
                     <?php else: ?>
                         <?php foreach (array_slice($clientsEmballage['lignes'], 0, 10) as $ligne): ?>
                             <tr>
@@ -83,6 +84,15 @@ ob_start();
                                 <td class="text-right"><?= number_format((int) $ligne['caisses_vides_recues'], 0, ',', ' ') ?> cs</td>
                                 <td class="text-right"><?= number_format((int) $ligne['caisses_retournees'], 0, ',', ' ') ?> cs</td>
                                 <td class="text-right font-bold text-red-600"><?= number_format((int) $ligne['dette_caisses'], 0, ',', ' ') ?> cs</td>
+                                <td class="text-right">
+                                    <?php if (can('emballages.gerer')): ?>
+                                    <button type="button"
+                                            class="btn btn-sm btn-primary"
+                                            onclick="openQuickRetour(<?= (int) $ligne['client_id'] ?>, <?= (int) $ligne['produit_id'] ?>, <?= (int) $ligne['bouteilles_par_caisses'] ?>, <?= (int) $ligne['dette_caisses'] ?>)">
+                                        Completer
+                                    </button>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -215,6 +225,89 @@ ob_start();
         </div>
     </div>
 </div>
+
+<?php if (can('emballages.gerer')): ?>
+<div x-data="quickRetourModal" x-show="isOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-black/50" @click="close()"></div>
+        <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 class="text-lg font-semibold mb-6 text-gray-900 dark:text-white">Completer un retour</h3>
+            <form @submit.prevent="save">
+                <div class="space-y-4">
+                    <div>
+                        <label class="label">Caisses retournees</label>
+                        <input type="number" x-model.number="form.caisses" class="input" min="0.01" step="0.01" :max="maxCaisses" required>
+                        <p class="text-xs text-gray-500 mt-1">Dette restante: <span x-text="maxCaisses"></span> cs</p>
+                    </div>
+                    <div>
+                        <label class="label">Receptionne a</label>
+                        <select x-model="form.emplacement_id" class="input" required>
+                            <?php foreach ($emplacements as $e): ?>
+                            <option value="<?= (int) $e['id'] ?>"><?= htmlspecialchars($e['nom']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" @click="close()" class="btn btn-secondary">Annuler</button>
+                    <button type="submit" class="btn btn-primary" :disabled="loading">Valider</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('quickRetourModal', () => ({
+        isOpen: false,
+        loading: false,
+        bouteillesParCaisse: 24,
+        maxCaisses: 0,
+        form: {
+            client_id: '',
+            produit_id: '',
+            caisses: 1,
+            emplacement_id: '<?= $emplacements[0]['id'] ?? '' ?>'
+        },
+        open(clientId, produitId, bouteillesParCaisse, detteCaisses) {
+            this.bouteillesParCaisse = parseInt(bouteillesParCaisse || 24, 10) || 24;
+            this.maxCaisses = parseInt(detteCaisses || 0, 10) || 0;
+            this.form = {
+                client_id: clientId,
+                produit_id: produitId,
+                caisses: this.maxCaisses,
+                emplacement_id: '<?= $emplacements[0]['id'] ?? '' ?>'
+            };
+            this.isOpen = true;
+        },
+        close() { this.isOpen = false; },
+        async save() {
+            this.loading = true;
+            try {
+                await App.api('/api/retours-emballages', 'POST', {
+                    client_id: this.form.client_id,
+                    produit_id: this.form.produit_id,
+                    quantite: Math.round((parseFloat(this.form.caisses) || 0) * this.bouteillesParCaisse),
+                    emplacement_id: this.form.emplacement_id
+                });
+                App.notify('Retour enregistre', 'success');
+                setTimeout(() => location.reload(), 700);
+            } catch (e) {
+                App.notify(e.message, 'error');
+            } finally {
+                this.loading = false;
+            }
+        }
+    }));
+});
+
+function openQuickRetour(clientId, produitId, bouteillesParCaisse, detteCaisses) {
+    const modal = document.querySelector('[x-data="quickRetourModal"]');
+    Alpine.$data(modal).open(clientId, produitId, bouteillesParCaisse, detteCaisses);
+}
+</script>
+<?php endif; ?>
 
 <?php 
 $content = ob_get_clean();

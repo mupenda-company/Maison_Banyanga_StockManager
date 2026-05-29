@@ -1,0 +1,2 @@
+ALTER TABLE pertes
+    MODIFY quantite DECIMAL(12,4) NOT NULL;

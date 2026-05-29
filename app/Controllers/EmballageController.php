@@ -5,6 +5,7 @@ class EmballageController extends Controller
     private $clientModel;
     private $retourModel;
     private $detteModel;
+    private $emplacementModel;
 
     public function __construct()
     {
@@ -12,6 +13,7 @@ class EmballageController extends Controller
         $this->clientModel = new Client();
         $this->retourModel = new RetourEmballage();
         $this->detteModel = new DetteEmballage();
+        $this->emplacementModel = new Emplacement();
     }
 
     public function index()
@@ -27,6 +29,7 @@ class EmballageController extends Controller
         $retoursRecents = $this->retourModel->getRecents(8);
         $dettesEnCours = $this->detteModel->getEnCours();
         $clientsEmballage = $this->getClientsEmballageDetails($dateDebut, $dateFin);
+        $emplacements = $this->emplacementModel->getFixes();
 
         $this->view('emballages/index', [
             'dateDebut' => $dateDebut,
@@ -36,6 +39,7 @@ class EmballageController extends Controller
             'retoursRecents' => $retoursRecents,
             'dettesEnCours' => $dettesEnCours,
             'clientsEmballage' => $clientsEmballage,
+            'emplacements' => $emplacements,
         ]);
     }
 
@@ -49,6 +53,7 @@ class EmballageController extends Controller
         $statsRetours = $this->retourModel->getStats(date('Y-m-01'), date('Y-m-d'), 10);
         $statsDettes = $this->detteModel->getStatsGlobales();
         $clientsEmballage = $this->getClientsEmballageDetails(date('Y-m-01'), date('Y-m-d'));
+        $emplacements = $this->emplacementModel->getFixes();
 
         $this->view('emballages/suivi', [
             'dettesEnCours' => $dettesEnCours,
@@ -56,6 +61,7 @@ class EmballageController extends Controller
             'statsRetours' => $statsRetours,
             'statsDettes' => $statsDettes,
             'clientsEmballage' => $clientsEmballage,
+            'emplacements' => $emplacements,
         ]);
     }
 
@@ -81,8 +87,10 @@ class EmballageController extends Controller
                     'client_id' => (int) $client['id'],
                     'client_nom' => $client['nom'],
                     'zone_nom' => $client['zone_nom'] ?? 'N/A',
+                    'produit_id' => (int) $produit['produit_id'],
                     'produit_nom' => $produit['produit_nom'],
                     'produit_code' => $produit['produit_code'],
+                    'bouteilles_par_caisses' => (int) ($produit['bouteilles_par_caisses'] ?? 24),
                     'caisses_vendues' => (int) ($produit['caisses_vendues'] ?? 0),
                     'caisses_vides_recues' => (int) ($produit['caisses_vides_recues'] ?? 0),
                     'caisses_retournees' => (int) ($produit['caisses_retournees'] ?? 0),

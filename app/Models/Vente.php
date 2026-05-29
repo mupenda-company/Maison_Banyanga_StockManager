@@ -143,6 +143,7 @@ class Vente extends Model
             $stockModel = new Stock();
             $mouvementModel = new MouvementStock();
             $produitModel = new Produit();
+            $empruntModel = new EmpruntEmballage();
             
             foreach ($details as $detail) {
                 $detail['vente_id'] = $venteId;
@@ -161,7 +162,16 @@ class Vente extends Model
                 if ($quantiteCaisses <= 0) {
                     $quantiteCaisses = 1;
                 }
-                $caissesVidesRecues = max(0, min($quantiteCaisses, (int) ($detail['caisses_vides_recues'] ?? 0)));
+                $caissesVidesPhysiques = max(0, min($quantiteCaisses, (int) ($detail['caisses_vides_recues'] ?? 0)));
+                $creditEmballagesUtilise = 0;
+                if (!empty($data['client_id'])) {
+                    $creditEmballagesUtilise = $empruntModel->utiliserCreditClient(
+                        $data['client_id'],
+                        $detail['produit_id'],
+                        max(0, $quantiteCaisses - $caissesVidesPhysiques)
+                    );
+                }
+                $caissesVidesRecues = min($quantiteCaisses, $caissesVidesPhysiques + $creditEmballagesUtilise);
                 $quantiteBouteilles = $quantiteCaisses * $btlParCaisse;
                 $prixCaisse = (float) ($detail['prix_caisse'] ?? ($produit['prix_vente_caisses'] ?? ($produit['prix_vente_unitaire'] * $btlParCaisse)));
                 if ($prixCaisse <= 0) {
@@ -212,14 +222,14 @@ class Vente extends Model
                     'created_by' => $data['created_by']
                 ]);
 
-                if ($caissesVidesRecues > 0) {
+                if ($caissesVidesPhysiques > 0) {
                     // Ajouter au stock (VIDE) uniquement pour les emballages réellement reçus
                     $stockModel->updateOrCreate(
                         $detail['produit_id'],
                         $data['emplacement_id'],
                         [
-                            'quantite_vide' => $caissesVidesRecues * $btlParCaisse,
-                            'caisses_vide' => $caissesVidesRecues
+                            'quantite_vide' => $caissesVidesPhysiques * $btlParCaisse,
+                            'caisses_vide' => $caissesVidesPhysiques
                         ]
                     );
 
@@ -228,7 +238,7 @@ class Vente extends Model
                         'produit_id' => $detail['produit_id'],
                         'emplacement_id' => $data['emplacement_id'],
                         'type_mouvement' => 'entree',
-                        'quantite' => $caissesVidesRecues * $btlParCaisse,
+                        'quantite' => $caissesVidesPhysiques * $btlParCaisse,
                         'reference_type' => 'vente',
                         'reference_id' => $venteId,
                         'motif' => 'Vente N° ' . $data['numero_facture'] . ' - Entrée des emballages vides',

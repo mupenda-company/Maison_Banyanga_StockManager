@@ -49,8 +49,13 @@ ob_start();
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     <?php foreach ($emplacements as $emp): 
         $caisses = (int) round($emp['total_caisses_pleine'] ?? 0);
+        $isVehicule = !empty($emp['vehicule_id']);
     ?>
+    <?php if ($isVehicule): ?>
+    <a href="<?= url('vehicules/' . $emp['vehicule_id']) ?>" class="stat-card block hover:ring-2 hover:ring-primary-500 transition" title="Voir le détail du véhicule <?= htmlspecialchars($emp['vehicule_immatriculation'] ?? $emp['nom']) ?>">
+    <?php else: ?>
     <div class="stat-card">
+    <?php endif; ?>
         <div class="flex items-center justify-between">
             <div>
                 <p class="stat-label"><?= htmlspecialchars($emp['nom']) ?></p>
@@ -76,7 +81,7 @@ ob_start();
                 <?= $emp['type'] === 'fixe' ? 'Fixe' : 'Mobile' ?>
             </span>
         </p>
-    </div>
+    <?= $isVehicule ? '</a>' : '</div>' ?>
     <?php endforeach; ?>
 </div>
 
@@ -155,7 +160,9 @@ ob_start();
                             <td class="px-4 py-3 text-left max-w-[150px]">
                                 <div class="font-medium text-gray-800 dark:text-gray-200 truncate" title="<?= htmlspecialchars($stock['emplacement_nom']) ?>"><?= htmlspecialchars($stock['emplacement_nom']) ?></div>
                                 <?php if ($stock['vehicule_immatriculation']): ?>
-                                <div class="text-[10px] text-gray-500 font-bold"><?= htmlspecialchars($stock['vehicule_immatriculation']) ?></div>
+                                <a href="<?= url('vehicules/' . $stock['vehicule_id']) ?>" class="text-[10px] text-primary-600 hover:underline font-bold">
+                                    <?= htmlspecialchars($stock['vehicule_immatriculation']) ?>
+                                </a>
                                 <?php endif; ?>
                             </td>
                             <td class="px-4 py-3 text-center">
@@ -171,7 +178,7 @@ ob_start();
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex justify-center">
-                                    <?php if ($stock['quantite_pleine'] <= ($stock['seuil_alerte'] ?? 0)): ?>
+                                    <?php if ($stock['caisses_pleine'] <= ($stock['seuil_alerte'] ?? 0)): ?>
                                     <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/40 dark:text-red-400 dark:border-red-800">CRITIQUE</span>
                                     <?php else: ?>
                                     <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-green-100 text-green-700 border border-green-200 dark:bg-green-900/40 dark:text-green-400 dark:border-green-800">OK</span>
