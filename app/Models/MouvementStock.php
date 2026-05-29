@@ -75,7 +75,20 @@ class MouvementStock extends Model
                            WHEN m.reference_type = 'approvisionnement' THEN (SELECT numero_bon FROM approvisionnements WHERE id = m.reference_id)
                            WHEN m.reference_type = 'mission' THEN (SELECT numero_mission FROM missions WHERE id = m.reference_id)
                            ELSE NULL
-                       END as reference_numero
+                       END as reference_numero,
+                       CASE
+                           WHEN m.reference_type = 'vente' AND m.type_mouvement = 'sortie' THEN (
+                               SELECT SUM(vd.quantite_caisses)
+                               FROM vente_details vd
+                               WHERE vd.vente_id = m.reference_id AND vd.produit_id = m.produit_id
+                           )
+                           WHEN m.reference_type = 'vente' AND m.type_mouvement = 'entree' THEN (
+                               SELECT SUM(vd.caisses_vides_recues)
+                               FROM vente_details vd
+                               WHERE vd.vente_id = m.reference_id AND vd.produit_id = m.produit_id
+                           )
+                           ELSE NULL
+                       END as quantite_caisses_reference
                 FROM {$this->table} m
                 JOIN produits p ON m.produit_id = p.id
                 JOIN emplacements e ON m.emplacement_id = e.id
@@ -103,7 +116,20 @@ class MouvementStock extends Model
     {
         return $this->db->fetchAll(
             "SELECT m.*, p.nom as produit_nom, p.code as produit_code, p.bouteilles_par_caisses,
-                    e.nom as emplacement_nom
+                    e.nom as emplacement_nom,
+                    CASE
+                        WHEN m.reference_type = 'vente' AND m.type_mouvement = 'sortie' THEN (
+                            SELECT SUM(vd.quantite_caisses)
+                            FROM vente_details vd
+                            WHERE vd.vente_id = m.reference_id AND vd.produit_id = m.produit_id
+                        )
+                        WHEN m.reference_type = 'vente' AND m.type_mouvement = 'entree' THEN (
+                            SELECT SUM(vd.caisses_vides_recues)
+                            FROM vente_details vd
+                            WHERE vd.vente_id = m.reference_id AND vd.produit_id = m.produit_id
+                        )
+                        ELSE NULL
+                    END as quantite_caisses_reference
              FROM {$this->table} m
              JOIN produits p ON m.produit_id = p.id
              JOIN emplacements e ON m.emplacement_id = e.id

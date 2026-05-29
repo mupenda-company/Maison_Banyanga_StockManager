@@ -386,7 +386,9 @@ ob_start();
                             <p class="font-bold
                                 <?= $mvt['quantite'] > 0 ? 'text-green-600' : 'text-red-600' ?>">
                                 <?php 
-                                    $caisses = $mvt['quantite'] / ($mvt['bouteilles_par_caisses'] ?: 24);
+                                    $caisses = isset($mvt['quantite_caisses_reference']) && $mvt['quantite_caisses_reference'] !== null
+                                        ? (float) $mvt['quantite_caisses_reference']
+                                        : ($mvt['quantite'] / ($mvt['bouteilles_par_caisses'] ?: 24));
                                     echo ($mvt['quantite'] > 0 ? '+' : '') . number_format($caisses, 1, '.', '') . ' cs';
                                 ?>
                             </p>

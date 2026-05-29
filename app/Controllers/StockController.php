@@ -483,7 +483,9 @@ class StockController extends Controller
             $produit = new Produit();
             $p = $produit->find($m['produit_id']);
             $btlParCaisse = $p['bouteilles_par_caisses'] ?: 24;
-            $caisses = abs($m['quantite'] / $btlParCaisse);
+            $caisses = isset($m['quantite_caisses_reference']) && $m['quantite_caisses_reference'] !== null
+                ? abs((float) $m['quantite_caisses_reference'])
+                : abs($m['quantite'] / $btlParCaisse);
 
             $emplacement = $m['emplacement_source'] ?? ($m['emplacement_nom'] ?? '');
             if (($m['type_mouvement'] ?? '') === 'transfert' && !empty($m['emplacement_dest'])) {

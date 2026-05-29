@@ -151,7 +151,9 @@ ob_start();
                     <?php foreach ($mouvements as $mvt): 
                         // Conversion en caisses pour l'affichage
                         $bouteillesParCaisse = (int)($mvt['bouteilles_par_caisses'] ?? 24);
-                        $caisses = $mvt['quantite'] / $bouteillesParCaisse;
+                        $caisses = isset($mvt['quantite_caisses_reference']) && $mvt['quantite_caisses_reference'] !== null
+                            ? (float) $mvt['quantite_caisses_reference']
+                            : ((float) $mvt['quantite'] / max(1, $bouteillesParCaisse));
                     ?>
                     <tr>
                         <td><?= date('d/m/Y H:i', strtotime($mvt['created_at'])) ?></td>
