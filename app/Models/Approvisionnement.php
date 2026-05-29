@@ -37,7 +37,10 @@ class Approvisionnement extends Model
         
         if ($approvisionnement) {
             $approvisionnement['details'] = $this->db->fetchAll(
-                "SELECT ad.*, p.nom as produit_nom, p.code as produit_code, p.bouteilles_par_caisses
+                "SELECT ad.*, p.nom as produit_nom, p.code as produit_code,
+                        p.bouteilles_par_caisses, p.caisses_par_palette,
+                        p.prix_achat_deposer, p.prix_achat_enlever,
+                        p.prix_vente_unitaire, p.prix_vente_caisses
                  FROM approvisionnement_details ad
                  JOIN produits p ON ad.produit_id = p.id
                  WHERE ad.approvisionnement_id = :id",

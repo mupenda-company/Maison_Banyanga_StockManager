@@ -129,6 +129,7 @@ class ProduitController extends Controller
             'prix_achat_enlever' => 'numeric',
             'prix_vente_caisses' => 'required|numeric',
             'bouteilles_par_caisses' => 'required|numeric',
+            'caisses_par_palette' => 'numeric',
             'seuil_alerte' => 'numeric'
         ]);
         
@@ -158,6 +159,7 @@ class ProduitController extends Controller
             'categorie' => $data['categorie'] ?? null,
             'unite_base' => $data['unite_base'] ?? 'bouteille',
             'bouteilles_par_caisses' => $data['bouteilles_par_caisses'],
+            'caisses_par_palette' => $data['caisses_par_palette'] ?? 0,
             'prix_achat_unitaire' => $prixAchatUnitaire,
             'prix_achat_deposer' => $prixAchatDeposer ?? 0,
             'prix_achat_enlever' => $prixAchatEnlever ?? 0,
@@ -207,7 +209,8 @@ class ProduitController extends Controller
             'prix_achat_unitaire' => 'numeric',
             'prix_achat_deposer' => 'numeric',
             'prix_achat_enlever' => 'numeric',
-            'prix_vente_caisses' => 'numeric'
+            'prix_vente_caisses' => 'numeric',
+            'caisses_par_palette' => 'numeric'
         ]);
         
         if (!empty($errors)) {
@@ -223,7 +226,7 @@ class ProduitController extends Controller
         
         $updateData = array_intersect_key($data, array_flip([
             'code', 'nom', 'description', 'categorie', 'unite_base',
-            'bouteilles_par_caisses', 'prix_achat_deposer', 'prix_achat_enlever', 'prix_vente_unitaire',
+            'bouteilles_par_caisses', 'caisses_par_palette', 'prix_achat_deposer', 'prix_achat_enlever', 'prix_vente_unitaire',
             'prix_vente_caisses', 'seuil_alerte'
         ]));
         

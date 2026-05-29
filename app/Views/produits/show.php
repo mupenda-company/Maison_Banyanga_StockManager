@@ -182,6 +182,10 @@ ob_start();
                         <input type="number" step="0.01" x-model="form.prix_vente_caisses" class="input" required>
                     </div>
                     <div>
+                        <label class="label">Caisses par palette</label>
+                        <input type="number" x-model.number="form.caisses_par_palette" class="input" min="0">
+                    </div>
+                    <div>
                         <label class="label">Seuil d'alerte</label>
                         <input type="number" x-model="form.seuil_alerte" class="input">
                     </div>
@@ -217,6 +221,7 @@ document.addEventListener('alpine:init', () => {
             prix_achat_deposer: <?= ($produit['prix_achat_deposer'] ?? 0) ?>,
             prix_achat_enlever: <?= ($produit['prix_achat_enlever'] ?? 0) ?>,
             prix_vente_caisses: <?= $produit['prix_vente_caisses'] ?? ($produit['prix_vente_unitaire'] * ($produit['bouteilles_par_caisses'] ?? 1)) ?>,
+            caisses_par_palette: <?= (int)($produit['caisses_par_palette'] ?? 0) ?>,
             seuil_alerte: <?= $produit['seuil_alerte'] ?>
         },
 

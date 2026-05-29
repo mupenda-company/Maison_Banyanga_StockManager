@@ -34,6 +34,12 @@ ob_start();
     <div class="card-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Liste des approvisionnements</h2>
         <div class="flex items-center space-x-3">
+            <a href="?<?= http_build_query(array_merge($_GET, ['print' => '1'])) ?>" target="_blank" class="btn-secondary">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                </svg>
+                Imprimer
+            </a>
             <a href="?<?= http_build_query(array_merge($_GET, ['export' => 'excel'])) ?>" class="btn-secondary">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -41,12 +47,12 @@ ob_start();
                 Exporter Excel
             </a>
             <?php if (can('approvisionnements.creer')): ?>
-            <button @click="$dispatch('open-modal-appro')" class="btn-primary">
+            <a href="<?= url('approvisionnements/create') ?>" class="btn-primary">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
                 Nouvel approvisionnement
-            </button>
+            </a>
             <?php endif; ?>
         </div>
     </div>
@@ -61,7 +67,7 @@ ob_start();
     >
         <div class="flex items-center justify-center min-h-screen px-4">
             <div class="fixed inset-0 bg-black bg-opacity-50" @click="isOpen = false"></div>
-            <div class="relative w-full max-w-4xl bg-white dark:bg-gray-800 rounded-lg shadow-xl">
+            <div class="relative w-full max-w-6xl bg-white dark:bg-gray-800 rounded-lg shadow-xl">
                 <div class="p-6 border-b flex justify-between items-center">
                     <h3 class="text-xl font-bold">Nouvel Approvisionnement (Plein contre Vide)</h3>
                     <button @click="isOpen = false" class="text-gray-400 hover:text-gray-600">&times;</button>
@@ -82,9 +88,12 @@ ob_start();
                         <thead>
                             <tr>
                                 <th>Produit</th>
+                                <th>NP</th>
+                                <th>Achat</th>
+                                <th>Unite</th>
+                                <th>Caisses</th>
                                 <th>Type</th>
                                 <th>Prix Caisse</th>
-                                <th>Nb Caisses</th>
                                 <th>Sous-total</th>
                                 <th></th>
                             </tr>
@@ -101,6 +110,21 @@ ob_start();
                                         </select>
                                     </td>
                                     <td>
+                                        <span x-text="getProduit(ligne.produit_id)?.caisses_par_palette || '-'"></span>
+                                    </td>
+                                    <td>
+                                        <input type="number" x-model.number="ligne.quantite_achat" class="input w-24" min="1" @input="calculerTotal()">
+                                    </td>
+                                    <td>
+                                        <select x-model="ligne.unite_achat" class="input w-28" @change="calculerTotal()">
+                                            <option value="caisse">Caisse</option>
+                                            <option value="palette">Palette</option>
+                                        </select>
+                                    </td>
+                                    <td class="font-bold">
+                                        <span x-text="getQuantiteCaisses(ligne)"></span>
+                                    </td>
+                                    <td>
                                         <select x-model="ligne.type_achat" class="input w-24" @change="calculerTotal()">
                                             <option value="deposer">Déposer</option>
                                             <option value="enlever">Enlever</option>
@@ -109,11 +133,8 @@ ob_start();
                                     <td>
                                         <span x-text="getProduit(ligne.produit_id) ? App.formatMoneyConverted(getPrixCaisse(getProduit(ligne.produit_id), ligne.type_achat), window.BASE_DEVISE, window.DEVISE) : '-'"></span>
                                     </td>
-                                    <td>
-                                        <input type="number" x-model.number="ligne.quantite_caisses" class="input w-24" min="1" @input="calculerTotal()">
-                                    </td>
                                     <td class="font-bold">
-                                        <span x-text="getProduit(ligne.produit_id) ? App.formatMoneyConverted((ligne.quantite_caisses || 0) * getPrixCaisse(getProduit(ligne.produit_id), ligne.type_achat), window.BASE_DEVISE, window.DEVISE) : '-'"></span>
+                                        <span x-text="getProduit(ligne.produit_id) ? App.formatMoneyConverted(getQuantiteCaisses(ligne) * getPrixCaisse(getProduit(ligne.produit_id), ligne.type_achat), window.BASE_DEVISE, window.DEVISE) : '-'"></span>
                                     </td>
                                     <td>
                                         <button @click="form.lignes.splice(index, 1); calculerTotal()" class="text-red-500" x-show="form.lignes.length > 1">&times;</button>
@@ -123,7 +144,7 @@ ob_start();
                         </tbody>
                     </table>
 
-                    <button @click="form.lignes.push({ produit_id: '', quantite_caisses: 1, type_achat: 'deposer' })" class="btn-secondary btn-sm mb-6">+ Ajouter un produit</button>
+                    <button @click="form.lignes.push({ produit_id: '', quantite_achat: 1, unite_achat: 'caisse', type_achat: 'deposer' })" class="btn-secondary btn-sm mb-6">+ Ajouter un produit</button>
 
                     <div class="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg flex justify-between items-center mb-6">
                         <span class="text-lg font-bold text-gray-700 dark:text-gray-300">TOTAL À PAYER :</span>
@@ -156,6 +177,15 @@ function getPrixCaisse(produit, typeAchat) {
     return produit.prix_achat_caisse || (produit.prix_achat_unitaire * produit.bouteilles_par_caisses);
 }
 
+function getQuantiteCaissesFromLigne(ligne, produit) {
+    const quantite = parseInt(ligne.quantite_achat || 0);
+    if (!produit || quantite <= 0) return 0;
+    if (ligne.unite_achat === 'palette') {
+        return quantite * (parseInt(produit.caisses_par_palette || 0) || 0);
+    }
+    return quantite;
+}
+
 document.addEventListener('alpine:init', () => {
     Alpine.data('approModal', () => ({
         isOpen: false,
@@ -166,7 +196,7 @@ document.addEventListener('alpine:init', () => {
             date: '<?= date('Y-m-d') ?>',
             fournisseur: 'Bralima',
             notes: '',
-            lignes: [{ produit_id: '', quantite_caisses: 1, type_achat: 'deposer' }]
+            lignes: [{ produit_id: '', quantite_achat: 1, unite_achat: 'caisse', type_achat: 'deposer' }]
         },
 
         init() {
@@ -182,13 +212,17 @@ document.addEventListener('alpine:init', () => {
             return this.produits.find(p => p.id == id);
         },
 
+        getQuantiteCaisses(ligne) {
+            return getQuantiteCaissesFromLigne(ligne, this.getProduit(ligne.produit_id));
+        },
+
         getTotal() {
             let sum = 0;
             this.form.lignes.forEach(l => {
                 const p = this.getProduit(l.produit_id);
                 if (p) {
                     const prixCaisse = getPrixCaisse(p, l.type_achat);
-                    sum += (l.quantite_caisses || 0) * prixCaisse;
+                    sum += this.getQuantiteCaisses(l) * prixCaisse;
                 }
             });
             return sum;
@@ -200,7 +234,7 @@ document.addEventListener('alpine:init', () => {
                 const p = this.getProduit(l.produit_id);
                 if (p) {
                     const prixCaisse = getPrixCaisse(p, l.type_achat);
-                    sum += (l.quantite_caisses || 0) * prixCaisse;
+                    sum += this.getQuantiteCaisses(l) * prixCaisse;
                 }
             });
             const el = document.getElementById('display-total-global');
@@ -209,7 +243,13 @@ document.addEventListener('alpine:init', () => {
         },
 
         async save() {
-            const validLignes = this.form.lignes.filter(l => l.produit_id && l.quantite_caisses > 0);
+            const validLignes = this.form.lignes
+                .filter(l => l.produit_id && this.getQuantiteCaisses(l) > 0)
+                .map(l => ({
+                    produit_id: parseInt(l.produit_id),
+                    quantite_caisses: this.getQuantiteCaisses(l),
+                    type_achat: l.type_achat
+                }));
             if (validLignes.length === 0) {
                 App.notify('Sélectionnez au moins un produit avec une quantité', 'error');
                 return;

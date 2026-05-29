@@ -34,7 +34,12 @@ class ApprovisionnementController extends Controller
         
         // Exporter en Excel
         if (isset($_GET['export']) && $_GET['export'] === 'excel') {
-            $this->exportExcel($filters);
+            $this->exportProduitsExcel($filters);
+            return;
+        }
+
+        if (isset($_GET['print']) && $_GET['print'] === '1') {
+            $this->printProduits($filters);
             return;
         }
 
@@ -88,6 +93,157 @@ class ApprovisionnementController extends Controller
     /**
      * Formulaire de création
      */
+    private function exportProduitsExcel($filters)
+    {
+        $this->requireAuth();
+
+        $report = $this->buildProduitsApprovisionnementReport($filters);
+        $filename = "approvisionnements_produits_" . date('Y-m-d_H-i') . ".csv";
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename=' . $filename);
+
+        $output = fopen('php://output', 'w');
+        fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+
+        fputcsv($output, ['Etat des approvisionnements par produit']);
+        fputcsv($output, ['Du', $filters['date_debut'] ?: 'Debut']);
+        fputcsv($output, ['Au', $filters['date_fin'] ?: 'Fin']);
+        fputcsv($output, ['Statut', $filters['statut'] ?: 'Tous']);
+        fputcsv($output, []);
+        fputcsv($output, ['PRODUITS', 'N P', 'ACHAT', 'PLT', 'P.A.AD', 'P.A.A.E', 'P.T', 'P.V.U', 'P.V.T', 'ECART', 'TOTAL EC', 'ECART A EN', 'TOTAL A ENL']);
+
+        foreach ($report['items'] as $row) {
+            fputcsv($output, [
+                $row['produit'],
+                $row['np'],
+                number_format($row['achat'], 0, '.', ''),
+                number_format($row['plt'], 2, '.', ''),
+                number_format($row['paad'], 2, '.', ''),
+                number_format($row['paae'], 2, '.', ''),
+                number_format($row['pt'], 2, '.', ''),
+                number_format($row['pvu'], 2, '.', ''),
+                number_format($row['pvt'], 2, '.', ''),
+                number_format($row['ecart'], 2, '.', ''),
+                number_format($row['total_ec'], 2, '.', ''),
+                number_format($row['ecart_a_en'], 2, '.', ''),
+                number_format($row['total_a_enl'], 2, '.', ''),
+            ]);
+        }
+
+        fputcsv($output, []);
+        fputcsv($output, ['TOTAUX', '', number_format($report['totals']['achat'], 0, '.', ''), number_format($report['totals']['plt'], 2, '.', ''), '', '', number_format($report['totals']['pt'], 2, '.', ''), '', number_format($report['totals']['pvt'], 2, '.', ''), '', number_format($report['totals']['total_ec'], 2, '.', ''), '', number_format($report['totals']['total_a_enl'], 2, '.', '')]);
+
+        fclose($output);
+        exit;
+    }
+
+    private function printProduits($filters)
+    {
+        $this->requireAuth();
+
+        $this->view('approvisionnements/print-produits', [
+            'filters' => $filters,
+            'report' => $this->buildProduitsApprovisionnementReport($filters)
+        ]);
+    }
+
+    private function buildProduitsApprovisionnementReport($filters)
+    {
+        $where = ['1=1'];
+        $params = [];
+
+        if (!empty($filters['date_debut'])) {
+            $where[] = 'a.date_approvisionnement >= :date_debut';
+            $params['date_debut'] = $filters['date_debut'];
+        }
+
+        if (!empty($filters['date_fin'])) {
+            $where[] = 'a.date_approvisionnement <= :date_fin';
+            $params['date_fin'] = $filters['date_fin'];
+        }
+
+        if (!empty($filters['statut'])) {
+            $where[] = 'a.statut = :statut';
+            $params['statut'] = $filters['statut'];
+        }
+
+        $whereSql = implode(' AND ', $where);
+        $rows = $this->db->fetchAll(
+            "SELECT p.id, p.nom, p.code, p.caisses_par_palette, p.bouteilles_par_caisses,
+                    p.prix_achat_deposer, p.prix_achat_enlever, p.prix_vente_unitaire, p.prix_vente_caisses,
+                    COALESCE(ap.achat, 0) as achat,
+                    COALESCE(ap.pt, 0) as pt
+             FROM produits p
+             LEFT JOIN (
+                SELECT ad.produit_id,
+                       SUM(ad.quantite_caisses) as achat,
+                       SUM(ad.sous_total) as pt
+                FROM approvisionnement_details ad
+                JOIN approvisionnements a ON a.id = ad.approvisionnement_id
+                WHERE {$whereSql}
+                GROUP BY ad.produit_id
+             ) ap ON ap.produit_id = p.id
+             WHERE p.actif = 1
+             ORDER BY p.nom",
+            $params
+        );
+
+        $items = [];
+        $totals = [
+            'achat' => 0,
+            'plt' => 0,
+            'pt' => 0,
+            'pvt' => 0,
+            'total_ec' => 0,
+            'total_a_enl' => 0,
+        ];
+
+        foreach ($rows as $row) {
+            $achat = (float) ($row['achat'] ?? 0);
+            $np = (int) ($row['caisses_par_palette'] ?? 0);
+            $plt = $np > 0 ? ($achat / $np) : 0;
+            $btl = max(1, (int) ($row['bouteilles_par_caisses'] ?? 1));
+            $paad = (float) ($row['prix_achat_deposer'] ?? 0);
+            $paae = (float) ($row['prix_achat_enlever'] ?? 0);
+            $pt = (float) ($row['pt'] ?? 0);
+            $pvu = (float) ($row['prix_vente_caisses'] ?? 0);
+            if ($pvu <= 0) {
+                $pvu = (float) ($row['prix_vente_unitaire'] ?? 0) * $btl;
+            }
+            $pvt = $achat * $pvu;
+            $ecart = $pvu - $paad;
+            $totalEc = $achat * $ecart;
+            $ecartAEn = $pvu - $paae;
+            $totalAEnl = $achat * $ecartAEn;
+
+            $items[] = [
+                'produit' => $row['nom'],
+                'np' => $np,
+                'achat' => $achat,
+                'plt' => $plt,
+                'paad' => $paad,
+                'paae' => $paae,
+                'pt' => $pt,
+                'pvu' => $pvu,
+                'pvt' => $pvt,
+                'ecart' => $ecart,
+                'total_ec' => $totalEc,
+                'ecart_a_en' => $ecartAEn,
+                'total_a_enl' => $totalAEnl,
+            ];
+
+            $totals['achat'] += $achat;
+            $totals['plt'] += $plt;
+            $totals['pt'] += $pt;
+            $totals['pvt'] += $pvt;
+            $totals['total_ec'] += $totalEc;
+            $totals['total_a_enl'] += $totalAEnl;
+        }
+
+        return ['items' => $items, 'totals' => $totals];
+    }
+
     public function create()
     {
         $this->requirePermission('approvisionnements.voir');
@@ -211,6 +367,133 @@ class ApprovisionnementController extends Controller
             'approvisionnement' => $approvisionnement,
             'dettes' => $dettes
         ]);
+    }
+
+    public function print($id)
+    {
+        $this->requirePermission('approvisionnements.voir');
+
+        $approvisionnement = $this->approvisionnementModel->getWithDetails($id);
+        if (!$approvisionnement) {
+            return $this->error('Approvisionnement non trouve', 404);
+        }
+
+        $this->view('approvisionnements/print', [
+            'approvisionnement' => $approvisionnement,
+            'rows' => $this->buildDetailRows($approvisionnement)
+        ]);
+    }
+
+    public function exportDetail($id)
+    {
+        $this->requirePermission('approvisionnements.voir');
+
+        $approvisionnement = $this->approvisionnementModel->getWithDetails($id);
+        if (!$approvisionnement) {
+            return $this->error('Approvisionnement non trouve', 404);
+        }
+
+        $rows = $this->buildDetailRows($approvisionnement);
+        $filename = 'approvisionnement_' . ($approvisionnement['numero_bon'] ?? $id) . '.csv';
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename=' . $filename);
+
+        $output = fopen('php://output', 'w');
+        fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+
+        fputcsv($output, ['Approvisionnement', $approvisionnement['numero_bon'] ?? $id]);
+        fputcsv($output, ['Date', $approvisionnement['date_approvisionnement'] ?? '']);
+        fputcsv($output, ['Fournisseur', $approvisionnement['fournisseur'] ?? 'Bralima']);
+        fputcsv($output, []);
+        fputcsv($output, ['PRODUITS', 'N P', 'ACHAT', 'PLT', 'P.A.AD', 'P.A.A.E', 'P.T', 'P.V.U', 'P.V.T', 'ECART', 'TOTAL EC', 'ECART A EN', 'TOTAL A ENL']);
+
+        foreach ($rows['items'] as $row) {
+            fputcsv($output, [
+                $row['produit'],
+                $row['np'],
+                $row['achat'],
+                number_format($row['plt'], 2, '.', ''),
+                number_format($row['paad'], 2, '.', ''),
+                number_format($row['paae'], 2, '.', ''),
+                number_format($row['pt'], 2, '.', ''),
+                number_format($row['pvu'], 2, '.', ''),
+                number_format($row['pvt'], 2, '.', ''),
+                number_format($row['ecart'], 2, '.', ''),
+                number_format($row['total_ec'], 2, '.', ''),
+                number_format($row['ecart_a_en'], 2, '.', ''),
+                number_format($row['total_a_enl'], 2, '.', ''),
+            ]);
+        }
+
+        fputcsv($output, []);
+        fputcsv($output, ['TOTAUX', '', $rows['totals']['achat'], number_format($rows['totals']['plt'], 2, '.', ''), '', '', number_format($rows['totals']['pt'], 2, '.', ''), '', number_format($rows['totals']['pvt'], 2, '.', ''), '', number_format($rows['totals']['total_ec'], 2, '.', ''), '', number_format($rows['totals']['total_a_enl'], 2, '.', '')]);
+
+        fclose($output);
+        exit;
+    }
+
+    private function buildDetailRows(array $approvisionnement)
+    {
+        $items = [];
+        $totals = [
+            'achat' => 0,
+            'plt' => 0,
+            'pt' => 0,
+            'pvt' => 0,
+            'total_ec' => 0,
+            'total_a_enl' => 0,
+        ];
+
+        foreach ($approvisionnement['details'] ?? [] as $detail) {
+            $achat = (float) ($detail['quantite_caisses'] ?? 0);
+            $np = (int) ($detail['caisses_par_palette'] ?? 0);
+            $plt = $np > 0 ? ($achat / $np) : 0;
+            $btl = max(1, (int) ($detail['bouteilles_par_caisses'] ?? 1));
+            $paad = (float) ($detail['prix_achat_deposer'] ?? 0);
+            $paae = (float) ($detail['prix_achat_enlever'] ?? 0);
+            $pvu = (float) ($detail['prix_vente_caisses'] ?? 0);
+            if ($pvu <= 0) {
+                $pvu = (float) ($detail['prix_vente_unitaire'] ?? 0) * $btl;
+            }
+
+            $prixAchatChoisi = (($detail['type_achat'] ?? 'deposer') === 'enlever') ? $paae : $paad;
+            if ($prixAchatChoisi <= 0) {
+                $prixAchatChoisi = (float)($detail['prix_caisse'] ?? (($detail['prix_unitaire'] ?? 0) * $btl));
+            }
+
+            $pt = $achat * $prixAchatChoisi;
+            $pvt = $achat * $pvu;
+            $ecart = $pvu - $paad;
+            $totalEc = $ecart * $achat;
+            $ecartAEn = $pvu - $paae;
+            $totalAEnl = $ecartAEn * $achat;
+
+            $items[] = [
+                'produit' => $detail['produit_nom'] ?? '',
+                'np' => $np,
+                'achat' => $achat,
+                'plt' => $plt,
+                'paad' => $paad,
+                'paae' => $paae,
+                'pt' => $pt,
+                'pvu' => $pvu,
+                'pvt' => $pvt,
+                'ecart' => $ecart,
+                'total_ec' => $totalEc,
+                'ecart_a_en' => $ecartAEn,
+                'total_a_enl' => $totalAEnl,
+            ];
+
+            $totals['achat'] += $achat;
+            $totals['plt'] += $plt;
+            $totals['pt'] += $pt;
+            $totals['pvt'] += $pvt;
+            $totals['total_ec'] += $totalEc;
+            $totals['total_a_enl'] += $totalAEnl;
+        }
+
+        return ['items' => $items, 'totals' => $totals];
     }
     
     /**

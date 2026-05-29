@@ -19,6 +19,8 @@ ob_start();
             <div class="card-header flex items-center justify-between">
                 <h2 class="text-lg font-semibold">Approvisionnement N° <?= htmlspecialchars($approvisionnement['numero_bon'] ?? $approvisionnement['id']) ?></h2>
                 <div class="flex gap-2">
+                    <a href="<?= url('approvisionnements/' . $approvisionnement['id'] . '/print') ?>" target="_blank" class="btn btn-sm btn-secondary">Imprimer</a>
+                    <a href="<?= url('approvisionnements/' . $approvisionnement['id'] . '/export') ?>" class="btn btn-sm btn-success">Excel</a>
                     <?php if ($approvisionnement['statut'] === 'en_attente'): ?>
                     <button onclick="valider()" class="btn btn-sm btn-primary">Valider la réception</button>
                     <button onclick="annuler()" class="btn btn-sm btn-danger">Annuler</button>
