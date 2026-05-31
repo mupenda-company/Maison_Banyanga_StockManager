@@ -9,6 +9,15 @@ class EmpruntEmballage extends Model
         'emplacement_id', 'date_emprunt', 'statut', 'notes', 'created_by'
     ];
 
+    private function normaliserGamme($nom)
+    {
+        $nom = strtoupper(trim((string) $nom));
+        $nom = preg_replace('/\b\d+\s*CL\b/', '', $nom);
+        $nom = preg_replace('/\b(BL|B|CAN|PET)\b/', '', $nom);
+        $nom = preg_replace('/\s+/', ' ', trim($nom));
+        return $nom;
+    }
+
     public function getAllWithDetails($filters = [])
     {
         $where = '1=1';
@@ -90,18 +99,26 @@ class EmpruntEmballage extends Model
             return 0;
         }
 
+        $produitVendu = (new Produit())->find($produitId);
+        $gammeVendue = $this->normaliserGamme($produitVendu['nom'] ?? '');
+
         $emprunts = $this->db->fetchAll(
-            "SELECT id, quantite_empruntee, quantite_utilisee, quantite_retournee
+            "SELECT e.id, e.produit_id, e.quantite_empruntee, e.quantite_utilisee, e.quantite_retournee,
+                    p.nom as produit_nom
              FROM {$this->table}
-             WHERE source_type = 'client'
-               AND client_id = :client_id
-               AND produit_id = :produit_id
-               AND statut = 'en_cours'
-             ORDER BY date_emprunt ASC, id ASC",
+             e JOIN produits p ON e.produit_id = p.id
+             WHERE e.source_type = 'client'
+               AND e.client_id = :client_id
+               AND e.statut = 'en_cours'
+             ORDER BY CASE WHEN e.produit_id = :produit_id THEN 0 ELSE 1 END, e.date_emprunt ASC, e.id ASC",
             ['client_id' => $clientId, 'produit_id' => $produitId]
         );
 
         foreach ($emprunts as $emprunt) {
+            if ((int) $emprunt['produit_id'] !== (int) $produitId && $this->normaliserGamme($emprunt['produit_nom'] ?? '') !== $gammeVendue) {
+                continue;
+            }
+
             $disponible = (int) $emprunt['quantite_empruntee'] - (int) $emprunt['quantite_utilisee'] - (int) $emprunt['quantite_retournee'];
             if ($disponible <= 0) {
                 continue;

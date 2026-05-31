@@ -88,7 +88,21 @@ ob_start();
             </div>
         </div>
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            <?= $statsPertes['nb_pertes'] ?? 0 ?> perte(s) · <?= number_format((int) round($statsPertes['total_caisses'] ?? 0), 0, '.', ' ') ?> caisse(s)
+            <?php
+                $totalCaissesPertes = (float)($statsPertes['total_caisses'] ?? 0);
+                $btlParCaissePertes = 24;
+                $totalBouteillesPertes = round($totalCaissesPertes * $btlParCaissePertes);
+                $caissesPleinesPertes = intdiv($totalBouteillesPertes, $btlParCaissePertes);
+                $bouteillesRestePertes = $totalBouteillesPertes % $btlParCaissePertes;
+                if ($caissesPleinesPertes > 0 && $bouteillesRestePertes > 0) {
+                    $pertesQuantite = $caissesPleinesPertes . ' cs + ' . $bouteillesRestePertes . ' btl';
+                } elseif ($caissesPleinesPertes > 0) {
+                    $pertesQuantite = $caissesPleinesPertes . ' cs';
+                } else {
+                    $pertesQuantite = $totalBouteillesPertes . ' btl';
+                }
+            ?>
+            <?= $statsPertes['nb_pertes'] ?? 0 ?> perte(s) · <?= $pertesQuantite ?>
         </p>
     </div>
 
@@ -129,7 +143,7 @@ ob_start();
     </div>
 
     <!-- Récolté ce mois (local) -->
-    <div class="stat-card">
+    <!-- <div class="stat-card">
         <div class="flex items-center justify-between">
             <div class="min-w-0 flex-1 mr-2">
                 <p class="stat-label">Récolté ce mois</p>
@@ -144,7 +158,7 @@ ob_start();
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
             Deduction locale ristournes
         </p>
-    </div>
+    </div> -->
 </div>
 
 <!-- Deuxième rangée : Dettes + Panier -->

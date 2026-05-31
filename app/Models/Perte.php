@@ -60,7 +60,7 @@ class Perte extends Model
         }
         
         return $this->db->fetchAll(
-            "SELECT p.*, pr.nom as produit_nom, pr.code as produit_code,
+            "SELECT p.*, pr.nom as produit_nom, pr.code as produit_code, pr.bouteilles_par_caisses,
                     e.nom as emplacement_nom, e.type as emplacement_type
              FROM {$this->table} p
              JOIN produits pr ON p.produit_id = pr.id

@@ -304,7 +304,22 @@ ob_start();
                             <td>
                                 <div class="font-medium"><?= htmlspecialchars($vente['nom']) ?></div>
                             </td>
-                            <td><?= $vente['quantite_vendue'] ?></td>
+                            <td>
+                                <?php
+                                    $totalCaissesVente = (float)($vente['total_caisses'] ?? 0);
+                                    $btlParCaisseVente = 24;
+                                    $totalBouteillesVente = round($totalCaissesVente * $btlParCaisseVente);
+                                    $caissesPleinesVente = intdiv($totalBouteillesVente, $btlParCaisseVente);
+                                    $bouteillesResteVente = $totalBouteillesVente % $btlParCaisseVente;
+                                    if ($caissesPleinesVente > 0 && $bouteillesResteVente > 0) {
+                                        echo $caissesPleinesVente . ' cs + ' . $bouteillesResteVente . ' btl';
+                                    } elseif ($caissesPleinesVente > 0) {
+                                        echo $caissesPleinesVente . ' cs';
+                                    } else {
+                                        echo $totalBouteillesVente . ' btl';
+                                    }
+                                ?>
+                            </td>
                             <td class="font-medium">
                                 <?= format_money_converted($vente['total_vente'] ?? 0) ?>
                             </td>

@@ -66,16 +66,30 @@ class PerteController extends Controller
 
         $output = fopen('php://output', 'w');
         fprintf($output, chr(0xEF) . chr(0xBB) . chr(0xBF));
-        fputcsv($output, ['Date', 'Produit', 'Code', 'Type stock', 'Categorie', 'Quantite (cs)', 'Valeur', 'Emplacement', 'Motif']);
+        fputcsv($output, ['Date', 'Produit', 'Code', 'Type stock', 'Categorie', 'Quantite', 'Valeur', 'Emplacement', 'Motif']);
 
         foreach ($pertes as $perte) {
+            $caisses = (float)($perte['quantite'] ?? 0);
+            $btlParCaisse = (int)($perte['bouteilles_par_caisses'] ?? 24);
+            $totalBouteilles = round($caisses * $btlParCaisse);
+            $caissesPleines = intdiv($totalBouteilles, $btlParCaisse);
+            $bouteillesReste = $totalBouteilles % $btlParCaisse;
+
+            if ($caissesPleines > 0 && $bouteillesReste > 0) {
+                $quantiteExport = $caissesPleines . ' cs + ' . $bouteillesReste . ' btl';
+            } elseif ($caissesPleines > 0) {
+                $quantiteExport = $caissesPleines . ' cs';
+            } else {
+                $quantiteExport = $totalBouteilles . ' btl';
+            }
+
             fputcsv($output, [
                 !empty($perte['date_perte']) ? date('d/m/Y', strtotime($perte['date_perte'])) : '',
                 $perte['produit_nom'] ?? '',
                 $perte['produit_code'] ?? '',
                 $perte['type_stock'] ?? '',
                 $perte['type_perte'] ?? '',
-                number_format((float) ($perte['quantite'] ?? 0), 4, '.', ''),
+                $quantiteExport,
                 number_format((float) ($perte['valeur_perte'] ?? 0), 2, '.', ''),
                 $perte['emplacement_nom'] ?? '',
                 $perte['motif'] ?? ''

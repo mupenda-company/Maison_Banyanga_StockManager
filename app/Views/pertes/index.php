@@ -110,8 +110,23 @@ ob_start();
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($pertes as $perte): 
+                    <?php foreach ($pertes as $perte):
                         $caisses = (float)$perte['quantite'];
+                        $btlParCaisse = (int)($perte['bouteilles_par_caisses'] ?? 24);
+                        $totalBouteilles = round($caisses * $btlParCaisse);
+                        $caissesPleines = intdiv($totalBouteilles, $btlParCaisse);
+                        $bouteillesReste = $totalBouteilles % $btlParCaisse;
+
+                        if ($caissesPleines > 0 && $bouteillesReste > 0) {
+                            $quantiteTop = $caissesPleines . ' cs';
+                            $quantiteBottom = $bouteillesReste . ' btl';
+                        } elseif ($caissesPleines > 0) {
+                            $quantiteTop = $caissesPleines . ' cs';
+                            $quantiteBottom = '';
+                        } else {
+                            $quantiteTop = '';
+                            $quantiteBottom = $totalBouteilles . ' btl';
+                        }
                     ?>
                     <tr>
                         <td><?= date('d/m/Y', strtotime($perte['date_perte'])) ?></td>
@@ -137,8 +152,19 @@ ob_start();
                             <span class="badge-secondary">Perte</span>
                             <?php endif; ?>
                         </td>
-                        <td class="text-right no-print">
-                            <div class="font-black text-red-600"><?= $caisses ?> cs</div>
+                        <td class="text-right">
+                            <?php if ($printMode): ?>
+                                <div class="font-bold text-red-600">
+                                    <?php if ($quantiteTop && $quantiteBottom): ?>
+                                        <?= $quantiteTop ?> + <?= $quantiteBottom ?>
+                                    <?php else: ?>
+                                        <?= $quantiteTop ?: $quantiteBottom ?>
+                                    <?php endif; ?>
+                                </div>
+                            <?php else: ?>
+                                <div class="font-black text-red-600"><?= $quantiteTop ?></div>
+                                <div class="text-sm text-red-500"><?= $quantiteBottom ?></div>
+                            <?php endif; ?>
                         </td>
                         <td class="text-right font-bold"><?= format_money_converted($perte['valeur_perte'] ?? 0) ?></td>
                         <td><?= htmlspecialchars($perte['emplacement_nom'] ?? '-') ?></td>
