@@ -3,6 +3,21 @@
  * Configuration principale de l'application Bralima
  */
 
+$isLocal = in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1'])
+           || str_starts_with($_SERVER['HTTP_HOST'] ?? '', 'localhost:');
+
+if ($isLocal) {
+    define('DB_HOST', 'localhost');
+    define('DB_NAME', 'bralima_logistique');
+    define('DB_USER', 'root');
+    define('DB_PASS', '');
+} else {
+    define('DB_HOST', 'localhost');
+    define('DB_NAME', 'suncityc_bralima_logistique');
+    define('DB_USER', 'suncityc_NelsonMupenda');
+    define('DB_PASS', 'HgK9Em3H=}lJ_[jj');
+}
+define('DB_CHARSET', 'utf8mb4');
 // Configuration de la base de données
 // define('DB_HOST', 'localhost');
 // define('DB_NAME', 'bralima_logistique');
@@ -10,11 +25,11 @@
 // define('DB_PASS', '');
 // define('DB_CHARSET', 'utf8mb4');
 // Configuration de la base de données on line
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'suncityc_bralima_logistique');
-define('DB_USER', 'suncityc_NelsonMupenda');
-define('DB_PASS', 'HgK9Em3H=}lJ_[jj');
-define('DB_CHARSET', 'utf8mb4');
+// define('DB_HOST', 'localhost');
+// define('DB_NAME', 'suncityc_bralima_logistique');
+// define('DB_USER', 'suncityc_NelsonMupenda');
+// define('DB_PASS', 'HgK9Em3H=}lJ_[jj');
+// define('DB_CHARSET', 'utf8mb4');
 
 // Configuration de l'application
 define('APP_NAME', 'SUN CITY-CE SARL');
