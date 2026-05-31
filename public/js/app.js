@@ -110,10 +110,7 @@ function can(permissionCode) {
 const App = {
     // Effectuer une requête API
     async api(url, method = 'GET', data = null) {
-        // Ajouter BASE_URL si l'URL est relative
-        const base = (window.BASE_URL || '').replace(/\/public\/?$/, '').replace(/\/+$/, '');
-        const path = url.startsWith('/') ? url : '/' + url;
-        const fullUrl = url.startsWith('http') ? url : base + path;
+        const fullUrl = url.startsWith('http') ? url : (window.BASE_URL || '') + url;
         
         const options = {
             method,

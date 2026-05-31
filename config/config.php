@@ -3,9 +3,11 @@
  * Configuration principale de l'application Bralima
  */
 
-$isLocal = in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1'])
+// Détection local vs serveur — une seule fois, proprement
+$isLocal = in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1', '::1'])
            || str_starts_with($_SERVER['HTTP_HOST'] ?? '', 'localhost:');
 
+// Configuration de la base de données
 if ($isLocal) {
     define('DB_HOST', 'localhost');
     define('DB_NAME', 'bralima_logistique');
@@ -18,51 +20,27 @@ if ($isLocal) {
     define('DB_PASS', 'HgK9Em3H=}lJ_[jj');
 }
 define('DB_CHARSET', 'utf8mb4');
-// Configuration de la base de données
-// define('DB_HOST', 'localhost');
-// define('DB_NAME', 'bralima_logistique');
-// define('DB_USER', 'root');
-// define('DB_PASS', '');
-// define('DB_CHARSET', 'utf8mb4');
-// Configuration de la base de données on line
-// define('DB_HOST', 'localhost');
-// define('DB_NAME', 'suncityc_bralima_logistique');
-// define('DB_USER', 'suncityc_NelsonMupenda');
-// define('DB_PASS', 'HgK9Em3H=}lJ_[jj');
-// define('DB_CHARSET', 'utf8mb4');
 
 // Configuration de l'application
 define('APP_NAME', 'SUN CITY-CE SARL');
 define('APP_VERSION', '1.0.0');
-// Détecter automatiquement l'URL de base
-// $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
-// $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-// $scriptName = dirname($_SERVER['SCRIPT_NAME']);
-// $basePath = $scriptName === '/' || $scriptName === '\\' ? '' : $scriptName;
-// define('APP_URL', $protocol . '://' . $host . $basePath);
-// define('APP_DEBUG', true);
-// define('BASE_PATH', $basePath);
 
-$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+// ✅ URL de base — logique claire et unique
 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
 
-// En local : le projet est dans un sous-dossier (ex: localhost/bralima/public)
-// Sur le serveur : public/ EST la racine du domaine, donc basePath = ''
-$scriptDir = dirname($_SERVER['SCRIPT_NAME'] ?? '');
-$isLocalhost = in_array($host, ['localhost', '127.0.0.1', '::1']) 
-               || str_starts_with($host, 'localhost:');
-
-if ($isLocalhost) {
-    // Local : conserver le sous-dossier pour que ça marche en dev
+if ($isLocal) {
+    // Local : toujours HTTP (jamais HTTPS), garder le sous-dossier
+    $scriptDir = dirname($_SERVER['SCRIPT_NAME'] ?? '');
     $basePath = ($scriptDir === '/' || $scriptDir === '\\') ? '' : $scriptDir;
+    define('APP_URL', 'http://' . $host . $basePath);
+    define('APP_DEBUG', true);
 } else {
-    // Serveur hébergé : public/ est la racine, pas de sous-dossier
-    $basePath = '';
+    // Serveur : toujours HTTPS, public/ est la racine
+    define('APP_URL', 'https://' . $host);
+    define('APP_DEBUG', false);
 }
 
-define('APP_URL', $protocol . '://' . $host . $basePath);
-define('APP_DEBUG', false); // ← Désactiver le debug en production !
-define('BASE_PATH', $basePath);
+define('BASE_PATH', $isLocal ? dirname($_SERVER['SCRIPT_NAME'] ?? '') : '');
 
 // Configuration des chemins
 define('ROOT_PATH', dirname(__DIR__));
@@ -95,7 +73,6 @@ spl_autoload_register(function ($class) {
         ROOT_PATH . '/app/Controllers/Api/',
         ROOT_PATH . '/app/Core/',
     ];
-    
     foreach ($paths as $path) {
         $file = $path . $class . '.php';
         if (file_exists($file)) {
@@ -105,9 +82,8 @@ spl_autoload_register(function ($class) {
     }
 });
 
-// Fonction d'aide pour les chemins
+// Fonctions d'aide
 function asset($path) {
-    // Le document root est le dossier public, donc pas besoin de /public/
     return APP_URL . '/' . ltrim($path, '/');
 }
 
@@ -128,20 +104,20 @@ function can($permissionCode) {
 function getDefaultRoute() {
     $perms = $_SESSION['user_permissions'] ?? [];
     $routeMap = [
-        'dashboard.voir' => '/',
-        'ventes.voir' => 'ventes',
-        'clients.voir' => 'clients',
-        'produits.voir' => 'produits',
-        'stock.voir' => 'stocks',
-        'approvisionnements.voir' => 'approvisionnements',
-        'missions.voir' => 'missions',
-        'vehicules.voir' => 'vehicules',
-        'emballages.voir' => 'emballages',
-        'pertes.voir' => 'pertes',
-        'depenses.voir' => 'depenses',
-        'finance.voir' => 'finance',
-        'rapports.voir' => 'rapports',
-        'admin.voir' => 'admin',
+        'dashboard.voir'           => '/',
+        'ventes.voir'              => 'ventes',
+        'clients.voir'             => 'clients',
+        'produits.voir'            => 'produits',
+        'stock.voir'               => 'stocks',
+        'approvisionnements.voir'  => 'approvisionnements',
+        'missions.voir'            => 'missions',
+        'vehicules.voir'           => 'vehicules',
+        'emballages.voir'          => 'emballages',
+        'pertes.voir'              => 'pertes',
+        'depenses.voir'            => 'depenses',
+        'finance.voir'             => 'finance',
+        'rapports.voir'            => 'rapports',
+        'admin.voir'               => 'admin',
     ];
     foreach ($routeMap as $perm => $route) {
         if (in_array($perm, $perms)) return $route;
@@ -149,7 +125,6 @@ function getDefaultRoute() {
     return 'ventes';
 }
 
-// Fonction de débogage
 function dd($data) {
     if (APP_DEBUG) {
         echo '<pre>';
@@ -163,5 +138,4 @@ function env($key, $default = null) {
     return $_ENV[$key] ?? $default;
 }
 
-// Charger les fonctions utilitaires
 require_once ROOT_PATH . '/app/helpers.php';

@@ -33,7 +33,8 @@
         }
     </style>
     <script>
-        window.BASE_URL = '<?= APP_URL ?>';
+        window.BASE_URL = '<?= defined("APP_URL") ? APP_URL : "" ?>';
+        window.APP_URL  = window.BASE_URL;
         <?php 
         $parametreModel = new Parametre();
         $logo = $parametreModel->get('logo');
@@ -60,8 +61,8 @@
             });
         });
     </script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="<?= asset('js/app.js') ?>" defer></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 min-h-screen flex items-center justify-center p-4">
     <div class="max-w-md w-full">

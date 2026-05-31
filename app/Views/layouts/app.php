@@ -38,7 +38,7 @@
     
     <!-- Base URL pour les requêtes API -->
     <script>
-        window.BASE_URL = '<?= rtrim(preg_replace('#/public$#', '', rtrim(APP_URL, '/')), '/') ?>';
+        window.BASE_URL = '<?= defined("APP_URL") ? APP_URL : "" ?>';
         <?php 
         $parametreModel = new Parametre();
         $devise = $parametreModel->get('devise', 'CDF');
