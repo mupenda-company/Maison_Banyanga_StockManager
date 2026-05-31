@@ -290,13 +290,13 @@
                     </svg>
                     Emballages
                 </a>
-                <a href="<?= url('emballages/emprunts') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/emballages/emprunts') !== false ? 'active' : '' ?>">
+                <!-- <a href="<?= url('emballages/emprunts') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/emballages/emprunts') !== false ? 'active' : '' ?>">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4"/>
                     </svg>
                     Emprunts emballages
                 </a>
-                <?php endif; ?>
+                <?php endif; ?> -->
                 
                 <!-- Stocks -->
                 <?php if (can('stock.voir')): ?>
