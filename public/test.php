@@ -1,5 +1,5 @@
 <?php
-require_once dirname(__DIR__) . '/app/config.php';
+require_once dirname(__DIR__) . '/config/config.php';
 
 try {
     $pdo = new PDO(
