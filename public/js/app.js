@@ -111,7 +111,9 @@ const App = {
     // Effectuer une requête API
     async api(url, method = 'GET', data = null) {
         // Ajouter BASE_URL si l'URL est relative
-        const fullUrl = url.startsWith('http') ? url : (window.BASE_URL || '') + url;
+        const base = (window.BASE_URL || '').replace(/\/public\/?$/, '').replace(/\/+$/, '');
+        const path = url.startsWith('/') ? url : '/' + url;
+        const fullUrl = url.startsWith('http') ? url : base + path;
         
         const options = {
             method,
@@ -491,12 +493,13 @@ const App = {
         const element = document.getElementById(elementId);
         if (element) {
             const printWindow = window.open('', '_blank');
+            const base = (window.BASE_URL || '').replace(/\/public\/?$/, '').replace(/\/+$/, '');
             printWindow.document.write(`
                 <!DOCTYPE html>
                 <html>
                 <head>
                     <title>Impression</title>
-                    <link href="${window.location.origin}/public/css/app.css" rel="stylesheet">
+                    <link href="${base}/css/app.css" rel="stylesheet">
                     <style>
                         body { padding: 20px; }
                         @media print {

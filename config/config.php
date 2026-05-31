@@ -20,12 +20,33 @@ define('DB_CHARSET', 'utf8mb4');
 define('APP_NAME', 'SUN CITY-CE SARL');
 define('APP_VERSION', '1.0.0');
 // Détecter automatiquement l'URL de base
+// $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+// $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+// $scriptName = dirname($_SERVER['SCRIPT_NAME']);
+// $basePath = $scriptName === '/' || $scriptName === '\\' ? '' : $scriptName;
+// define('APP_URL', $protocol . '://' . $host . $basePath);
+// define('APP_DEBUG', true);
+// define('BASE_PATH', $basePath);
+
 $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-$scriptName = dirname($_SERVER['SCRIPT_NAME']);
-$basePath = $scriptName === '/' || $scriptName === '\\' ? '' : $scriptName;
+
+// En local : le projet est dans un sous-dossier (ex: localhost/bralima/public)
+// Sur le serveur : public/ EST la racine du domaine, donc basePath = ''
+$scriptDir = dirname($_SERVER['SCRIPT_NAME'] ?? '');
+$isLocalhost = in_array($host, ['localhost', '127.0.0.1', '::1']) 
+               || str_starts_with($host, 'localhost:');
+
+if ($isLocalhost) {
+    // Local : conserver le sous-dossier pour que ça marche en dev
+    $basePath = ($scriptDir === '/' || $scriptDir === '\\') ? '' : $scriptDir;
+} else {
+    // Serveur hébergé : public/ est la racine, pas de sous-dossier
+    $basePath = '';
+}
+
 define('APP_URL', $protocol . '://' . $host . $basePath);
-define('APP_DEBUG', true);
+define('APP_DEBUG', false); // ← Désactiver le debug en production !
 define('BASE_PATH', $basePath);
 
 // Configuration des chemins
