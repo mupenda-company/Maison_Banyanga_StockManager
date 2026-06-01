@@ -40,7 +40,7 @@ Application web complète pour la gestion logistique d'un dépôt de boissons Br
 
 1. **Cloner le projet**
 ```bash
-git clone https://github.com/mupenda-company/Stock_Manage_App.git
+git clone https://github.com/mupenda-company/Maison_Banyanga_StockManager.git
 # assurer d'avoir git dans votre pc si non installer le pour eviter des erreur de clonnage
 ```
 
