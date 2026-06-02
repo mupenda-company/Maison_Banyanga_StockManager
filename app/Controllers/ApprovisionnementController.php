@@ -134,7 +134,7 @@ class ApprovisionnementController extends Controller
         }
 
         fputcsv($output, []);
-        fputcsv($output, ['TOTAUX CDF', '', number_format($report['totals']['achat'], 0, '.', ''), number_format($report['totals']['plt'], 2, '.', ''), '', '', number_format($report['totals']['pt'], 2, '.', ''), '', number_format($report['totals']['pvt'], 2, '.', ''), '', number_format($report['totals']['total_ec'], 2, '.', ''), '', number_format($report['totals']['total_a_enl'], 2, '.', '')]);
+        fputcsv($output, ['TOTAUX CDF', '', number_format($report['totals']['achat'], 0, '.', ''), number_format($report['totals']['plt'], 2, '.', ''), '', '', number_format(convert_money($report['totals']['pt'], get_base_devise(), 'CDF'), 2, '.', ''), '', number_format(convert_money($report['totals']['pvt'], get_base_devise(), 'CDF'), 2, '.', ''), '', number_format(convert_money($report['totals']['total_ec'], get_base_devise(), 'CDF'), 2, '.', ''), '', number_format(convert_money($report['totals']['total_a_enl'], get_base_devise(), 'CDF'), 2, '.', '')]);
         fputcsv($output, ['TOTAUX USD', '', '', '', '', '', number_format(convert_money($report['totals']['pt'], get_base_devise(), 'USD'), 2, '.', ''), '', number_format(convert_money($report['totals']['pvt'], get_base_devise(), 'USD'), 2, '.', ''), '', number_format(convert_money($report['totals']['total_ec'], get_base_devise(), 'USD'), 2, '.', ''), '', number_format(convert_money($report['totals']['total_a_enl'], get_base_devise(), 'USD'), 2, '.', '')]);
 
         fclose($output);
@@ -432,7 +432,7 @@ class ApprovisionnementController extends Controller
         }
 
         fputcsv($output, []);
-        fputcsv($output, ['TOTAUX CDF', '', $rows['totals']['achat'], number_format($rows['totals']['plt'], 2, '.', ''), '', '', number_format($rows['totals']['pt'], 2, '.', ''), '', number_format($rows['totals']['pvt'], 2, '.', ''), '', number_format($rows['totals']['total_ec'], 2, '.', ''), '', number_format($rows['totals']['total_a_enl'], 2, '.', '')]);
+        fputcsv($output, ['TOTAUX CDF', '', $rows['totals']['achat'], number_format($rows['totals']['plt'], 2, '.', ''), '', '', number_format(convert_money($rows['totals']['pt'], get_base_devise(), 'CDF'), 2, '.', ''), '', number_format(convert_money($rows['totals']['pvt'], get_base_devise(), 'CDF'), 2, '.', ''), '', number_format(convert_money($rows['totals']['total_ec'], get_base_devise(), 'CDF'), 2, '.', ''), '', number_format(convert_money($rows['totals']['total_a_enl'], get_base_devise(), 'CDF'), 2, '.', '')]);
         fputcsv($output, ['TOTAUX USD', '', '', '', '', '', number_format(convert_money($rows['totals']['pt'], get_base_devise(), 'USD'), 2, '.', ''), '', number_format(convert_money($rows['totals']['pvt'], get_base_devise(), 'USD'), 2, '.', ''), '', number_format(convert_money($rows['totals']['total_ec'], get_base_devise(), 'USD'), 2, '.', ''), '', number_format(convert_money($rows['totals']['total_a_enl'], get_base_devise(), 'USD'), 2, '.', '')]);
 
         fclose($output);

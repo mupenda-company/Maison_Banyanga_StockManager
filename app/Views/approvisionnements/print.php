@@ -81,13 +81,13 @@ $numeroBon = $approvisionnement['numero_bon'] ?? $approvisionnement['id'];
                 <td class="num"><?= number_format($rows['totals']['plt'], 2, ',', ' ') ?></td>
                 <td></td>
                 <td></td>
-                <td class="num"><?= format_money_converted($rows['totals']['pt']) ?></td>
+                <td class="num"><?= format_money(convert_money($rows['totals']['pt'], get_base_devise(), 'CDF'), 'CDF') ?></td>
                 <td></td>
-                <td class="num"><?= format_money_converted($rows['totals']['pvt']) ?></td>
+                <td class="num"><?= format_money(convert_money($rows['totals']['pvt'], get_base_devise(), 'CDF'), 'CDF') ?></td>
                 <td></td>
-                <td class="num"><?= format_money_converted($rows['totals']['total_ec']) ?></td>
+                <td class="num"><?= format_money(convert_money($rows['totals']['total_ec'], get_base_devise(), 'CDF'), 'CDF') ?></td>
                 <td></td>
-                <td class="num"><?= format_money_converted($rows['totals']['total_a_enl']) ?></td>
+                <td class="num"><?= format_money(convert_money($rows['totals']['total_a_enl'], get_base_devise(), 'CDF'), 'CDF') ?></td>
             </tr>
             <tr>
                 <td>TOTAUX USD</td>

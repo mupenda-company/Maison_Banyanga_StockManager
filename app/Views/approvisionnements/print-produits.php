@@ -84,13 +84,13 @@ $periode = ($dateDebut ?: 'Debut') . ' au ' . ($dateFin ?: 'Fin');
                 <td class="num"><?= number_format($report['totals']['plt'], 2, ',', ' ') ?></td>
                 <td></td>
                 <td></td>
-                <td class="num"><?= format_money_converted($report['totals']['pt']) ?></td>
+                <td class="num"><?= format_money(convert_money($report['totals']['pt'], get_base_devise(), 'CDF'), 'CDF') ?></td>
                 <td></td>
-                <td class="num"><?= format_money_converted($report['totals']['pvt']) ?></td>
+                <td class="num"><?= format_money(convert_money($report['totals']['pvt'], get_base_devise(), 'CDF'), 'CDF') ?></td>
                 <td></td>
-                <td class="num"><?= format_money_converted($report['totals']['total_ec']) ?></td>
+                <td class="num"><?= format_money(convert_money($report['totals']['total_ec'], get_base_devise(), 'CDF'), 'CDF') ?></td>
                 <td></td>
-                <td class="num"><?= format_money_converted($report['totals']['total_a_enl']) ?></td>
+                <td class="num"><?= format_money(convert_money($report['totals']['total_a_enl'], get_base_devise(), 'CDF'), 'CDF') ?></td>
             </tr>
             <tr>
                 <td>TOTAUX USD</td>
