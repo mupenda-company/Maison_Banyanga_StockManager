@@ -43,8 +43,8 @@ ob_start();
         <div class="flex items-center justify-between">
             <div class="min-w-0 flex-1 mr-2">
                 <p class="stat-label">Chiffre d'affaires TTC</p>
-                <p class="text-lg md:text-xl font-bold text-green-600 dark:text-green-400 truncate" title="<?= format_money_converted($caTotal) ?>">
-                    <?= format_money_converted($caTotal) ?>
+                <p class="text-lg md:text-xl font-bold text-green-600 dark:text-green-400 truncate" title="<?= format_money_dual($caTotal) ?>">
+                    <?= format_money_dual($caTotal) ?>
                 </p>
             </div>
             <div class="w-10 h-10 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center shrink-0">
@@ -61,8 +61,8 @@ ob_start();
         <div class="flex items-center justify-between">
             <div class="min-w-0 flex-1 mr-2">
                 <p class="stat-label">Solde net</p>
-                <p class="text-lg md:text-xl font-bold truncate <?= $benefice >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400' ?>" title="<?= format_money_converted($benefice) ?>">
-                    <?= format_money_converted($benefice) ?>
+                <p class="text-lg md:text-xl font-bold truncate <?= $benefice >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400' ?>" title="<?= format_money_dual($benefice) ?>">
+                    <?= format_money_dual($benefice) ?>
                 </p>
             </div>
             <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center shrink-0">
@@ -79,8 +79,8 @@ ob_start();
         <div class="flex items-center justify-between">
             <div class="min-w-0 flex-1 mr-2">
                 <p class="stat-label">Valeur des pertes</p>
-                <p class="text-lg md:text-xl font-bold text-red-600 dark:text-red-400 truncate" title="<?= format_money_converted($pertesValeur) ?>">
-                    <?= format_money_converted($pertesValeur) ?>
+                <p class="text-lg md:text-xl font-bold text-red-600 dark:text-red-400 truncate" title="<?= format_money_dual($pertesValeur) ?>">
+                    <?= format_money_dual($pertesValeur) ?>
                 </p>
             </div>
             <div class="w-10 h-10 bg-red-100 dark:bg-red-900/50 rounded-full flex items-center justify-center shrink-0">
@@ -111,8 +111,8 @@ ob_start();
         <div class="flex items-center justify-between">
             <div class="min-w-0 flex-1 mr-2">
                 <p class="stat-label">Dépenses</p>
-                <p class="text-lg md:text-xl font-bold text-amber-600 dark:text-amber-400 truncate" title="<?= format_money_converted($totalDepenses) ?>">
-                    <?= format_money_converted($totalDepenses) ?>
+                <p class="text-lg md:text-xl font-bold text-amber-600 dark:text-amber-400 truncate" title="<?= format_money_dual($totalDepenses) ?>">
+                    <?= format_money_dual($totalDepenses) ?>
                 </p>
             </div>
             <div class="w-10 h-10 bg-amber-100 dark:bg-amber-900/50 rounded-full flex items-center justify-center shrink-0">
@@ -129,8 +129,8 @@ ob_start();
         <div class="flex items-center justify-between">
             <div class="min-w-0 flex-1 mr-2">
                 <p class="stat-label">TVA collectée</p>
-                <p class="text-lg md:text-xl font-bold text-purple-600 dark:text-purple-400 truncate" title="<?= format_money_converted($tvaCollectee) ?>">
-                    <?= format_money_converted($tvaCollectee) ?>
+                <p class="text-lg md:text-xl font-bold text-purple-600 dark:text-purple-400 truncate" title="<?= format_money_dual($tvaCollectee) ?>">
+                    <?= format_money_dual($tvaCollectee) ?>
                 </p>
             </div>
             <div class="w-10 h-10 bg-purple-100 dark:bg-purple-900/50 rounded-full flex items-center justify-center shrink-0">
@@ -138,27 +138,27 @@ ob_start();
             </div>
         </div>
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            HT: <?= format_money_converted($statsVentes['total_ht'] ?? 0) ?>
+            HT: <?= format_money_dual($statsVentes['total_ht'] ?? 0) ?>
         </p>
     </div>
 
     <!-- Récolté ce mois (local) -->
-    <!-- <div class="stat-card">
+    <div class="stat-card">
         <div class="flex items-center justify-between">
             <div class="min-w-0 flex-1 mr-2">
-                <p class="stat-label">Récolté ce mois</p>
-                <p class="text-lg md:text-xl font-bold text-teal-600 dark:text-teal-400 truncate" title="<?= format_money_converted($totalRecolteLocale) ?>">
-                    <?= format_money_converted($totalRecolteLocale) ?>
+                <p class="stat-label">Récolte locale</p>
+                <p class="text-lg md:text-xl font-bold text-teal-600 dark:text-teal-400 truncate" title="<?= format_money_dual($totalRecolteLocale) ?>">
+                    <?= format_money_dual($totalRecolteLocale) ?>
                 </p>
             </div>
             <div class="w-10 h-10 bg-teal-100 dark:bg-teal-900/50 rounded-full flex items-center justify-center shrink-0">
                 <svg class="w-5 h-5 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
             </div>
         </div>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+        <!-- <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
             Deduction locale ristournes
-        </p>
-    </div> -->
+        </p> -->
+    </div>
 </div>
 
 <!-- Deuxième rangée : Dettes + Panier -->
@@ -188,7 +188,7 @@ ob_start();
             <div class="min-w-0 flex-1 mr-2">
                 <p class="stat-label">Panier moyen</p>
                 <p class="text-lg md:text-xl font-bold text-teal-600 dark:text-teal-400 truncate">
-                    <?= format_money_converted($statsVentes['moyenne_vente'] ?? 0) ?>
+                    <?= format_money_dual($statsVentes['moyenne_vente'] ?? 0) ?>
                 </p>
             </div>
             <div class="w-10 h-10 bg-teal-100 dark:bg-teal-900/50 rounded-full flex items-center justify-center shrink-0">
@@ -217,7 +217,7 @@ ob_start();
                 <div class="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-5 overflow-hidden">
                     <div class="bg-primary-500 h-full rounded-full transition-all duration-500" style="width: <?= $pct ?>%"></div>
                 </div>
-                <span class="text-xs font-semibold text-gray-700 dark:text-gray-300 w-28 text-right shrink-0"><?= format_money_converted($v['ca_jour']) ?></span>
+                <span class="text-xs font-semibold text-gray-700 dark:text-gray-300 w-28 text-right shrink-0"><?= format_money_dual($v['ca_jour']) ?></span>
             </div>
             <?php endforeach; ?>
         </div>
@@ -244,7 +244,7 @@ ob_start();
                     <tr class="border-b border-gray-100 dark:border-gray-700/50">
                         <td class="py-2 px-3 text-gray-900 dark:text-white"><?= htmlspecialchars($z['zone_nom']) ?></td>
                         <td class="py-2 px-3 text-right text-gray-600 dark:text-gray-400"><?= $z['nb_ventes'] ?></td>
-                        <td class="py-2 px-3 text-right font-semibold text-gray-900 dark:text-white"><?= format_money_converted($z['total_ca']) ?></td>
+                        <td class="py-2 px-3 text-right font-semibold text-gray-900 dark:text-white"><?= format_money_dual($z['total_ca']) ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -276,7 +276,7 @@ ob_start();
                     <tr class="border-b border-gray-100 dark:border-gray-700/50">
                         <td class="py-2 px-3 text-gray-900 dark:text-white"><?= htmlspecialchars($p['nom']) ?></td>
                         <td class="py-2 px-3 text-right text-gray-600 dark:text-gray-400"><?= number_format((int) round($p['total_caisses'] ?? 0), 0, '.', ' ') ?></td>
-                        <td class="py-2 px-3 text-right font-semibold text-gray-900 dark:text-white"><?= format_money_converted($p['total_vente'] ?? 0) ?></td>
+                        <td class="py-2 px-3 text-right font-semibold text-gray-900 dark:text-white"><?= format_money_dual($p['total_vente'] ?? 0) ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -307,7 +307,7 @@ ob_start();
                         <td class="py-2 px-3 text-gray-500 dark:text-gray-400"><?= $i + 1 ?></td>
                         <td class="py-2 px-3 text-gray-900 dark:text-white"><?= htmlspecialchars($c['nom']) ?></td>
                         <td class="py-2 px-3 text-right text-gray-600 dark:text-gray-400"><?= $c['nb_ventes'] ?></td>
-                        <td class="py-2 px-3 text-right font-semibold text-gray-900 dark:text-white"><?= format_money_converted($c['total_ca']) ?></td>
+                        <td class="py-2 px-3 text-right font-semibold text-gray-900 dark:text-white"><?= format_money_dual($c['total_ca']) ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -328,7 +328,7 @@ ob_start();
         <div class="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
             <p class="font-semibold text-red-700 dark:text-red-300"><?= htmlspecialchars($pt['type_perte'] ?? 'Autre') ?></p>
             <p class="text-sm text-gray-600 dark:text-gray-400"><?= $pt['nb'] ?? 0 ?> perte(s)</p>
-            <p class="text-sm font-bold text-red-600 dark:text-red-400 mt-1"><?= format_money_converted($pt['valeur'] ?? 0) ?></p>
+            <p class="text-sm font-bold text-red-600 dark:text-red-400 mt-1"><?= format_money_dual($pt['valeur'] ?? 0) ?></p>
             <p class="text-xs text-gray-500 dark:text-gray-400"><?= number_format((int)($pt['quantite'] ?? 0), 0, '.', ' ') ?> caisse(s)</p>
         </div>
         <?php endforeach; ?>
@@ -349,7 +349,7 @@ ob_start();
         <div class="p-4 bg-<?= $color ?>-50 dark:bg-<?= $color ?>-900/20 rounded-lg border border-<?= $color ?>-200 dark:border-<?= $color ?>-800">
             <p class="font-semibold text-<?= $color ?>-700 dark:text-<?= $color ?>-300"><?= htmlspecialchars($dc['categorie']) ?></p>
             <p class="text-sm text-gray-600 dark:text-gray-400"><?= $dc['nb'] ?? 0 ?> dépense(s)</p>
-            <p class="text-sm font-bold text-<?= $color ?>-600 dark:text-<?= $color ?>-400 mt-1"><?= format_money_converted($dc['total'] ?? 0) ?></p>
+            <p class="text-sm font-bold text-<?= $color ?>-600 dark:text-<?= $color ?>-400 mt-1"><?= format_money_dual($dc['total'] ?? 0) ?></p>
         </div>
         <?php endforeach; ?>
     </div>
@@ -362,27 +362,27 @@ ob_start();
     <div class="space-y-3">
         <div class="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
             <span class="text-gray-600 dark:text-gray-400">Chiffre d'affaires HT</span>
-            <span class="font-semibold text-gray-900 dark:text-white"><?= format_money_converted($statsVentes['total_ht'] ?? 0) ?></span>
+            <span class="font-semibold text-gray-900 dark:text-white"><?= format_money_dual($statsVentes['total_ht'] ?? 0) ?></span>
         </div>
         <div class="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
             <span class="text-gray-600 dark:text-gray-400">TVA collectée</span>
-            <span class="font-semibold text-purple-600 dark:text-purple-400">+ <?= format_money_converted($tvaCollectee) ?></span>
+            <span class="font-semibold text-purple-600 dark:text-purple-400">+ <?= format_money_dual($tvaCollectee) ?></span>
         </div>
         <div class="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
             <span class="text-gray-600 dark:text-gray-400">Chiffre d'affaires TTC</span>
-            <span class="font-semibold text-green-600 dark:text-green-400"><?= format_money_converted($caTotal) ?></span>
+            <span class="font-semibold text-green-600 dark:text-green-400"><?= format_money_dual($caTotal) ?></span>
         </div>
         <div class="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
             <span class="text-gray-600 dark:text-gray-400">Valeur des pertes</span>
-            <span class="font-semibold text-red-600 dark:text-red-400">- <?= format_money_converted($pertesValeur) ?></span>
+            <span class="font-semibold text-red-600 dark:text-red-400">- <?= format_money_dual($pertesValeur) ?></span>
         </div>
         <div class="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
             <span class="text-gray-600 dark:text-gray-400">Dépenses</span>
-            <span class="font-semibold text-amber-600 dark:text-amber-400">- <?= format_money_converted($totalDepenses) ?></span>
+            <span class="font-semibold text-amber-600 dark:text-amber-400">- <?= format_money_dual($totalDepenses) ?></span>
         </div>
         <div class="flex justify-between items-center py-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg px-4 mt-2">
             <span class="font-bold text-gray-900 dark:text-white">Solde net</span>
-            <span class="font-bold text-lg <?= $benefice >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400' ?>"><?= format_money_converted($benefice) ?></span>
+            <span class="font-bold text-lg <?= $benefice >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400' ?>"><?= format_money_dual($benefice) ?></span>
         </div>
     </div>
 </div>

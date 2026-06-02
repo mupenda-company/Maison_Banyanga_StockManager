@@ -6,7 +6,7 @@
 class Perte extends Model
 {
     protected $table = 'pertes';
-    protected $fillable = ['produit_id', 'emplacement_id', 'quantite', 'type_perte', 'motif', 'date_perte', 'valeur_perte', 'created_by', 'type_stock'];
+    protected $fillable = ['produit_id', 'emplacement_id', 'quantite', 'type_perte', 'motif', 'date_perte', 'valeur_perte', 'agent_id', 'created_by', 'type_stock'];
     
     /**
      * Récupérer avec les détails
@@ -16,11 +16,13 @@ class Perte extends Model
         return $this->db->fetch(
             "SELECT p.*, pr.nom as produit_nom, pr.code as produit_code, pr.bouteilles_par_caisses,
                     e.nom as emplacement_nom, e.type as emplacement_type,
-                    u.nom as created_by_nom, u.prenom as created_by_prenom
+                    u.nom as created_by_nom, u.prenom as created_by_prenom,
+                    a.nom as agent_nom, a.prenom as agent_prenom
              FROM {$this->table} p
              JOIN produits pr ON p.produit_id = pr.id
              JOIN emplacements e ON p.emplacement_id = e.id
              LEFT JOIN users u ON p.created_by = u.id
+             LEFT JOIN users a ON p.agent_id = a.id
              WHERE p.id = :id",
             ['id' => $id]
         );
@@ -43,6 +45,11 @@ class Perte extends Model
             $where .= " AND p.emplacement_id = :emplacement_id";
             $params['emplacement_id'] = $filters['emplacement_id'];
         }
+
+        if (!empty($filters['agent_id'])) {
+            $where .= " AND p.agent_id = :agent_id";
+            $params['agent_id'] = $filters['agent_id'];
+        }
         
         if (!empty($filters['type_perte'])) {
             $where .= " AND p.type_perte = :type_perte";
@@ -61,10 +68,12 @@ class Perte extends Model
         
         return $this->db->fetchAll(
             "SELECT p.*, pr.nom as produit_nom, pr.code as produit_code, pr.bouteilles_par_caisses,
-                    e.nom as emplacement_nom, e.type as emplacement_type
+                    e.nom as emplacement_nom, e.type as emplacement_type,
+                    a.nom as agent_nom, a.prenom as agent_prenom
              FROM {$this->table} p
              JOIN produits pr ON p.produit_id = pr.id
              JOIN emplacements e ON p.emplacement_id = e.id
+             LEFT JOIN users a ON p.agent_id = a.id
              WHERE {$where}
              ORDER BY p.date_perte DESC",
             $params
@@ -183,6 +192,32 @@ class Perte extends Model
              WHERE {$where}
              GROUP BY type_perte
              ORDER BY valeur DESC",
+            $params
+        );
+    }
+
+    public function getByAgent($dateDebut = null, $dateFin = null)
+    {
+        $where = "1=1";
+        $params = [];
+
+        if ($dateDebut && $dateFin) {
+            $where .= " AND p.date_perte BETWEEN :date_debut AND :date_fin";
+            $params['date_debut'] = $dateDebut;
+            $params['date_fin'] = $dateFin;
+        }
+
+        return $this->db->fetchAll(
+            "SELECT p.agent_id,
+                    COALESCE(CONCAT(u.prenom, ' ', u.nom), 'Non assigne') as agent_nom_complet,
+                    COUNT(*) as nb,
+                    COALESCE(SUM(p.quantite), 0) as total_caisses,
+                    COALESCE(SUM(p.valeur_perte), 0) as total_valeur
+             FROM {$this->table} p
+             LEFT JOIN users u ON p.agent_id = u.id
+             WHERE {$where}
+             GROUP BY p.agent_id, u.prenom, u.nom
+             ORDER BY total_valeur DESC",
             $params
         );
     }

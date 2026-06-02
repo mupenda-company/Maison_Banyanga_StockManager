@@ -26,6 +26,7 @@ ob_start();
                     produits: <?= htmlspecialchars(json_encode($produits ?? []), ENT_QUOTES, 'UTF-8') ?>,
                     zones: <?= htmlspecialchars(json_encode($zones ?? []), ENT_QUOTES, 'UTF-8') ?>,
                     globalProduit: '',
+                    produitsMission: {},
                     selected: {},
                     produitParRistourne: {},
                     proposalMontant: {},
@@ -35,17 +36,35 @@ ob_start();
                             this.produitParRistourne[r.id] = '';
                             this.proposalMontant[r.id] = 0;
                         });
+                        this.produits.forEach(p => {
+                            this.produitsMission[p.id] = false;
+                        });
+                    },
+                    getProduitsMission() {
+                        return this.produits.filter(p => this.produitsMission[p.id]);
+                    },
+                    getVisibleRistournes() {
+                        if (!this.zone_id) return [];
+                        return this.ristournes.filter(r => String(r.zone_id || '') === String(this.zone_id));
+                    },
+                    onZoneChange() {
+                        this.selectAll = false;
+                        this.ristournes.forEach(r => {
+                            if (String(r.zone_id || '') !== String(this.zone_id || '')) {
+                                this.selected[r.id] = false;
+                            }
+                        });
                     },
                     toggleAll() {
                         const val = this.selectAll;
-                        this.ristournes.forEach(r => {
+                        this.getVisibleRistournes().forEach(r => {
                             this.selected[r.id] = val;
                         });
                         // Propager produit global aux sélectionnés
                         this.applyGlobalToSelected();
                     },
                     getSelectedRistournes() {
-                        return this.ristournes.filter(r => this.selected[r.id]);
+                        return this.getVisibleRistournes().filter(r => this.selected[r.id]);
                     },
                     getPrixCaisse(produitId) {
                         const p = this.produits.find(item => String(item.id) === String(produitId));
@@ -128,6 +147,14 @@ ob_start();
                             App.notify('Sélectionnez un véhicule', 'error');
                             return;
                         }
+                        if (!this.zone_id) {
+                            App.notify('Selectionnez une zone', 'error');
+                            return;
+                        }
+                        if (this.getProduitsMission().length === 0) {
+                            App.notify('Selectionnez au moins un produit pour la mission', 'error');
+                            return;
+                        }
                         // Ensure global product is applied to selected ristournes before validation
                         this.applyGlobalToSelected();
                         const selectedRistournes = this.getSelectedRistournes();
@@ -136,9 +163,15 @@ ob_start();
                             return;
                         }
                         // Vérifier que chaque sélectionnée a un produit
-                        const sansProduit = this.ristournes.filter(r => this.selected[r.id] && !this.produitParRistourne[r.id]);
+                        const produitsAutorises = this.getProduitsMission().map(p => String(p.id));
+                        const sansProduit = selectedRistournes.filter(r => !this.produitParRistourne[r.id]);
                         if (sansProduit.length > 0) {
                             App.notify('Chaque ristourne sélectionnée doit avoir un produit choisi', 'error');
+                            return;
+                        }
+                        const produitHorsLot = selectedRistournes.filter(r => !produitsAutorises.includes(String(this.produitParRistourne[r.id])));
+                        if (produitHorsLot.length > 0) {
+                            App.notify('Chaque produit choisi doit faire partie du lot de la mission', 'error');
                             return;
                         }
 
@@ -178,8 +211,8 @@ ob_start();
                         <input type="datetime-local" class="input" x-model="date_depart" required>
                     </div>
                     <div>
-                        <label class="label">Zone</label>
-                        <select class="input" x-model="zone_id">
+                        <label class="label">Zone *</label>
+                        <select class="input" x-model="zone_id" @change="onZoneChange()" required>
                             <option value="">Sélectionner</option>
                             <?php foreach ($zones as $zone): ?>
                             <option value="<?= $zone['id'] ?>"><?= htmlspecialchars($zone['nom']) ?></option>
@@ -196,20 +229,25 @@ ob_start();
                             <option :value="vehicule.id" x-text="vehicule.immatriculation + ' - ' + (vehicule.agent_nom || 'Sans agent')"></option>
                         </template>
                     </select>
-                </div>
-
-                <!-- Produit global pour toutes les ristournes sélectionnées -->
+                </div>                <!-- Produits autorises pour la mission -->
                 <div class="mb-6">
-                    <label class="label">Produit à livrer pour les ristournes sélectionnées</label>
+                    <label class="label">Produits de la mission *</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-3">
+                        <template x-for="produit in produits" :key="produit.id">
+                            <label class="flex items-center gap-2 rounded border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
+                                <input type="checkbox" x-model="produitsMission[produit.id]" class="rounded border-gray-300">
+                                <span x-text="produit.nom + (produit.code ? ' (' + produit.code + ')' : '')"></span>
+                            </label>
+                        </template>
+                    </div>
                     <div class="flex gap-2">
                         <select class="input" x-model="globalProduit" @change="applyGlobalToSelected()">
-                            <option value="">Sélectionner un produit (optionnel)</option>
-                            <template x-for="produit in produits" :key="produit.id">
-                                <option :value="produit.id" x-text="produit.nom + ' (' + produit.code + ')'">
-                                </option>
+                            <option value="">Produit rapide pour les clients coches</option>
+                            <template x-for="produit in getProduitsMission()" :key="produit.id">
+                                <option :value="produit.id" x-text="produit.nom + ' (' + produit.code + ')'"></option>
                             </template>
                         </select>
-                        <button type="button" @click="applyGlobalProduit()" class="btn btn-secondary">Appliquer aux sélectionnés</button>
+                        <button type="button" @click="applyGlobalProduit()" class="btn btn-secondary">Appliquer aux selectionnes</button>
                     </div>
                 </div>
 
@@ -269,16 +307,24 @@ ob_start();
                                 </tr>
                             </thead>
                             <tbody>
-                                <template x-for="ristourne in ristournes" :key="ristourne.id">
+                                <template x-for="ristourne in getVisibleRistournes()" :key="ristourne.id">
                                     <tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-800/50" :class="selected[ristourne.id] ? 'bg-blue-50 dark:bg-blue-900/20' : ''">
                                         <td class="p-3">
                                             <input type="checkbox" x-model="selected[ristourne.id]" @change="if(globalProduit && selected[ristourne.id]) produitParRistourne[ristourne.id]=globalProduit" class="rounded border-gray-300">
                                         </td>
-                                        <td class="p-3 font-medium" x-text="ristourne.client_nom + (ristourne.numero_client ? ' (' + ristourne.numero_client + ')' : '')"></td>
+                                        <td class="p-3 font-medium">
+                                            <div x-text="ristourne.client_nom + (ristourne.numero_client ? ' (' + ristourne.numero_client + ')' : '')"></div>
+                                            <div class="text-xs text-gray-500" x-text="ristourne.zone_nom || ''"></div>
+                                        </td>
                                         <td class="p-3" x-text="App.formatMoneyConverted(parseFloat(ristourne.montant_ristourne || 0), window.BASE_DEVISE, window.DEVISE)"></td>
                                         <td class="p-3 text-xs text-gray-500" x-text="(ristourne.periode_debut || '') + ' → ' + (ristourne.periode_fin || '')"></td>
                                         <td class="p-3">
-                                            <div x-text="produitParRistourne[ristourne.id] ? getProduitName(produitParRistourne[ristourne.id]) : (globalProduit ? getProduitName(globalProduit) : '—')"></div>
+                                            <select class="input min-w-48" x-model="produitParRistourne[ristourne.id]" :disabled="!selected[ristourne.id]">
+                                                <option value="">Choisir</option>
+                                                <template x-for="produit in getProduitsMission()" :key="produit.id">
+                                                    <option :value="produit.id" x-text="produit.nom + (produit.code ? ' (' + produit.code + ')' : '')"></option>
+                                                </template>
+                                            </select>
                                         </td>
                                         <td class="p-3 text-right font-semibold" x-text="selected[ristourne.id] && produitParRistourne[ristourne.id] ? getCaissesLivrables(ristourne.id) + ' cs' : '—'"></td>
                                         <td class="p-3 text-right" x-text="selected[ristourne.id] && produitParRistourne[ristourne.id] ? App.formatMoneyConverted(getCaissesLivrables(ristourne.id) * getPrixCaisse(produitParRistourne[ristourne.id]), window.BASE_DEVISE, window.DEVISE) : '—'"></td>
@@ -299,7 +345,7 @@ ob_start();
                         </table>
                     </div>
                     <p class="text-xs text-gray-500 mt-2">
-                        <span x-text="getSelectedRistournes().length"></span> ristourne(s) sélectionnée(s) sur <span x-text="ristournes.length"></span>
+                        <span x-text="getSelectedRistournes().length"></span> ristourne(s) sélectionnée(s) sur <span x-text="getVisibleRistournes().length"></span>
                     </p>
                 </div>
 
@@ -324,3 +370,7 @@ ob_start();
 $content = ob_get_clean();
 require_once ROOT_PATH . '/app/Views/layouts/app.php';
 ?>
+
+
+
+

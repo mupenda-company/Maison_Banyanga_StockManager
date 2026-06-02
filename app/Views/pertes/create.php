@@ -50,12 +50,21 @@ ob_start();
                         </select>
                     </div>
                     <div>
+                        <label class="label">Agent responsable *</label>
+                        <select x-model="form.agent_id" class="input" required>
+                            <option value="">Selectionner</option>
+                            <?php foreach ($agents as $agent): ?>
+                            <option value="<?= $agent['id'] ?>"><?= htmlspecialchars(trim(($agent['prenom'] ?? '') . ' ' . ($agent['nom'] ?? ''))) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
                         <label class="label">Catégorie de perte *</label>
                         <select x-model="form.type_perte" class="input" required>
                             <option value="casse">Casse</option>
-                            <option value="perte">Perte</option>
+                            <option value="dommage">Dommage</option>
                             <option value="vol">Vol</option>
-                            <option value="peremption">Péremption</option>
+                            <option value="expiration">Expiration</option>
                         </select>
                     </div>
                     <div>
@@ -79,10 +88,13 @@ ob_start();
                     </div>
                 </div>
                 
-                <!-- Valeur estimée -->
+                <!-- Valeur de la perte -->
                 <div class="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Valeur estimée de la perte</p>
-                    <p class="text-2xl font-bold text-red-600" x-text="App.formatMoneyConverted(valeurEstimee, (window.BASE_DEVISE || 'CDF'), window.DEVISE)">-</p>
+                    <label class="label">Montant de la perte *</label>
+                    <input type="number" x-model.number="form.valeur_perte" class="input" min="0" step="0.01" required>
+                    <p class="text-xs text-gray-500 mt-2">
+                        Proposition: <span x-text="App.formatMoneyConverted(valeurProposee, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></span>
+                    </p>
                     <p class="text-[10px] text-gray-400 mt-1 italic" x-show="form.type_stock === 'vide'">* La valeur des vides est souvent symbolique ou nulle.</p>
                 </div>
                 
@@ -105,18 +117,20 @@ document.addEventListener('alpine:init', () => {
         form: {
             produit_id: '',
             emplacement_id: '',
+            agent_id: '',
             type_perte: 'casse',
             type_stock: 'plein',
             caisses: 1,
             unite_perte: 'caisse',
             quantite_saisie: 1,
             date_perte: new Date().toISOString().split('T')[0],
-            motif: ''
+            motif: '',
+            valeur_perte: 0
         },
         prixCaisse: 0,
         btlParCaisse: 24,
         
-        get valeurEstimee() {
+        get valeurProposee() {
             if (this.form.type_stock === 'vide') return 0;
             return this.caissesCalculees * (parseFloat(this.prixCaisse) || 0);
         },
@@ -140,6 +154,9 @@ document.addEventListener('alpine:init', () => {
             const option = select.options[select.selectedIndex];
             this.prixCaisse = parseFloat(option.dataset.prix || 0);
             this.btlParCaisse = parseInt(option.dataset.btl || 24);
+            if (!this.form.valeur_perte || this.form.valeur_perte === 0) {
+                this.form.valeur_perte = this.valeurProposee;
+            }
         },
         
         async save() {
@@ -149,7 +166,7 @@ document.addEventListener('alpine:init', () => {
                     ...this.form,
                     quantite: this.form.quantite_saisie,
                     unite_perte: this.form.unite_perte,
-                    valeur_perte: this.form.type_stock === 'plein' ? (this.caissesCalculees * this.prixCaisse) : 0
+                    valeur_perte: parseFloat(this.form.valeur_perte || 0)
                 };
                 
                 await App.api('/api/pertes', 'POST', data);
@@ -169,3 +186,7 @@ document.addEventListener('alpine:init', () => {
 $content = ob_get_clean();
 require_once ROOT_PATH . '/app/Views/layouts/app.php';
 ?>
+
+
+
+

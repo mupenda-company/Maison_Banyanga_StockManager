@@ -34,6 +34,8 @@ $periode = ($dateDebut ?: 'Debut') . ' au ' . ($dateFin ?: 'Fin');
         <h1>Etat des approvisionnements par produit</h1>
         <p>Periode: <?= htmlspecialchars($periode) ?></p>
         <p>Statut: <?= htmlspecialchars($statut ?: 'Tous') ?></p>
+        <p>Taux systeme: 1 USD = <?= number_format(get_taux_change(), 2, ',', ' ') ?> CDF</p>
+        <p><strong>Total prix achat: <?= format_money_dual($report['totals']['pt']) ?></strong></p>
         <p>Imprime le <?= date('d/m/Y H:i') ?></p>
     </header>
 
@@ -76,7 +78,7 @@ $periode = ($dateDebut ?: 'Debut') . ' au ' . ($dateFin ?: 'Fin');
         </tbody>
         <tfoot>
             <tr>
-                <td>TOTAUX</td>
+                <td>TOTAUX CDF</td>
                 <td></td>
                 <td class="num"><?= number_format($report['totals']['achat'], 0, ',', ' ') ?></td>
                 <td class="num"><?= number_format($report['totals']['plt'], 2, ',', ' ') ?></td>
@@ -89,6 +91,21 @@ $periode = ($dateDebut ?: 'Debut') . ' au ' . ($dateFin ?: 'Fin');
                 <td class="num"><?= format_money_converted($report['totals']['total_ec']) ?></td>
                 <td></td>
                 <td class="num"><?= format_money_converted($report['totals']['total_a_enl']) ?></td>
+            </tr>
+            <tr>
+                <td>TOTAUX USD</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td class="num"><?= format_money(convert_money($report['totals']['pt'], get_base_devise(), 'USD'), 'USD') ?></td>
+                <td></td>
+                <td class="num"><?= format_money(convert_money($report['totals']['pvt'], get_base_devise(), 'USD'), 'USD') ?></td>
+                <td></td>
+                <td class="num"><?= format_money(convert_money($report['totals']['total_ec'], get_base_devise(), 'USD'), 'USD') ?></td>
+                <td></td>
+                <td class="num"><?= format_money(convert_money($report['totals']['total_a_enl'], get_base_devise(), 'USD'), 'USD') ?></td>
             </tr>
         </tfoot>
     </table>

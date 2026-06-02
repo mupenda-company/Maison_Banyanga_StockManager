@@ -33,7 +33,7 @@ ob_start();
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
     <div class="stat-card">
         <p class="stat-label">Total dépenses</p>
-        <p class="stat-value text-red-600"><?= format_money_converted($stats['total_depenses'] ?? 0) ?></p>
+        <p class="stat-value text-red-600"><?= format_money_dual($stats['total_depenses'] ?? 0) ?></p>
     </div>
     <div class="stat-card">
         <p class="stat-label">Nombre de dépenses</p>
@@ -62,7 +62,7 @@ ob_start();
     <div class="bg-<?= $color ?>-50 dark:bg-<?= $color ?>-900/20 rounded-lg border border-<?= $color ?>-200 dark:border-<?= $color ?>-800 p-4">
         <p class="font-semibold text-<?= $color ?>-700 dark:text-<?= $color ?>-300"><?= htmlspecialchars($cat['categorie']) ?></p>
         <p class="text-sm text-gray-600 dark:text-gray-400 mt-1"><?= $cat['nb'] ?? 0 ?> dépense(s)</p>
-        <p class="text-sm font-bold text-<?= $color ?>-600 dark:text-<?= $color ?>-400 mt-1"><?= format_money_converted($cat['total'] ?? 0) ?></p>
+        <p class="text-sm font-bold text-<?= $color ?>-600 dark:text-<?= $color ?>-400 mt-1"><?= format_money_dual($cat['total'] ?? 0) ?></p>
     </div>
     <?php endforeach; ?>
 </div>
@@ -137,7 +137,12 @@ ob_start();
                             </span>
                         </td>
                         <td class="py-3 px-4 text-gray-900 dark:text-white"><?= htmlspecialchars($d['description']) ?></td>
-                        <td class="py-3 px-4 text-right font-semibold text-red-600 dark:text-red-400"><?= format_money_converted($d['montant']) ?></td>
+                        <td class="py-3 px-4 text-right font-semibold text-red-600 dark:text-red-400">
+                            <?= format_money_dual($d['montant']) ?>
+                            <?php if (!empty($d['devise']) && (float)($d['montant_original'] ?? 0) > 0): ?>
+                                <div class="text-xs text-gray-500 font-normal">Saisi: <?= format_money((float)$d['montant_original'], $d['devise']) ?></div>
+                            <?php endif; ?>
+                        </td>
                         <td class="py-3 px-4 text-gray-600 dark:text-gray-400"><?= htmlspecialchars(($d['created_by_prenom'] ?? '') . ' ' . ($d['created_by_nom'] ?? '')) ?></td>
                         <td class="py-3 px-4 text-center">
                             <div class="flex items-center justify-center gap-2">

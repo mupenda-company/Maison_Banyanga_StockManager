@@ -92,6 +92,28 @@ ob_start();
     </div>
 </div>
 
+<!-- Stock global -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <div class="stat-card">
+        <p class="stat-label">Stock plein total</p>
+        <p class="stat-value text-green-600 dark:text-green-400">
+            <?= number_format((int) ($stockTotaux['caisses_pleine'] ?? 0), 0, ',', ' ') ?> cs
+        </p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            <?= number_format((int) ($stockTotaux['pleines'] ?? 0), 0, ',', ' ') ?> bouteille(s)
+        </p>
+    </div>
+    <div class="stat-card">
+        <p class="stat-label">Stock emballage total</p>
+        <p class="stat-value text-gray-700 dark:text-gray-200">
+            <?= number_format((int) ($stockTotaux['caisses_vide'] ?? 0), 0, ',', ' ') ?> cs
+        </p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            <?= number_format((int) ($stockTotaux['vides'] ?? 0), 0, ',', ' ') ?> bouteille(s) vides
+        </p>
+    </div>
+</div>
+
 <?php
     $objectifSummary = $objectifMois['summary'] ?? [
         'objectif_total' => 0,

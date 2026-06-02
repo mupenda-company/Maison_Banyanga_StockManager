@@ -441,7 +441,7 @@ class Vente extends Model
              WHERE v.date_vente BETWEEN :date_debut AND :date_fin
              AND v.statut = 'validee'
              GROUP BY p.id
-             ORDER BY quantite_vendue DESC",
+             ORDER BY total_caisses DESC",
             ['date_debut' => $dateDebut, 'date_fin' => $dateFin]
         );
     }

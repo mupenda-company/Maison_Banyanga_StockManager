@@ -146,6 +146,38 @@ ob_start();
                     </div>
                 </div>
                 
+                <!-- Billetage -->
+                <div class="mb-6 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="label mb-0">Billetage</label>
+                        <div class="text-sm font-semibold" :class="Math.abs(totalBilletage() - totalTtc) <= 0.01 ? 'text-green-600' : 'text-red-600'" x-text="'Ecart: ' + App.formatMoneyConverted(totalBilletage() - totalTtc, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-xs font-semibold text-gray-500 mb-2">CDF</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                <template x-for="coupure in coupures.CDF" :key="'cdf-' + coupure">
+                                    <label class="flex items-center gap-2 text-sm">
+                                        <span class="w-16" x-text="coupure"></span>
+                                        <input type="number" min="0" step="1" class="input" x-model.number="billetage.CDF[coupure]">
+                                    </label>
+                                </template>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold text-gray-500 mb-2">USD</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                <template x-for="coupure in coupures.USD" :key="'usd-' + coupure">
+                                    <label class="flex items-center gap-2 text-sm">
+                                        <span class="w-16" x-text="coupure"></span>
+                                        <input type="number" min="0" step="1" class="input" x-model.number="billetage.USD[coupure]">
+                                    </label>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-3" x-text="'Total billetage: ' + App.formatMoneyConverted(totalBilletage(), (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></p>
+                </div>
                 <!-- Notes -->
                 <div class="mb-6">
                     <label class="label">Notes</label>
@@ -180,6 +212,8 @@ document.addEventListener('alpine:init', () => {
         totalHt: 0,
         totalTva: 0,
         totalTtc: 0,
+        coupures: { CDF: [50000, 20000, 10000, 5000, 1000, 500, 100], USD: [100, 50, 20, 10, 5, 1] },
+        billetage: { CDF: {}, USD: {} },
 
         init() {
             this.calculateTotals();
@@ -252,6 +286,20 @@ document.addEventListener('alpine:init', () => {
             this.totalTtc = this.totalHt + this.totalTva;
         },
 
+        totalBilletage() {
+            let total = 0;
+            Object.entries(this.billetage.CDF || {}).forEach(([coupure, quantite]) => {
+                total += (parseFloat(coupure) || 0) * (parseInt(quantite) || 0);
+            });
+            Object.entries(this.billetage.USD || {}).forEach(([coupure, quantite]) => {
+                total += App.convertMoney((parseFloat(coupure) || 0) * (parseInt(quantite) || 0), 'USD', (window.BASE_DEVISE || 'CDF'));
+            });
+            return total;
+        },
+
+        hasBilletage() {
+            return this.totalBilletage() > 0;
+        },
         async saveVente() {
             this.loading = true;
             try {
@@ -262,6 +310,10 @@ document.addEventListener('alpine:init', () => {
 
                 if (this.hasMissingEmballagesRecus()) {
                     throw new Error('Veuillez renseigner les emballages reçus pour chaque ligne de vente. Indiquez 0 si aucun emballage vide n’a été récupéré.');
+                }
+
+                if (this.hasBilletage() && Math.abs(this.totalBilletage() - this.totalTtc) > 0.01) {
+                    throw new Error('Le billetage ne correspond pas au total TTC.');
                 }
 
                 if (this.allEmballagesRecusZero() && !window.confirm('Aucun emballage vide n’a été déclaré pour cette vente. Confirmez-vous cette saisie ?')) {
@@ -290,7 +342,8 @@ document.addEventListener('alpine:init', () => {
                     client_id: parseInt(this.client_id),
                     emplacement_id: parseInt(this.emplacement_id),
                     notes: this.notes,
-                    details: details
+                    details: details,
+                    billetage: this.billetage
                 });
                 
                 App.notify('Vente enregistrée avec succès', 'success');
@@ -309,3 +362,4 @@ document.addEventListener('alpine:init', () => {
 $content = ob_get_clean();
 require_once ROOT_PATH . '/app/Views/layouts/app.php';
 ?>
+

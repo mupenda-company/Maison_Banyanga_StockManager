@@ -113,6 +113,20 @@ if (!function_exists('format_money_converted')) {
     }
 }
 
+if (!function_exists('format_money_dual')) {
+    /**
+     * Afficher un montant de base avec son equivalent CDF et USD.
+     */
+    function format_money_dual($montant, $from = null)
+    {
+        $from = $from ?? get_base_devise();
+        $cdf = convert_money((float) $montant, $from, 'CDF');
+        $usd = convert_money((float) $montant, $from, 'USD');
+
+        return format_money($cdf, 'CDF') . ' / ' . format_money($usd, 'USD');
+    }
+}
+
 if (!function_exists('get_taux_change')) {
     /**
      * Récupérer le taux de change actuel

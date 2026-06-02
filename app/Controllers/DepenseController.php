@@ -69,6 +69,16 @@ class DepenseController extends Controller
             return $this->error('Données invalides', 422, $errors);
         }
         
+        $devise = strtoupper($data['devise'] ?? get_base_devise());
+        if (!in_array($devise, ['CDF', 'USD'], true)) {
+            $devise = get_base_devise();
+        }
+
+        $montantOriginal = (float) $data['montant'];
+        $data['devise'] = $devise;
+        $data['montant_original'] = $montantOriginal;
+        $data['taux_change'] = get_taux_change();
+        $data['montant'] = convert_money($montantOriginal, $devise, get_base_devise());
         $data['created_by'] = $_SESSION['user_id'] ?? null;
         
         $id = $this->depenseModel->create($data);

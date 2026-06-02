@@ -110,6 +110,8 @@ class ApprovisionnementController extends Controller
         fputcsv($output, ['Du', $filters['date_debut'] ?: 'Debut']);
         fputcsv($output, ['Au', $filters['date_fin'] ?: 'Fin']);
         fputcsv($output, ['Statut', $filters['statut'] ?: 'Tous']);
+        fputcsv($output, ['Taux systeme', '1 USD = ' . number_format(get_taux_change(), 2, '.', '') . ' CDF']);
+        fputcsv($output, ['Total prix achat', number_format($report['totals']['pt'], 2, '.', ''), 'CDF', number_format(convert_money($report['totals']['pt'], get_base_devise(), 'USD'), 2, '.', ''), 'USD']);
         fputcsv($output, []);
         fputcsv($output, ['PRODUITS', 'N P', 'ACHAT', 'PLT', 'P.A.AD', 'P.A.A.E', 'P.T', 'P.V.U', 'P.V.T', 'ECART', 'TOTAL EC', 'ECART A EN', 'TOTAL A ENL']);
 
@@ -132,7 +134,8 @@ class ApprovisionnementController extends Controller
         }
 
         fputcsv($output, []);
-        fputcsv($output, ['TOTAUX', '', number_format($report['totals']['achat'], 0, '.', ''), number_format($report['totals']['plt'], 2, '.', ''), '', '', number_format($report['totals']['pt'], 2, '.', ''), '', number_format($report['totals']['pvt'], 2, '.', ''), '', number_format($report['totals']['total_ec'], 2, '.', ''), '', number_format($report['totals']['total_a_enl'], 2, '.', '')]);
+        fputcsv($output, ['TOTAUX CDF', '', number_format($report['totals']['achat'], 0, '.', ''), number_format($report['totals']['plt'], 2, '.', ''), '', '', number_format($report['totals']['pt'], 2, '.', ''), '', number_format($report['totals']['pvt'], 2, '.', ''), '', number_format($report['totals']['total_ec'], 2, '.', ''), '', number_format($report['totals']['total_a_enl'], 2, '.', '')]);
+        fputcsv($output, ['TOTAUX USD', '', '', '', '', '', number_format(convert_money($report['totals']['pt'], get_base_devise(), 'USD'), 2, '.', ''), '', number_format(convert_money($report['totals']['pvt'], get_base_devise(), 'USD'), 2, '.', ''), '', number_format(convert_money($report['totals']['total_ec'], get_base_devise(), 'USD'), 2, '.', ''), '', number_format(convert_money($report['totals']['total_a_enl'], get_base_devise(), 'USD'), 2, '.', '')]);
 
         fclose($output);
         exit;
@@ -214,7 +217,7 @@ class ApprovisionnementController extends Controller
             $pvt = $achat * $pvu;
             $ecart = $pvu - $paad;
             $totalEc = $achat * $ecart;
-            $ecartAEn = $pvu - $paae;
+            $ecartAEn = $paad - $paae;
             $totalAEnl = $achat * $ecartAEn;
 
             $items[] = [
@@ -405,6 +408,8 @@ class ApprovisionnementController extends Controller
         fputcsv($output, ['Approvisionnement', $approvisionnement['numero_bon'] ?? $id]);
         fputcsv($output, ['Date', $approvisionnement['date_approvisionnement'] ?? '']);
         fputcsv($output, ['Fournisseur', $approvisionnement['fournisseur'] ?? 'Bralima']);
+        fputcsv($output, ['Taux systeme', '1 USD = ' . number_format(get_taux_change(), 2, '.', '') . ' CDF']);
+        fputcsv($output, ['Total prix achat', number_format($rows['totals']['pt'], 2, '.', ''), 'CDF', number_format(convert_money($rows['totals']['pt'], get_base_devise(), 'USD'), 2, '.', ''), 'USD']);
         fputcsv($output, []);
         fputcsv($output, ['PRODUITS', 'N P', 'ACHAT', 'PLT', 'P.A.AD', 'P.A.A.E', 'P.T', 'P.V.U', 'P.V.T', 'ECART', 'TOTAL EC', 'ECART A EN', 'TOTAL A ENL']);
 
@@ -427,7 +432,8 @@ class ApprovisionnementController extends Controller
         }
 
         fputcsv($output, []);
-        fputcsv($output, ['TOTAUX', '', $rows['totals']['achat'], number_format($rows['totals']['plt'], 2, '.', ''), '', '', number_format($rows['totals']['pt'], 2, '.', ''), '', number_format($rows['totals']['pvt'], 2, '.', ''), '', number_format($rows['totals']['total_ec'], 2, '.', ''), '', number_format($rows['totals']['total_a_enl'], 2, '.', '')]);
+        fputcsv($output, ['TOTAUX CDF', '', $rows['totals']['achat'], number_format($rows['totals']['plt'], 2, '.', ''), '', '', number_format($rows['totals']['pt'], 2, '.', ''), '', number_format($rows['totals']['pvt'], 2, '.', ''), '', number_format($rows['totals']['total_ec'], 2, '.', ''), '', number_format($rows['totals']['total_a_enl'], 2, '.', '')]);
+        fputcsv($output, ['TOTAUX USD', '', '', '', '', '', number_format(convert_money($rows['totals']['pt'], get_base_devise(), 'USD'), 2, '.', ''), '', number_format(convert_money($rows['totals']['pvt'], get_base_devise(), 'USD'), 2, '.', ''), '', number_format(convert_money($rows['totals']['total_ec'], get_base_devise(), 'USD'), 2, '.', ''), '', number_format(convert_money($rows['totals']['total_a_enl'], get_base_devise(), 'USD'), 2, '.', '')]);
 
         fclose($output);
         exit;
@@ -466,7 +472,7 @@ class ApprovisionnementController extends Controller
             $pvt = $achat * $pvu;
             $ecart = $pvu - $paad;
             $totalEc = $ecart * $achat;
-            $ecartAEn = $pvu - $paae;
+            $ecartAEn = $paad - $paae;
             $totalAEnl = $ecartAEn * $achat;
 
             $items[] = [

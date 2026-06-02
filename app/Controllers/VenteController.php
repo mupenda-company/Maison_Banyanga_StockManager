@@ -139,7 +139,12 @@ class VenteController extends Controller
         
         $totalTva = $totalHt * ($tva / 100);
         $totalTtc = $totalHt + $totalTva;
-        
+        $billetage = $data['billetage'] ?? [];
+        $billetageModel = new Billetage();
+        $totalBilletage = is_array($billetage) ? $billetageModel->totalBase($billetage) : 0;
+        if ($totalBilletage > 0 && abs($totalBilletage - $totalTtc) > 0.01) {
+            return $this->error('Le billetage ne correspond pas au total TTC. Billetage: ' . format_money_dual($totalBilletage) . ', attendu: ' . format_money_dual($totalTtc), 422);
+        }        
         $venteData = [
             'numero_facture' => $this->venteModel->generateNumeroFacture(),
             'client_id' => $data['client_id'],
@@ -156,6 +161,9 @@ class VenteController extends Controller
         $result = $this->venteModel->createWithDetails($venteData, $details);
         
         if ($result['success']) {
+            if ($totalBilletage > 0) {
+                $billetageModel->saveForReference('vente', (int) $result['id'], $billetage, $_SESSION['user_id'] ?? null);
+            }
             return $this->success(['id' => $result['id']], 'Vente enregistrée avec succès');
         }
         
@@ -697,3 +705,4 @@ class VenteController extends Controller
         exit;
     }
 }
+

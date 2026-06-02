@@ -200,7 +200,7 @@
         <div class="stats-grid">
             <div class="stat-item">
                 <div class="stat-label">Total</div>
-                <div class="stat-value total"><?= format_money_converted($stats['total_depenses'] ?? 0) ?></div>
+                <div class="stat-value total"><?= format_money_dual($stats['total_depenses'] ?? 0) ?></div>
             </div>
             <div class="stat-item">
                 <div class="stat-label">Nombre</div>
@@ -242,7 +242,7 @@
                     <td class="description-cell" title="<?= htmlspecialchars($d['description']) ?>">
                         <?= htmlspecialchars($d['description']) ?>
                     </td>
-                    <td class="amount-cell"><?= format_money_converted($d['montant']) ?></td>
+                    <td class="amount-cell"><?= format_money_dual($d['montant']) ?></td>
                     <td><?= htmlspecialchars(($d['created_by_prenom'] ?? '') . ' ' . ($d['created_by_nom'] ?? '')) ?></td>
                 </tr>
                 <?php endforeach; ?>
@@ -252,7 +252,7 @@
 
         <!-- Footer -->
         <div class="footer">
-            <p>Document généré le <?= date('d/m/Y à H:i') ?> - Total: <?= format_money_converted($grandTotal) ?> - <?= count($depenses) ?> dépense(s)</p>
+            <p>Document généré le <?= date('d/m/Y à H:i') ?> - Total: <?= format_money_dual($grandTotal) ?> - <?= count($depenses) ?> dépense(s)</p>
         </div>
     </div>
 

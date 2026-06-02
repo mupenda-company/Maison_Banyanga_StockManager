@@ -471,6 +471,19 @@ ob_start();
             loading: false,
             justification_cloture: '',
             isRestourne: <?= $isRestourne ? 'true' : 'false' ?>,
+            montantAttendu: <?= (float) ($isRestourne ? ($mission['montant_livre'] ?? 0) : ($mission['montant_attendu'] ?? 0)) ?>,
+            coupures: { CDF: [50000, 20000, 10000, 5000, 1000, 500, 100], USD: [100, 50, 20, 10, 5, 1] },
+            billetage: { CDF: {}, USD: {} },
+            totalBilletage() {
+                let total = 0;
+                Object.entries(this.billetage.CDF || {}).forEach(([coupure, quantite]) => {
+                    total += (parseFloat(coupure) || 0) * (parseInt(quantite) || 0);
+                });
+                Object.entries(this.billetage.USD || {}).forEach(([coupure, quantite]) => {
+                    total += App.convertMoney((parseFloat(coupure) || 0) * (parseInt(quantite) || 0), 'USD', (window.BASE_DEVISE || 'CDF'));
+                });
+                return total;
+            },
             async submit() {
                 const ok = await App.confirm({
                     title: 'Clôturer la mission ?',
@@ -482,8 +495,14 @@ ob_start();
                 if (!ok) return;
                 this.loading = true;
                 try {
+                    if (this.totalBilletage() > 0 && Math.abs(this.totalBilletage() - this.montantAttendu) > 0.01) {
+                        throw new Error('Le billetage ne correspond pas au montant attendu.');
+                    }
+
                     const payload = {
-                        justification_cloture: this.justification_cloture
+                        justification_cloture: this.justification_cloture,
+                        montant_encaisse: this.totalBilletage() > 0 ? this.totalBilletage() : this.montantAttendu,
+                        billetage: this.billetage
                     };
 
                     await App.api('/api/missions/<?= $mission['id'] ?>/terminer', 'POST', payload);
@@ -567,6 +586,38 @@ ob_start();
                                     <p class="text-lg font-bold text-primary-600"><?= number_format((float) ($mission['montant_attendu'] ?? 0), 2, ',', ' ') ?> <?= htmlspecialchars($mission['devise_base'] ?? 'CDF') ?></p>
                                 </div>
                                 <?php endif; ?>
+                            </div>
+
+                            <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">Billetage</p>
+                                    <p class="text-sm font-semibold" :class="Math.abs(totalBilletage() - montantAttendu) <= 0.01 ? 'text-green-600' : 'text-red-600'" x-text="'Ecart: ' + App.formatMoneyConverted(totalBilletage() - montantAttendu, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></p>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <p class="text-xs font-semibold text-gray-500 mb-2">CDF</p>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <template x-for="coupure in coupures.CDF" :key="'mission-cdf-' + coupure">
+                                                <label class="flex items-center gap-2 text-sm">
+                                                    <span class="w-16" x-text="coupure"></span>
+                                                    <input type="number" min="0" step="1" class="input" x-model.number="billetage.CDF[coupure]">
+                                                </label>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs font-semibold text-gray-500 mb-2">USD</p>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <template x-for="coupure in coupures.USD" :key="'mission-usd-' + coupure">
+                                                <label class="flex items-center gap-2 text-sm">
+                                                    <span class="w-16" x-text="coupure"></span>
+                                                    <input type="number" min="0" step="1" class="input" x-model.number="billetage.USD[coupure]">
+                                                </label>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-gray-600 mt-3" x-text="'Total billetage: ' + App.formatMoneyConverted(totalBilletage(), (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></p>
                             </div>
 
                             <?php if (!$isRestourne): ?>

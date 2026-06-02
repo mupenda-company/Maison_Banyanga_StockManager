@@ -8,6 +8,7 @@ class PerteController extends Controller
     private $perteModel;
     private $produitModel;
     private $emplacementModel;
+    private $userModel;
     
     public function __construct()
     {
@@ -15,6 +16,7 @@ class PerteController extends Controller
         $this->perteModel = new Perte();
         $this->produitModel = new Produit();
         $this->emplacementModel = new Emplacement();
+        $this->userModel = new User();
     }
     
     /**
@@ -27,6 +29,7 @@ class PerteController extends Controller
         $filters = [
             'produit_id' => $_GET['produit_id'] ?? null,
             'emplacement_id' => $_GET['emplacement_id'] ?? null,
+            'agent_id' => $_GET['agent_id'] ?? null,
             'type_perte' => $_GET['type'] ?? null,
             'date_debut' => $_GET['date_debut'] ?? null,
             'date_fin' => $_GET['date_fin'] ?? null
@@ -42,16 +45,20 @@ class PerteController extends Controller
 
         $produits = $this->produitModel->getActive();
         $emplacements = $this->emplacementModel->all('type, nom');
+        $agents = $this->userModel->getActive();
         
         // Stats du mois
         $stats = $this->perteModel->getStats(date('Y-m-01'), date('Y-m-d'));
+        $pertesParAgent = $this->perteModel->getByAgent($filters['date_debut'] ?: date('Y-m-01'), $filters['date_fin'] ?: date('Y-m-d'));
         
         $this->view('pertes/index', [
             'pertes' => $pertes,
             'produits' => $produits,
             'emplacements' => $emplacements,
+            'agents' => $agents,
             'filters' => $filters,
             'stats' => $stats,
+            'pertesParAgent' => $pertesParAgent,
             'print_mode' => $printMode
         ]);
     }
@@ -66,7 +73,7 @@ class PerteController extends Controller
 
         $output = fopen('php://output', 'w');
         fprintf($output, chr(0xEF) . chr(0xBB) . chr(0xBF));
-        fputcsv($output, ['Date', 'Produit', 'Code', 'Type stock', 'Categorie', 'Quantite', 'Valeur', 'Emplacement', 'Motif']);
+        fputcsv($output, ['Date', 'Produit', 'Code', 'Type stock', 'Categorie', 'Quantite', 'Valeur', 'Agent', 'Emplacement', 'Motif']);
 
         foreach ($pertes as $perte) {
             $caisses = (float)($perte['quantite'] ?? 0);
@@ -91,6 +98,7 @@ class PerteController extends Controller
                 $perte['type_perte'] ?? '',
                 $quantiteExport,
                 number_format((float) ($perte['valeur_perte'] ?? 0), 2, '.', ''),
+                trim(($perte['agent_prenom'] ?? '') . ' ' . ($perte['agent_nom'] ?? '')),
                 $perte['emplacement_nom'] ?? '',
                 $perte['motif'] ?? ''
             ]);
@@ -109,10 +117,12 @@ class PerteController extends Controller
         
         $produits = $this->produitModel->getWithStock();
         $emplacements = $this->emplacementModel->all('type, nom');
+        $agents = $this->userModel->getActive();
         
         $this->view('pertes/create', [
             'produits' => $produits,
-            'emplacements' => $emplacements
+            'emplacements' => $emplacements,
+            'agents' => $agents
         ]);
     }
     
@@ -148,6 +158,7 @@ class PerteController extends Controller
             'motif' => $data['motif'] ?? '',
             'date_perte' => $data['date_perte'],
             'valeur_perte' => $data['valeur_perte'] ?? 0,
+            'agent_id' => $data['agent_id'] ?? null,
             'created_by' => $_SESSION['user_id']
         ]);
         

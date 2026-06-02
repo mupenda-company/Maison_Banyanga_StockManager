@@ -73,6 +73,9 @@ class DashboardController extends Controller
         $produitsAlerteAll = $this->produitModel->getAlertProducts();
         $nbProduitsAlerte = count($produitsAlerteAll);
         $produitsAlerte = array_slice($produitsAlerteAll, 0, 5);
+
+        // Totaux de stock
+        $stockTotaux = $this->stockModel->getInventaireTotaux();
         
         // Alertes non lues
         $alertes = $this->alerteModel->getNonLues(5);
@@ -99,6 +102,7 @@ class DashboardController extends Controller
             'statsMonth' => $statsMonth,
             'produitsAlerte' => $produitsAlerte,
             'nbProduitsAlerte' => $nbProduitsAlerte,
+            'stockTotaux' => $stockTotaux,
             'alertes' => $alertes,
             'nbAlertes' => $nbAlertes,
             'missionsEnCours' => $missionsEnCours,

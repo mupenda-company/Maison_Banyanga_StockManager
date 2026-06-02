@@ -32,6 +32,8 @@ $numeroBon = $approvisionnement['numero_bon'] ?? $approvisionnement['id'];
         <h1>Approvisionnement <?= htmlspecialchars($numeroBon) ?></h1>
         <p>Date: <?= !empty($approvisionnement['date_approvisionnement']) ? date('d/m/Y', strtotime($approvisionnement['date_approvisionnement'])) : '' ?></p>
         <p>Fournisseur: <?= htmlspecialchars($approvisionnement['fournisseur'] ?? 'Bralima') ?></p>
+        <p>Taux systeme: 1 USD = <?= number_format(get_taux_change(), 2, ',', ' ') ?> CDF</p>
+        <p><strong>Total prix achat: <?= format_money_dual($rows['totals']['pt']) ?></strong></p>
     </header>
 
     <table>
@@ -73,7 +75,7 @@ $numeroBon = $approvisionnement['numero_bon'] ?? $approvisionnement['id'];
         </tbody>
         <tfoot>
             <tr>
-                <td>TOTAUX</td>
+                <td>TOTAUX CDF</td>
                 <td></td>
                 <td class="num"><?= number_format($rows['totals']['achat'], 0, ',', ' ') ?></td>
                 <td class="num"><?= number_format($rows['totals']['plt'], 2, ',', ' ') ?></td>
@@ -86,6 +88,21 @@ $numeroBon = $approvisionnement['numero_bon'] ?? $approvisionnement['id'];
                 <td class="num"><?= format_money_converted($rows['totals']['total_ec']) ?></td>
                 <td></td>
                 <td class="num"><?= format_money_converted($rows['totals']['total_a_enl']) ?></td>
+            </tr>
+            <tr>
+                <td>TOTAUX USD</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td class="num"><?= format_money(convert_money($rows['totals']['pt'], get_base_devise(), 'USD'), 'USD') ?></td>
+                <td></td>
+                <td class="num"><?= format_money(convert_money($rows['totals']['pvt'], get_base_devise(), 'USD'), 'USD') ?></td>
+                <td></td>
+                <td class="num"><?= format_money(convert_money($rows['totals']['total_ec'], get_base_devise(), 'USD'), 'USD') ?></td>
+                <td></td>
+                <td class="num"><?= format_money(convert_money($rows['totals']['total_a_enl'], get_base_devise(), 'USD'), 'USD') ?></td>
             </tr>
         </tfoot>
     </table>

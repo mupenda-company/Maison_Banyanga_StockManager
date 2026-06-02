@@ -6,7 +6,7 @@
 class Depense extends Model
 {
     protected $table = 'depenses';
-    protected $fillable = ['categorie', 'description', 'montant', 'date_depense', 'created_by'];
+    protected $fillable = ['categorie', 'description', 'montant', 'devise', 'montant_original', 'taux_change', 'date_depense', 'created_by'];
 
     /**
      * Récupérer avec le nom de l'utilisateur

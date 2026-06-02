@@ -80,6 +80,24 @@ CREATE TABLE `approvisionnement_details` (
 
 -- --------------------------------------------------------
 
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `billetages`
+--
+
+CREATE TABLE `billetages` (
+  `id` int UNSIGNED NOT NULL,
+  `reference_type` enum('vente','mission') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `reference_id` int UNSIGNED NOT NULL,
+  `devise` enum('CDF','USD') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `coupure` decimal(12,2) NOT NULL,
+  `quantite` int NOT NULL DEFAULT '0',
+  `montant_base` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `taux_change` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `created_by` int UNSIGNED DEFAULT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 --
 -- Table structure for table `clients`
 --
@@ -108,6 +126,9 @@ CREATE TABLE `depenses` (
   `categorie` enum('Transport','Carburant','Maintenance','Restauration','Autres') COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `montant` decimal(12,2) NOT NULL,
+  `devise` enum('CDF','USD') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'CDF',
+  `montant_original` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `taux_change` decimal(12,2) NOT NULL DEFAULT '0.00',
   `date_depense` date NOT NULL,
   `created_by` int UNSIGNED DEFAULT NULL,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
@@ -333,6 +354,7 @@ CREATE TABLE `pertes` (
   `motif` text COLLATE utf8mb4_unicode_ci,
   `date_perte` date NOT NULL,
   `valeur_perte` decimal(12,2) DEFAULT '0.00',
+  `agent_id` int UNSIGNED DEFAULT NULL,
   `created_by` int UNSIGNED DEFAULT NULL,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -574,6 +596,13 @@ ALTER TABLE `approvisionnement_details`
   ADD KEY `produit_id` (`produit_id`);
 
 --
+-- Indexes for table `billetages`
+--
+ALTER TABLE `billetages`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `reference_idx` (`reference_type`, `reference_id`),
+  ADD KEY `created_by` (`created_by`);
+--
 -- Indexes for table `clients`
 --
 ALTER TABLE `clients`
@@ -686,6 +715,7 @@ ALTER TABLE `pertes`
   ADD PRIMARY KEY (`id`),
   ADD KEY `produit_id` (`produit_id`),
   ADD KEY `emplacement_id` (`emplacement_id`),
+  ADD KEY `agent_id` (`agent_id`),
   ADD KEY `created_by` (`created_by`);
 
 --
@@ -812,6 +842,11 @@ ALTER TABLE `approvisionnements`
 ALTER TABLE `approvisionnement_details`
   MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
+--
+-- AUTO_INCREMENT for table `billetages`
+--
+ALTER TABLE `billetages`
+  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 --
 -- AUTO_INCREMENT for table `clients`
 --
@@ -987,6 +1022,11 @@ ALTER TABLE `approvisionnement_details`
   ADD CONSTRAINT `approvisionnement_details_ibfk_2` FOREIGN KEY (`produit_id`) REFERENCES `produits` (`id`) ON DELETE CASCADE;
 
 --
+-- Constraints for table `billetages`
+--
+ALTER TABLE `billetages`
+  ADD CONSTRAINT `billetages_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+--
 -- Constraints for table `clients`
 --
 ALTER TABLE `clients`
@@ -1060,7 +1100,8 @@ ALTER TABLE `objectifs_produits`
 ALTER TABLE `pertes`
   ADD CONSTRAINT `pertes_ibfk_1` FOREIGN KEY (`produit_id`) REFERENCES `produits` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `pertes_ibfk_2` FOREIGN KEY (`emplacement_id`) REFERENCES `emplacements` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `pertes_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+  ADD CONSTRAINT `pertes_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `pertes_ibfk_4` FOREIGN KEY (`agent_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `retours_emballages`
@@ -1258,3 +1299,5 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+

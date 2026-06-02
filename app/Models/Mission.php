@@ -861,6 +861,10 @@ class Mission extends Model
             $totalMontantLivre = 0;
             $chargementsParProduit = [];
             $missionRistournes = [];
+            $zoneIdDemandee = (int) ($data['zone_id'] ?? 0);
+            if ($zoneIdDemandee <= 0) {
+                throw new Exception('Selectionnez une zone pour la mission de ristourne');
+            }
 
             foreach ($ristournesData as $ristourneItem) {
                 $ristourneId = (int) ($ristourneItem['ristourne_id'] ?? 0);
@@ -878,6 +882,9 @@ class Mission extends Model
 
                 if (!$ristourne) {
                     throw new Exception('Ristourne #' . $ristourneId . ' non trouvée');
+                }
+                if ((int) ($ristourne['zone_id'] ?? 0) !== $zoneIdDemandee) {
+                    throw new Exception('La ristourne du client ' . ($ristourne['client_nom'] ?? '#' . $ristourneId) . ' ne correspond pas a la zone selectionnee');
                 }
 
                 $produit = (new Produit())->find($produitId);

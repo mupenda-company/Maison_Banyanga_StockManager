@@ -195,7 +195,7 @@
             
             <div class="detail-item">
                 <div class="detail-label">Montant</div>
-                <div class="detail-value amount"><?= format_money_converted($depense['montant']) ?></div>
+                <div class="detail-value amount"><?= format_money_dual($depense['montant']) ?></div>
             </div>
         </div>
 

@@ -2,7 +2,7 @@
 $pageTitle = 'Pertes';
 $printMode = isset($print_mode) ? (bool) $print_mode : false;
 $baseQuery = [];
-foreach (['type', 'date_debut', 'date_fin', 'produit_id', 'emplacement_id'] as $key) {
+foreach (['type', 'date_debut', 'date_fin', 'produit_id', 'emplacement_id', 'agent_id'] as $key) {
     if (!empty($_GET[$key])) {
         $baseQuery[$key] = $_GET[$key];
     }
@@ -57,9 +57,20 @@ ob_start();
                 <select name="type" class="input">
                     <option value="">Tous</option>
                     <option value="casse" <?= ($filters['type'] ?? '') == 'casse' ? 'selected' : '' ?>>Casse</option>
-                    <option value="perte" <?= ($filters['type'] ?? '') == 'perte' ? 'selected' : '' ?>>Perte</option>
+                    <option value="dommage" <?= ($filters['type'] ?? '') == 'dommage' ? 'selected' : '' ?>>Dommage</option>
                     <option value="vol" <?= ($filters['type'] ?? '') == 'vol' ? 'selected' : '' ?>>Vol</option>
-                    <option value="peremption" <?= ($filters['type'] ?? '') == 'peremption' ? 'selected' : '' ?>>Péremption</option>
+                    <option value="expiration" <?= ($filters['type'] ?? '') == 'expiration' ? 'selected' : '' ?>>Expiration</option>
+                </select>
+            </div>
+            <div>
+                <label class="label">Agent</label>
+                <select name="agent_id" class="input">
+                    <option value="">Tous</option>
+                    <?php foreach ($agents as $agent): ?>
+                    <option value="<?= $agent['id'] ?>" <?= (string)($filters['agent_id'] ?? '') === (string)$agent['id'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars(trim(($agent['prenom'] ?? '') . ' ' . ($agent['nom'] ?? ''))) ?>
+                    </option>
+                    <?php endforeach; ?>
                 </select>
             </div>
             <div>
@@ -75,7 +86,6 @@ ob_start();
         </form>
     </div>
 </div>
-
 <?php if ($printMode): ?>
 <div class="print-only mb-6 border-b-2 border-gray-800 pb-4">
     <h1 class="text-2xl font-bold uppercase"><?= htmlspecialchars((new Parametre())->get('nom_entreprise', APP_NAME)) ?></h1>
@@ -104,6 +114,7 @@ ob_start();
                         <th>Catégorie</th>
                         <th class="text-right">Quantité (cs)</th>
                         <th class="text-right">Valeur</th>
+                        <th>Agent</th>
                         <th>Emplacement</th>
                         <th>Motif</th>
                         <th class="text-right no-print">Actions</th>
@@ -166,7 +177,8 @@ ob_start();
                                 <div class="text-sm text-red-500"><?= $quantiteBottom ?></div>
                             <?php endif; ?>
                         </td>
-                        <td class="text-right font-bold"><?= format_money_converted($perte['valeur_perte'] ?? 0) ?></td>
+                        <td class="text-right font-bold"><?= format_money_dual($perte['valeur_perte'] ?? 0) ?></td>
+                        <td><?= htmlspecialchars(trim(($perte['agent_prenom'] ?? '') . ' ' . ($perte['agent_nom'] ?? '')) ?: '-') ?></td>
                         <td><?= htmlspecialchars($perte['emplacement_nom'] ?? '-') ?></td>
                         <td class="max-w-xs truncate text-sm"><?= htmlspecialchars($perte['motif'] ?? '-') ?></td>
                         <td class="text-right">
@@ -208,7 +220,6 @@ async function supprimerPerte(id) {
     }
 }
 </script>
-
 <?php if ($printMode): ?>
 <style>
 @media print {
@@ -229,3 +240,12 @@ window.addEventListener('afterprint', function () { if (window.opener) window.cl
 $content = ob_get_clean();
 require_once ROOT_PATH . '/app/Views/layouts/app.php';
 ?>
+
+
+
+
+
+
+
+
+

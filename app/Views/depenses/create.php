@@ -35,6 +35,13 @@ ob_start();
                         <input type="number" x-model.number="form.montant" class="input" min="0" step="0.01" required placeholder="0.00">
                     </div>
                     <div>
+                        <label class="label">Devise *</label>
+                        <select x-model="form.devise" class="input" required>
+                            <option value="CDF">CDF - Franc congolais</option>
+                            <option value="USD">USD - Dollar</option>
+                        </select>
+                    </div>
+                    <div>
                         <label class="label">Date *</label>
                         <input type="date" x-model="form.date_depense" class="input" required>
                     </div>
@@ -63,6 +70,7 @@ document.addEventListener('alpine:init', () => {
             categorie: 'Transport',
             description: '',
             montant: '',
+            devise: window.BASE_DEVISE || 'CDF',
             date_depense: new Date().toISOString().split('T')[0]
         },
         loading: false,

@@ -10,7 +10,7 @@ $isLocal = in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1', '::1
 // Configuration de la base de données
 if ($isLocal) {
     define('DB_HOST', 'localhost');
-    define('DB_NAME', 'banyanga_logistique');
+    define('DB_NAME', 'bralima_logistique');
     define('DB_USER', 'root');
     define('DB_PASS', '');
 } else {
