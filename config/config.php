@@ -22,10 +22,10 @@ if ($isLocal) {
 define('DB_CHARSET', 'utf8mb4');
 
 // Configuration de l'application
-define('APP_NAME', 'Banyanga');
+define('APP_NAME', 'Logistique');
 define('APP_VERSION', '1.0.0');
 
-// ✅ URL de base — logique claire et unique
+// URL de base — logique claire et unique
 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
 
 if ($isLocal) {

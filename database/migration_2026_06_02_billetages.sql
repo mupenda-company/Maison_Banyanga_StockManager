@@ -1,4 +1,4 @@
--- Migration: billetage des ventes et fins de mission
+-- Migration: billetage des ventes web et fins de mission
 
 CREATE TABLE IF NOT EXISTS billetages (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -7,9 +7,9 @@ CREATE TABLE IF NOT EXISTS billetages (
     devise ENUM('CDF','USD') NOT NULL,
     coupure DECIMAL(12,2) NOT NULL,
     quantite INT NOT NULL DEFAULT 0,
-    montant_base DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+    montant_total DECIMAL(15,2) NOT NULL DEFAULT 0.00,
     taux_change DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-    created_by INT UNSIGNED DEFAULT NULL,
+    created_by INT UNSIGNED NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     KEY reference_idx (reference_type, reference_id),

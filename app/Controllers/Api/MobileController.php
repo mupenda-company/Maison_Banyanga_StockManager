@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 class MobileController extends Controller {
     
@@ -27,7 +27,7 @@ class MobileController extends Controller {
                 unset($user['password']);
             }
 
-            // Récupérer la mission en cours pour ce vendeur
+            // RÃ©cupÃ©rer la mission en cours pour ce vendeur
             $mission = $this->db->fetch(
                 "SELECT m.*, 
                         v.immatriculation as vehicule_immatriculation,
@@ -81,7 +81,7 @@ class MobileController extends Controller {
     }
 
     /**
-     * Voir le stock disponible dans le véhicule de la mission
+     * Voir le stock disponible dans le vÃ©hicule de la mission
      */
     public function getStock($missionId) {
         new Mission();
@@ -95,11 +95,11 @@ class MobileController extends Controller {
         );
 
         if (!$mission) {
-            return $this->error('Mission non trouvée', 404);
+            return $this->error('Mission non trouvÃ©e', 404);
         }
 
         if (($mission['statut'] ?? null) !== 'en_cours') {
-            return $this->error('Mission clôturée', 409);
+            return $this->error('Mission clÃ´turÃ©e', 409);
         }
 
         $hasCaissesDejaColumn = (bool) $this->db->fetchColumn(
@@ -136,7 +136,7 @@ class MobileController extends Controller {
     }
 
     /**
-     * Résumé (dashboard) de mission: caisses restantes + vides dans le véhicule
+     * RÃ©sumÃ© (dashboard) de mission: caisses restantes + vides dans le vÃ©hicule
      */
     public function getMissionStats($missionId)
     {
@@ -157,16 +157,16 @@ class MobileController extends Controller {
         );
 
         if (!$mission) {
-            return $this->error('Mission non trouvée', 404);
+            return $this->error('Mission non trouvÃ©e', 404);
         }
 
         if (($mission['statut'] ?? null) !== 'en_cours') {
-            return $this->error('Mission clôturée', 409);
+            return $this->error('Mission clÃ´turÃ©e', 409);
         }
 
         $emplacementId = (int) ($mission['vehicule_emplacement_id'] ?? 0);
         if ($emplacementId <= 0) {
-            return $this->error('Emplacement véhicule introuvable', 422);
+            return $this->error('Emplacement vÃ©hicule introuvable', 422);
         }
 
         $stockTotals = $this->db->fetch(
@@ -215,7 +215,7 @@ class MobileController extends Controller {
             ['mission_id' => $missionId]
         );
 
-        // Calculer le montant complément récolté pour les ristournes
+        // Calculer le montant complÃ©ment rÃ©coltÃ© pour les ristournes
         $complementRecolte = 0;
         $nbClientsRistourne = 0;
         if (($mission['type_mission'] ?? 'vente') === 'ristourne') {
@@ -329,13 +329,13 @@ class MobileController extends Controller {
     }
 
     /**
-     * Marquer une ristourne comme payée depuis le mobile (agent)
+     * Marquer une ristourne comme payÃ©e depuis le mobile (agent)
      */
     public function payerRistourne($id)
     {
         $data = $this->getJsonInput();
 
-        // basic validation: montant payé optional, user_id required
+        // basic validation: montant payÃ© optional, user_id required
         $errors = $this->validate($data, [
             'user_id' => 'required|numeric'
         ]);
@@ -357,10 +357,10 @@ class MobileController extends Controller {
         $rModel = new Ristourne();
         $updated = $rModel->marquerPayee($ristourneId);
         if ($updated) {
-            return $this->success(null, 'Ristourne marquée comme payée');
+            return $this->success(null, 'Ristourne marquÃ©e comme payÃ©e');
         }
 
-        return $this->error('Impossible de marquer la ristourne comme payée', 500);
+        return $this->error('Impossible de marquer la ristourne comme payÃ©e', 500);
     }
 
     /**
@@ -385,7 +385,7 @@ class MobileController extends Controller {
 
         $row = $this->db->fetch("SELECT * FROM mission_ristournes WHERE id = :id", ['id' => $mrId]);
         if (!$row) {
-            return $this->error('Entrée mission_ristournes introuvable', 404);
+            return $this->error('EntrÃ©e mission_ristournes introuvable', 404);
         }
 
         $updates = [];
@@ -395,7 +395,7 @@ class MobileController extends Controller {
         $produitId = (int) ($row['produit_id'] ?? 0);
         $caissesPrevues = (int) ($row['caisses_prevues'] ?? 0);
 
-        // Récupérer le prix du produit
+        // RÃ©cupÃ©rer le prix du produit
         $prixCaisse = 0;
         $bouteillesParCaisse = 24;
         if ($produitId > 0) {
@@ -407,40 +407,40 @@ class MobileController extends Controller {
             }
         }
 
-        // Complément confirmé par le client ?
+        // ComplÃ©ment confirmÃ© par le client ?
         $complementConfirme = !empty($data['complement_confirme']) ? 1 : 0;
         $propositionMontant = (float) ($data['proposition_montant'] ?? $row['proposition_montant'] ?? 0);
 
-        // Déterminer les caisses livrées
+        // DÃ©terminer les caisses livrÃ©es
         $caissesLivrees = 0;
         if (isset($data['caisses_livrees']) && (int) $data['caisses_livrees'] > 0) {
-            // L'agent spécifie explicitement le nombre de caisses livrées
+            // L'agent spÃ©cifie explicitement le nombre de caisses livrÃ©es
             $caissesLivrees = (int) $data['caisses_livrees'];
         } elseif ($prixCaisse > 0) {
             // Calcul automatique
             if ($complementConfirme && $propositionMontant > 0) {
-                // Avec complément : ceil((ristourne + complément) / prix)
+                // Avec complÃ©ment : ceil((ristourne + complÃ©ment) / prix)
                 $caissesLivrees = (int) ceil(($montantRistourne + $propositionMontant) / $prixCaisse);
             } else {
-                // Sans complément : floor(ristourne / prix) — on ne donne que ce que couvre le montant
+                // Sans complÃ©ment : floor(ristourne / prix) â€” on ne donne que ce que couvre le montant
                 $caissesLivrees = (int) floor($montantRistourne / $prixCaisse);
             }
         }
 
-        // Ne pas livrer plus que prévu
+        // Ne pas livrer plus que prÃ©vu
         if ($caissesPrevues > 0 && $caissesLivrees > $caissesPrevues) {
             $caissesLivrees = $caissesPrevues;
         }
 
         $bouteillesLivrees = $caissesLivrees * $bouteillesParCaisse;
 
-        // Caisses vides reçues du client
+        // Caisses vides reÃ§ues du client
         $caissesVidesRecues = isset($data['caisses_vides_recues']) ? (int) $data['caisses_vides_recues'] : 0;
 
-        // Montant livré = caisses_livrees * prix
+        // Montant livrÃ© = caisses_livrees * prix
         $montantLivre = $caissesLivrees > 0 && $prixCaisse > 0 ? round($caissesLivrees * $prixCaisse, 2) : 0;
 
-        // Montant ajouté par le client (complement effectivement payé)
+        // Montant ajoutÃ© par le client (complement effectivement payÃ©)
         $montantAjoute = 0;
         if ($complementConfirme && $caissesLivrees > 0 && $prixCaisse > 0) {
             $montantAjoute = max(0, round($caissesLivrees * $prixCaisse - $montantRistourne, 2));
@@ -462,7 +462,7 @@ class MobileController extends Controller {
         $updates[] = 'statut = :statut';
         $params['statut'] = 'livree';
 
-        // Si complément confirmé, recalculer caisses_prevues pour refléter le ceil
+        // Si complÃ©ment confirmÃ©, recalculer caisses_prevues pour reflÃ©ter le ceil
         if ($complementConfirme && $propositionMontant > 0 && $prixCaisse > 0) {
             $newPrevues = (int) ceil(($montantRistourne + $propositionMontant) / $prixCaisse);
             if ($newPrevues != $caissesPrevues) {
@@ -477,7 +477,7 @@ class MobileController extends Controller {
         $ok = $this->db->query($sql, $params);
 
         if ($ok) {
-            // Mettre à jour le montant_livre total de la mission
+            // Mettre Ã  jour le montant_livre total de la mission
             $missionId = (int) ($row['mission_id'] ?? 0);
             if ($missionId > 0) {
                 $total = $this->db->fetchColumn(
@@ -490,7 +490,7 @@ class MobileController extends Controller {
                 );
             }
 
-            // Mettre à jour mission_chargements.quantite_vendue pour que le stock API reflète la livraison
+            // Mettre Ã  jour mission_chargements.quantite_vendue pour que le stock API reflÃ¨te la livraison
             if ($missionId > 0 && $produitId > 0 && $bouteillesLivrees > 0) {
                 $this->db->query(
                     "UPDATE mission_chargements
@@ -500,7 +500,7 @@ class MobileController extends Controller {
                 );
             }
 
-            // Mettre à jour le stock du véhicule : retirer les pleines livrées, ajouter les vides reçues
+            // Mettre Ã  jour le stock du vÃ©hicule : retirer les pleines livrÃ©es, ajouter les vides reÃ§ues
             if ($missionId > 0 && $produitId > 0) {
                 $mission = $this->db->fetch("SELECT vehicule_id FROM missions WHERE id = :id", ['id' => $missionId]);
                 $vehiculeId = (int) ($mission['vehicule_id'] ?? 0);
@@ -512,7 +512,7 @@ class MobileController extends Controller {
                         $stockModel = new Stock();
                         $mouvementModel = new MouvementStock();
 
-                        // Retirer les caisses pleines livrées du stock véhicule
+                        // Retirer les caisses pleines livrÃ©es du stock vÃ©hicule
                         if ($caissesLivrees > 0) {
                             $stockModel->updateOrCreate($produitId, $emplacementVehiculeId, [
                                 'quantite_pleine' => -$bouteillesLivrees,
@@ -530,7 +530,7 @@ class MobileController extends Controller {
                             ]);
                         }
 
-                        // Ajouter les caisses vides reçues du client au stock véhicule
+                        // Ajouter les caisses vides reÃ§ues du client au stock vÃ©hicule
                         if ($caissesVidesRecues > 0) {
                             $stockModel->updateOrCreate($produitId, $emplacementVehiculeId, [
                                 'quantite_vide' => $caissesVidesRecues * $bouteillesParCaisse,
@@ -543,7 +543,7 @@ class MobileController extends Controller {
                                 'quantite' => $caissesVidesRecues * $bouteillesParCaisse,
                                 'reference_type' => 'ristourne',
                                 'reference_id' => $mrId,
-                                'motif' => 'Caisses vides reçues ristourne',
+                                'motif' => 'Caisses vides reÃ§ues ristourne',
                                 'created_by' => (int) ($data['user_id'] ?? 0),
                             ]);
                         }
@@ -551,7 +551,7 @@ class MobileController extends Controller {
                 }
             }
 
-            // Retourner les infos calculées
+            // Retourner les infos calculÃ©es
             return $this->success([
                 'caisses_livrees' => $caissesLivrees,
                 'caisses_vides_recues' => $caissesVidesRecues,
@@ -559,7 +559,7 @@ class MobileController extends Controller {
                 'montant_ajoute' => $montantAjoute,
                 'complement_confirme' => $complementConfirme,
                 'reste_ristourne' => max(0, $montantRistourne - ($caissesLivrees > 0 ? round($caissesLivrees * $prixCaisse, 2) : 0)),
-            ], 'Ristourne livrée et encaissement enregistré');
+            ], 'Ristourne livrÃ©e et encaissement enregistrÃ©');
         }
 
         return $this->error('Impossible d\'enregistrer l\'encaissement', 500);
@@ -606,7 +606,7 @@ class MobileController extends Controller {
             $params
         );
 
-        // Ajouter les détails produits pour chaque vente
+        // Ajouter les dÃ©tails produits pour chaque vente
         if (!empty($rows)) {
             $venteIds = array_map(fn($r) => (int) $r['id'], $rows);
             $idList = implode(',', $venteIds);
@@ -634,7 +634,7 @@ class MobileController extends Controller {
     }
 
     /**
-     * Données facture (ticket) d'une vente pour le mobile
+     * DonnÃ©es facture (ticket) d'une vente pour le mobile
      */
     public function getVenteFacture($id)
     {
@@ -645,7 +645,7 @@ class MobileController extends Controller {
 
         $vente = (new Vente())->getWithDetails($venteId);
         if (!$vente) {
-            return $this->error('Vente non trouvée', 404);
+            return $this->error('Vente non trouvÃ©e', 404);
         }
 
         $parametreModel = new Parametre();
@@ -720,7 +720,7 @@ class MobileController extends Controller {
 
             if (!$mission) {
                 $this->db->rollBack();
-                return $this->error('Mission non trouvée', 404);
+                return $this->error('Mission non trouvÃ©e', 404);
             }
 
             if (($mission['statut'] ?? null) !== 'en_cours') {
@@ -742,7 +742,7 @@ class MobileController extends Controller {
 
             if (empty($emplacementVehiculeId)) {
                 $this->db->rollBack();
-                return $this->error('Emplacement véhicule introuvable', 422);
+                return $this->error('Emplacement vÃ©hicule introuvable', 422);
             }
 
             $venteModel = new Vente();
@@ -753,6 +753,9 @@ class MobileController extends Controller {
 
             $totalHt = 0;
             $details = [];
+            $emballagesRecus = $this->normaliserEmballagesRecusMobile($data['emballages_recus'] ?? null, $data['produits'] ?? []);
+            $totalCaissesVendues = 0;
+            $videsRestantsAAffecter = array_sum($emballagesRecus);
 
             foreach ($data['produits'] as $item) {
                 $produitId = (int) ($item['produit_id'] ?? 0);
@@ -761,12 +764,12 @@ class MobileController extends Controller {
                 $caissesVidesRecues = max(0, (int) ($item['caisses_vides_recues'] ?? 0));
 
                 if ($produitId <= 0 || $quantite <= 0) {
-                    throw new Exception('Produit ou quantité invalide');
+                    throw new Exception('Produit ou quantitÃ© invalide');
                 }
 
                 $produit = $produitModel->find($produitId);
                 if (!$produit) {
-                    throw new Exception('Produit non trouvé');
+                    throw new Exception('Produit non trouvÃ©');
                 }
 
                 $bouteillesParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
@@ -774,7 +777,7 @@ class MobileController extends Controller {
                     $bouteillesParCaisse = 24;
                 }
 
-                // Verrouiller la ligne pour éviter les ventes concurrentes sur le même chargement
+                // Verrouiller la ligne pour Ã©viter les ventes concurrentes sur le mÃªme chargement
                 $chargement = $this->db->fetch(
                     "SELECT quantite_chargee, IFNULL(quantite_vendue, 0) as quantite_vendue
                      FROM mission_chargements
@@ -815,11 +818,11 @@ class MobileController extends Controller {
                     $quantiteCaisses = (int) floor($quantite / $bouteillesParCaisse);
                 }
                 if ($quantiteCaisses <= 0) {
-                    throw new Exception('Quantité de caisses invalide');
+                    throw new Exception('QuantitÃ© de caisses invalide');
                 }
 
                 if ($caissesVidesRecues > $quantiteCaisses) {
-                    throw new Exception('Les emballages reçus ne peuvent pas dépasser les caisses vendues');
+                    throw new Exception('Les emballages reÃ§us ne peuvent pas dÃ©passer les caisses vendues');
                 }
 
                 $prixCaisseInput = $item['prix_caisse'] ?? $item['prix'] ?? null;
@@ -835,17 +838,24 @@ class MobileController extends Controller {
                 $prixUnitaireBase = $prixCaisseBase / $bouteillesParCaisse;
                 $sousTotal = $quantiteCaisses * $prixCaisseBase;
                 $totalHt += $sousTotal;
+                $totalCaissesVendues += $quantiteCaisses;
+                $caissesVidesAffectees = max(0, min($quantiteCaisses, $videsRestantsAAffecter));
+                $videsRestantsAAffecter -= $caissesVidesAffectees;
 
                 $details[] = [
                     'produit_id' => $produitId,
                     'quantite_caisses' => $quantiteCaisses,
                     'quantite' => $quantiteCaisses * $bouteillesParCaisse,
-                    'caisses_vides_recues' => $caissesVidesRecues,
+                    'caisses_vides_recues' => $caissesVidesAffectees,
                     'prix_unitaire' => $prixUnitaireBase,
                     'prix_caisse' => $prixCaisseBase,
                     'sous_total' => $sousTotal,
                     'bouteilles_par_caisses' => (float) $bouteillesParCaisse
                 ];
+            }
+
+            if (array_sum($emballagesRecus) > $totalCaissesVendues) {
+                throw new Exception('Le total des emballages recus ne peut pas depasser le total des caisses vendues');
             }
 
             $totalTva = $totalHt * ($tva / 100);
@@ -880,7 +890,7 @@ class MobileController extends Controller {
             ]);
 
             foreach ($details as $detail) {
-                // 1. Ajouter le détail de vente (stocké en devise_base)
+                // 1. Ajouter le dÃ©tail de vente (stockÃ© en devise_base)
                 $this->db->insert('vente_details', [
                     'vente_id' => $venteId,
                     'produit_id' => $detail['produit_id'],
@@ -892,7 +902,7 @@ class MobileController extends Controller {
                     'sous_total' => $detail['sous_total']
                 ]);
 
-                // 2. Déduire du stock de la mission
+                // 2. DÃ©duire du stock de la mission
                 $this->db->query(
                     "UPDATE mission_chargements
                      SET quantite_vendue = IFNULL(quantite_vendue, 0) + :q
@@ -914,7 +924,7 @@ class MobileController extends Controller {
                     ]
                 );
 
-                // 3. Déduire du stock du véhicule (pleins) pour que l'inventaire reste cohérent
+                // 3. DÃ©duire du stock du vÃ©hicule (pleins) pour que l'inventaire reste cohÃ©rent
                 $mouvementModel->create([
                     'produit_id' => $detail['produit_id'],
                     'emplacement_id' => (int) $emplacementVehiculeId,
@@ -922,7 +932,7 @@ class MobileController extends Controller {
                     'quantite' => -$detail['quantite'],
                     'reference_type' => 'vente',
                     'reference_id' => $venteId,
-                    'motif' => 'Vente mobile N° ' . $numeroFacture . ' (Plein)',
+                    'motif' => 'Vente mobile NÂ° ' . $numeroFacture . ' (Plein)',
                     'created_by' => (int) $data['user_id']
                 ]);
 
@@ -935,32 +945,49 @@ class MobileController extends Controller {
                     ]
                 );
 
-                // 4. Ajouter les vides uniquement si réellement reçus
-                if ($detail['caisses_vides_recues'] > 0) {
-                    $quantiteVides = $detail['caisses_vides_recues'] * $bouteillesParCaisse;
-
-                    $stockModel->updateOrCreate(
-                        $detail['produit_id'],
-                        (int) $emplacementVehiculeId,
-                        [
-                            'quantite_vide' => $quantiteVides,
-                            'caisses_vide' => $detail['caisses_vides_recues']
-                        ]
-                    );
-
-                    $mouvementModel->create([
-                        'produit_id' => $detail['produit_id'],
-                        'emplacement_id' => (int) $emplacementVehiculeId,
-                        'type_mouvement' => 'entree',
-                        'quantite' => $quantiteVides,
-                        'reference_type' => 'vente',
-                        'reference_id' => $venteId,
-                        'motif' => 'Retour vide Vente N° ' . $numeroFacture,
-                        'created_by' => (int) $data['user_id']
-                    ]);
-                }
             }
 
+
+            foreach ($emballagesRecus as $produitId => $caissesRecues) {
+                $caissesRecues = (int) $caissesRecues;
+                if ($caissesRecues <= 0) {
+                    continue;
+                }
+
+                $produit = $produitModel->find($produitId);
+                if (!$produit) {
+                    throw new Exception('Produit emballage introuvable');
+                }
+
+                $bouteillesParCaisse = max(1, (int) ($produit['bouteilles_par_caisses'] ?? 24));
+                $quantiteVides = $caissesRecues * $bouteillesParCaisse;
+
+                $this->db->insert('vente_emballages_recus', [
+                    'vente_id' => $venteId,
+                    'produit_id' => $produitId,
+                    'caisses_recues' => $caissesRecues
+                ]);
+
+                $stockModel->updateOrCreate(
+                    $produitId,
+                    (int) $emplacementVehiculeId,
+                    [
+                        'quantite_vide' => $quantiteVides,
+                        'caisses_vide' => $caissesRecues
+                    ]
+                );
+
+                $mouvementModel->create([
+                    'produit_id' => $produitId,
+                    'emplacement_id' => (int) $emplacementVehiculeId,
+                    'type_mouvement' => 'entree',
+                    'quantite' => $quantiteVides,
+                    'reference_type' => 'vente',
+                    'reference_id' => $venteId,
+                    'motif' => 'Retour vide Vente N° ' . $numeroFacture,
+                    'created_by' => (int) $data['user_id']
+                ]);
+            }
             $this->db->commit();
             return $this->success([
                 'vente_id' => $venteId,
@@ -969,11 +996,46 @@ class MobileController extends Controller {
                 'total_tva' => $totalTva,
                 'total_ttc' => $totalTtc,
                 'devise_base' => $toDevise
-            ], 'Vente enregistrée');
+            ], 'Vente enregistrÃ©e');
 
         } catch (Exception $e) {
             $this->db->rollBack();
             return $this->error($e->getMessage());
         }
+    }
+
+    private function normaliserEmballagesRecusMobile($emballagesRecus, array $produits)
+    {
+        $result = [];
+
+        if (is_array($emballagesRecus) && !empty($emballagesRecus)) {
+            foreach ($emballagesRecus as $ligne) {
+                if (!is_array($ligne)) {
+                    continue;
+                }
+
+                $produitId = (int) ($ligne['produit_id'] ?? 0);
+                $caisses = max(0, (int) ($ligne['caisses_recues'] ?? $ligne['caisses'] ?? 0));
+                if ($produitId > 0 && $caisses > 0) {
+                    $result[$produitId] = ($result[$produitId] ?? 0) + $caisses;
+                }
+            }
+
+            return $result;
+        }
+
+        foreach ($produits as $ligne) {
+            if (!is_array($ligne)) {
+                continue;
+            }
+
+            $produitId = (int) ($ligne['produit_id'] ?? 0);
+            $caisses = max(0, (int) ($ligne['caisses_vides_recues'] ?? 0));
+            if ($produitId > 0 && $caisses > 0) {
+                $result[$produitId] = ($result[$produitId] ?? 0) + $caisses;
+            }
+        }
+
+        return $result;
     }
 }

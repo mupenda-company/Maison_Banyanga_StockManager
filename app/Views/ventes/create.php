@@ -1,4 +1,4 @@
-<?php 
+﻿<?php 
 $pageTitle = 'Nouvelle vente';
 ob_start();
 ?>
@@ -13,13 +13,13 @@ ob_start();
                 x-data="venteForm()"
                 @submit.prevent="saveVente"
             >
-                <!-- Informations générales -->
+                <!-- Informations gÃ©nÃ©rales -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div>
                         <label class="label">Client *</label>
                         <input type="search" x-model="clientSearch" class="input mb-2" placeholder="Rechercher un client...">
                         <select x-model="client_id" class="input" required>
-                            <option value="">Sélectionner un client</option>
+                            <option value="">SÃ©lectionner un client</option>
                             <template x-for="c in filteredClients()" :key="c.id">
                                 <option :value="c.id" x-text="c.nom + (c.zone_nom ? ' (' + c.zone_nom + ')' : '')"></option>
                             </template>
@@ -34,7 +34,7 @@ ob_start();
                         </select>
                     </div>
                     <div>
-                        <label class="label">N° Facture</label>
+                        <label class="label">NÂ° Facture</label>
                         <input type="text" value="<?= htmlspecialchars($numero_facture) ?>" class="input bg-gray-50" readonly>
                     </div>
                 </div>
@@ -45,7 +45,7 @@ ob_start();
                         <label class="label mb-0">Produits</label>
                         <button 
                             type="button"
-                            @click="lignes.push({ produit_id: '', caisses: 0, caisses_vides_recues: null, prix_caisse: 0 })"
+                            @click="lignes.push({ produit_id: '', caisses: 0, prix_caisse: 0 })"
                             class="btn-secondary btn-sm"
                         >
                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -63,7 +63,6 @@ ob_start();
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Stock (cs)</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Prix/Caisse</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Caisses</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Emballages reçus</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Sous-total</th>
                                     <th class="px-4 py-3"></th>
                                 </tr>
@@ -73,7 +72,7 @@ ob_start();
                                     <tr>
                                         <td class="px-4 py-2">
                                             <select x-model="ligne.produit_id" class="input w-full" @change="onProduitChange(ligne)" required>
-                                                <option value="">Sélectionner</option>
+                                                <option value="">SÃ©lectionner</option>
                                                 <template x-for="p in produits" :key="p.id">
                                                     <option :value="p.id" x-text="p.nom"></option>
                                                 </template>
@@ -87,13 +86,6 @@ ob_start();
                                         </td>
                                         <td class="px-4 py-2">
                                             <input type="number" x-model.number="ligne.caisses" class="input w-24" min="1" step="1" required @input="ligne.caisses = Math.round(ligne.caisses || 0); calculateTotals()">
-                                        </td>
-                                        <td class="px-4 py-2">
-                                            <input type="number" x-model.number="ligne.caisses_vides_recues" class="input w-28" min="0" step="1" required placeholder="0" @input="ligne.caisses_vides_recues = ligne.caisses_vides_recues === null || ligne.caisses_vides_recues === '' ? null : Math.max(0, Math.round(ligne.caisses_vides_recues || 0)); if (ligne.caisses && ligne.caisses_vides_recues !== null && ligne.caisses_vides_recues > ligne.caisses) ligne.caisses_vides_recues = ligne.caisses">
-                                            <p class="text-[10px] text-gray-500 mt-1" x-show="ligne.produit_id && ligne.caisses > 0">
-                                                Dette: <span x-text="Math.max(0, (Math.round(ligne.caisses || 0) - Math.round(ligne.caisses_vides_recues || 0))) + ' cs'"></span>
-                                            </p>
-                                            <p class="text-[10px] text-amber-600 mt-1">Indiquez explicitement <span class="font-medium">0</span> si aucun emballage vide n’a été reçu.</p>
                                         </td>
                                         <td class="px-4 py-2 text-sm font-medium">
                                             <span x-text="App.formatMoney((ligne.caisses * (ligne.prix_caisse || 0)), (window.DEVISE || 'CDF'))"></span>
@@ -115,7 +107,7 @@ ob_start();
                             </tbody>
                             <tfoot class="bg-gray-50 dark:bg-gray-700">
                                 <tr>
-                                    <td colspan="5" class="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">
+                                    <td colspan="4" class="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">
                                         Total HT:
                                     </td>
                                     <td class="px-4 py-3 font-bold text-gray-900 dark:text-white">
@@ -124,7 +116,7 @@ ob_start();
                                     <td></td>
                                 </tr>
                                 <tr>
-                                    <td colspan="5" class="px-4 py-2 text-right font-medium text-gray-900 dark:text-white">
+                                    <td colspan="4" class="px-4 py-2 text-right font-medium text-gray-900 dark:text-white">
                                         TVA (<?= $tva ?>%):
                                     </td>
                                     <td class="px-4 py-2 text-gray-900 dark:text-white">
@@ -133,7 +125,7 @@ ob_start();
                                     <td></td>
                                 </tr>
                                 <tr class="bg-primary-50 dark:bg-primary-900/50">
-                                    <td colspan="5" class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">
+                                    <td colspan="4" class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">
                                         Total TTC:
                                     </td>
                                     <td class="px-4 py-3 font-bold text-primary-600 dark:text-primary-400 text-lg">
@@ -143,6 +135,28 @@ ob_start();
                                 </tr>
                             </tfoot>
                         </table>
+                    </div>
+                </div>
+
+                <!-- Emballages recus -->
+                <div class="mb-6 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-3">
+                        <label class="label mb-0">Emballages recus</label>
+                        <div class="text-sm font-semibold" :class="totalEmballagesRecus() <= totalCaissesVendues() ? 'text-gray-700 dark:text-gray-200' : 'text-red-600'">
+                            <span x-text="'Vendu: ' + totalCaissesVendues() + ' cs'"></span>
+                            <span class="mx-2">|</span>
+                            <span x-text="'Recu: ' + totalEmballagesRecus() + ' cs'"></span>
+                            <span class="mx-2">|</span>
+                            <span x-text="'Dette: ' + Math.max(0, totalCaissesVendues() - totalEmballagesRecus()) + ' cs'"></span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <template x-for="p in produits" :key="'emb-' + p.id">
+                            <label class="block">
+                                <span class="text-xs font-medium text-gray-600 dark:text-gray-300" x-text="p.nom"></span>
+                                <input type="number" min="0" step="1" class="input mt-1" x-model.number="emballages_recus[p.id]" @input="emballages_recus[p.id] = Math.max(0, Math.round(emballages_recus[p.id] || 0))">
+                            </label>
+                        </template>
                     </div>
                 </div>
                 
@@ -204,7 +218,7 @@ document.addEventListener('alpine:init', () => {
         clientSearch: '',
         emplacement_id: '<?= $emplacements[0]['id'] ?? '' ?>',
         notes: '',
-        lignes: [{ produit_id: '', caisses: 0, caisses_vides_recues: null, prix_caisse: 0 }],
+        lignes: [{ produit_id: '', caisses: 0, prix_caisse: 0 }],
         clients: <?= json_encode($clients) ?>,
         produits: <?= json_encode($produits) ?>,
         tva: <?= $tva ?>,
@@ -214,6 +228,7 @@ document.addEventListener('alpine:init', () => {
         totalTtc: 0,
         coupures: { CDF: [50000, 20000, 10000, 5000, 1000, 500, 100], USD: [100, 50, 20, 10, 5, 1] },
         billetage: { CDF: {}, USD: {} },
+        emballages_recus: {},
 
         init() {
             this.calculateTotals();
@@ -222,21 +237,29 @@ document.addEventListener('alpine:init', () => {
             }, { deep: true });
         },
 
-        hasMissingEmballagesRecus() {
-            return (this.lignes || []).some((ligne) => {
-                if (!ligne.produit_id || (Math.round(ligne.caisses || 0) <= 0)) {
-                    return false;
-                }
-
-                return ligne.caisses_vides_recues === null
-                    || ligne.caisses_vides_recues === undefined
-                    || String(ligne.caisses_vides_recues).trim() === '';
-            });
+        allEmballagesRecusZero() {
+            return this.totalCaissesVendues() > 0 && this.totalEmballagesRecus() === 0;
         },
 
-        allEmballagesRecusZero() {
-            const lignesValides = (this.lignes || []).filter((ligne) => ligne.produit_id && Math.round(ligne.caisses || 0) > 0);
-            return lignesValides.length > 0 && lignesValides.every((ligne) => Math.max(0, Math.round(ligne.caisses_vides_recues || 0)) === 0);
+        totalCaissesVendues() {
+            return (this.lignes || []).reduce((sum, ligne) => {
+                return sum + (ligne.produit_id ? Math.max(0, Math.round(parseFloat(ligne.caisses) || 0)) : 0);
+            }, 0);
+        },
+
+        totalEmballagesRecus() {
+            return Object.values(this.emballages_recus || {}).reduce((sum, value) => {
+                return sum + Math.max(0, Math.round(parseFloat(value) || 0));
+            }, 0);
+        },
+
+        getEmballagesRecusPayload() {
+            return Object.entries(this.emballages_recus || {})
+                .map(([produitId, caisses]) => ({
+                    produit_id: parseInt(produitId),
+                    caisses_recues: Math.max(0, Math.round(parseFloat(caisses) || 0))
+                }))
+                .filter(ligne => ligne.produit_id > 0 && ligne.caisses_recues > 0);
         },
 
         filteredClients() {
@@ -303,20 +326,20 @@ document.addEventListener('alpine:init', () => {
         async saveVente() {
             this.loading = true;
             try {
-                if (!this.client_id) throw new Error('Sélectionnez un client');
+                if (!this.client_id) throw new Error('SÃ©lectionnez un client');
 
                 const detailsLignes = this.lignes.filter(l => l.produit_id && l.caisses > 0);
                 if (detailsLignes.length === 0) throw new Error('Ajoutez au moins un produit');
 
-                if (this.hasMissingEmballagesRecus()) {
-                    throw new Error('Veuillez renseigner les emballages reçus pour chaque ligne de vente. Indiquez 0 si aucun emballage vide n’a été récupéré.');
+                if (this.totalEmballagesRecus() > this.totalCaissesVendues()) {
+                    throw new Error('Le total des emballages recus ne peut pas depasser le total des caisses vendues.');
                 }
 
                 if (this.hasBilletage() && Math.abs(this.totalBilletage() - this.totalTtc) > 0.01) {
                     throw new Error('Le billetage ne correspond pas au total TTC.');
                 }
 
-                if (this.allEmballagesRecusZero() && !window.confirm('Aucun emballage vide n’a été déclaré pour cette vente. Confirmez-vous cette saisie ?')) {
+                if (this.allEmballagesRecusZero() && !window.confirm('Aucun emballage vide nâ€™a Ã©tÃ© dÃ©clarÃ© pour cette vente. Confirmez-vous cette saisie ?')) {
                     return;
                 }
 
@@ -328,25 +351,26 @@ document.addEventListener('alpine:init', () => {
                     const prixCaisseDevise = (parseFloat(l.prix_caisse) || 0);
                     const prixCaisseBase = App.convertMoney(prixCaisseDevise, devise, baseDevise);
                     const caisses = Math.max(0, Math.round(parseFloat(l.caisses) || 0));
-                    const caissesVidesRecues = Math.max(0, Math.min(caisses, Math.round(parseFloat(l.caisses_vides_recues) || 0)));
                     return {
                         produit_id: parseInt(l.produit_id),
                         quantite: caisses * btlParCaisse,
                         quantite_caisses: caisses,
-                        caisses_vides_recues: caissesVidesRecues,
+                        caisses_vides_recues: 0,
                         prix_unitaire: prixCaisseBase / btlParCaisse
                     };
                 });
+                const emballagesRecus = this.getEmballagesRecusPayload();
                 
                 await App.api('/api/ventes', 'POST', {
                     client_id: parseInt(this.client_id),
                     emplacement_id: parseInt(this.emplacement_id),
                     notes: this.notes,
                     details: details,
+                    emballages_recus: emballagesRecus,
                     billetage: this.billetage
                 });
                 
-                App.notify('Vente enregistrée avec succès', 'success');
+                App.notify('Vente enregistrÃ©e avec succÃ¨s', 'success');
                 setTimeout(() => window.location.href = '<?= url('ventes') ?>', 1000);
             } catch (e) {
                 App.notify(e.message, 'error');

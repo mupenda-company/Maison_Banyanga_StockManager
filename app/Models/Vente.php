@@ -1,6 +1,6 @@
-<?php
+﻿<?php
 /**
- * Modèle Vente
+ * ModÃ¨le Vente
  */
 
 class Vente extends Model
@@ -9,7 +9,7 @@ class Vente extends Model
     protected $fillable = ['numero_facture', 'client_id', 'date_vente', 'mission_id', 'emplacement_id', 'total_ht', 'total_tva', 'total_ttc', 'statut', 'notes', 'created_by'];
     
     /**
-     * Générer un numéro de facture unique
+     * GÃ©nÃ©rer un numÃ©ro de facture unique
      */
     public function generateNumeroFacture($prefix = 'FAC-')
     {
@@ -35,7 +35,7 @@ class Vente extends Model
     }
     
     /**
-     * Récupérer avec les détails
+     * RÃ©cupÃ©rer avec les dÃ©tails
      */
     public function getWithDetails($id)
     {
@@ -68,13 +68,21 @@ class Vente extends Model
                  WHERE vd.vente_id = :id",
                 ['id' => $id]
             );
+
+            $vente['emballages_recus'] = $this->db->fetchAll(
+                "SELECT ver.*, p.nom as produit_nom, p.code as produit_code, p.bouteilles_par_caisses
+                 FROM vente_emballages_recus ver
+                 JOIN produits p ON ver.produit_id = p.id
+                 WHERE ver.vente_id = :id",
+                ['id' => $id]
+            );
         }
         
         return $vente;
     }
     
     /**
-     * Récupérer les ventes avec client
+     * RÃ©cupÃ©rer les ventes avec client
      */
     public function getAllWithClient($page = 1, $perPage = 20, $filters = [])
     {
@@ -129,31 +137,45 @@ class Vente extends Model
     }
     
     /**
-     * Créer une vente avec détails
+     * CrÃ©er une vente avec dÃ©tails
      */
-    public function createWithDetails($data, $details)
+    public function createWithDetails($data, $details, $emballagesRecus = null)
     {
         try {
             $this->db->beginTransaction();
             
-            // Créer la vente
+            // CrÃ©er la vente
             $venteId = $this->create($data);
             
-            // Créer les détails et mettre à jour le stock
+            // CrÃ©er les dÃ©tails et mettre Ã  jour le stock
             $stockModel = new Stock();
             $mouvementModel = new MouvementStock();
             $produitModel = new Produit();
             $empruntModel = new EmpruntEmballage();
+            $emballagesRecus = $this->normaliserEmballagesRecus($emballagesRecus, $details);
+            $totalVidesRecusPhysiques = array_sum($emballagesRecus);
+            $totalCaissesVendues = 0;
+            foreach ($details as $detailForTotal) {
+                $produitForTotal = $produitModel->find($detailForTotal['produit_id']);
+                $btlForTotal = max(1, (int) ($produitForTotal['bouteilles_par_caisses'] ?? 24));
+                $totalCaissesVendues += (int) ($detailForTotal['quantite_caisses'] ?? intdiv((int) ($detailForTotal['quantite'] ?? 0), $btlForTotal));
+            }
+
+            if ($totalVidesRecusPhysiques > $totalCaissesVendues) {
+                throw new Exception('Le total des emballages recus ne peut pas depasser le total des caisses vendues.');
+            }
+
+            $videsRestantsAAffecter = $totalVidesRecusPhysiques;
             
             foreach ($details as $detail) {
                 $detail['vente_id'] = $venteId;
 
                 if (!array_key_exists('caisses_vides_recues', $detail) || $detail['caisses_vides_recues'] === '' || $detail['caisses_vides_recues'] === null) {
-                    throw new Exception('Les emballages reçus doivent être renseignés pour chaque ligne de vente.');
+                    throw new Exception('Les emballages reÃ§us doivent Ãªtre renseignÃ©s pour chaque ligne de vente.');
                 }
 
                 if (!is_numeric($detail['caisses_vides_recues'])) {
-                    throw new Exception('Les emballages reçus doivent être un nombre valide.');
+                    throw new Exception('Les emballages reÃ§us doivent Ãªtre un nombre valide.');
                 }
                 
                 $produit = $produitModel->find($detail['produit_id']);
@@ -162,23 +184,24 @@ class Vente extends Model
                 if ($quantiteCaisses <= 0) {
                     $quantiteCaisses = 1;
                 }
-                $caissesVidesPhysiques = max(0, min($quantiteCaisses, (int) ($detail['caisses_vides_recues'] ?? 0)));
+                $caissesVidesAffectees = max(0, min($quantiteCaisses, $videsRestantsAAffecter));
+                $videsRestantsAAffecter -= $caissesVidesAffectees;
                 $creditEmballagesUtilise = 0;
                 if (!empty($data['client_id'])) {
                     $creditEmballagesUtilise = $empruntModel->utiliserCreditClient(
                         $data['client_id'],
                         $detail['produit_id'],
-                        max(0, $quantiteCaisses - $caissesVidesPhysiques)
+                        max(0, $quantiteCaisses - $caissesVidesAffectees)
                     );
                 }
-                $caissesVidesRecues = min($quantiteCaisses, $caissesVidesPhysiques + $creditEmballagesUtilise);
+                $caissesVidesRecues = min($quantiteCaisses, $caissesVidesAffectees + $creditEmballagesUtilise);
                 $quantiteBouteilles = $quantiteCaisses * $btlParCaisse;
                 $prixCaisse = (float) ($detail['prix_caisse'] ?? ($produit['prix_vente_caisses'] ?? ($produit['prix_vente_unitaire'] * $btlParCaisse)));
                 if ($prixCaisse <= 0) {
                     $prixCaisse = (float) (($produit['prix_vente_unitaire'] ?? 0) * $btlParCaisse);
                 }
                 
-                // VÉRIFICATION DU STOCK DISPONIBLE
+                // VÃ‰RIFICATION DU STOCK DISPONIBLE
                 $currentStock = $this->db->fetch(
                     "SELECT quantite_pleine FROM stocks WHERE produit_id = :p AND emplacement_id = :e",
                     ['p' => $detail['produit_id'], 'e' => $data['emplacement_id']]
@@ -200,7 +223,7 @@ class Vente extends Model
                     'sous_total' => $quantiteCaisses * $prixCaisse
                 ]);
                 
-                // Déduire du stock (PLEIN)
+                // DÃ©duire du stock (PLEIN)
                 $stockModel->updateOrCreate(
                     $detail['produit_id'],
                     $data['emplacement_id'],
@@ -218,36 +241,52 @@ class Vente extends Model
                     'quantite' => -$quantiteBouteilles,
                     'reference_type' => 'vente',
                     'reference_id' => $venteId,
-                    'motif' => 'Vente N° ' . $data['numero_facture'] . ' - Sortie des caisses pleines',
+                    'motif' => 'Vente NÂ° ' . $data['numero_facture'] . ' - Sortie des caisses pleines',
                     'created_by' => $data['created_by']
                 ]);
 
-                if ($caissesVidesPhysiques > 0) {
-                    // Ajouter au stock (VIDE) uniquement pour les emballages réellement reçus
-                    $stockModel->updateOrCreate(
-                        $detail['produit_id'],
-                        $data['emplacement_id'],
-                        [
-                            'quantite_vide' => $caissesVidesPhysiques * $btlParCaisse,
-                            'caisses_vide' => $caissesVidesPhysiques
-                        ]
-                    );
-
-                    // Enregistrer le mouvement VIDE (Entrée)
-                    $mouvementModel->create([
-                        'produit_id' => $detail['produit_id'],
-                        'emplacement_id' => $data['emplacement_id'],
-                        'type_mouvement' => 'entree',
-                        'quantite' => $caissesVidesPhysiques * $btlParCaisse,
-                        'reference_type' => 'vente',
-                        'reference_id' => $venteId,
-                        'motif' => 'Vente N° ' . $data['numero_facture'] . ' - Entrée des emballages vides',
-                        'created_by' => $data['created_by']
-                    ]);
-                }
             }
 
-            // DÉCLENCHER LES ALERTES IMMÉDIATEMENT
+
+            foreach ($emballagesRecus as $produitId => $caissesRecues) {
+                $caissesRecues = (int) $caissesRecues;
+                if ($caissesRecues <= 0) {
+                    continue;
+                }
+
+                $produit = $produitModel->find($produitId);
+                if (!$produit) {
+                    throw new Exception('Produit emballage introuvable.');
+                }
+
+                $btlParCaisse = max(1, (int) ($produit['bouteilles_par_caisses'] ?? 24));
+                $this->db->insert('vente_emballages_recus', [
+                    'vente_id' => $venteId,
+                    'produit_id' => $produitId,
+                    'caisses_recues' => $caissesRecues
+                ]);
+
+                $stockModel->updateOrCreate(
+                    $produitId,
+                    $data['emplacement_id'],
+                    [
+                        'quantite_vide' => $caissesRecues * $btlParCaisse,
+                        'caisses_vide' => $caissesRecues
+                    ]
+                );
+
+                $mouvementModel->create([
+                    'produit_id' => $produitId,
+                    'emplacement_id' => $data['emplacement_id'],
+                    'type_mouvement' => 'entree',
+                    'quantite' => $caissesRecues * $btlParCaisse,
+                    'reference_type' => 'vente',
+                    'reference_id' => $venteId,
+                    'motif' => 'Vente N° ' . $data['numero_facture'] . ' - Entree des emballages vides',
+                    'created_by' => $data['created_by']
+                ]);
+            }
+            // DÃ‰CLENCHER LES ALERTES IMMÃ‰DIATEMENT
             (new Alerte())->checkStockAlerts();
             
             $this->db->commit();
@@ -257,6 +296,37 @@ class Vente extends Model
             $this->db->rollBack();
             return ['success' => false, 'message' => $e->getMessage()];
         }
+    }
+
+    private function normaliserEmballagesRecus($emballagesRecus, array $details)
+    {
+        $result = [];
+
+        if (is_array($emballagesRecus) && !empty($emballagesRecus)) {
+            foreach ($emballagesRecus as $ligne) {
+                if (!is_array($ligne)) {
+                    continue;
+                }
+
+                $produitId = (int) ($ligne['produit_id'] ?? 0);
+                $caisses = (int) ($ligne['caisses_recues'] ?? $ligne['caisses'] ?? 0);
+                if ($produitId > 0 && $caisses > 0) {
+                    $result[$produitId] = ($result[$produitId] ?? 0) + $caisses;
+                }
+            }
+
+            return $result;
+        }
+
+        foreach ($details as $detail) {
+            $produitId = (int) ($detail['produit_id'] ?? 0);
+            $caisses = (int) ($detail['caisses_vides_recues'] ?? 0);
+            if ($produitId > 0 && $caisses > 0) {
+                $result[$produitId] = ($result[$produitId] ?? 0) + $caisses;
+            }
+        }
+
+        return $result;
     }
     
     /**
@@ -277,7 +347,7 @@ class Vente extends Model
     }
 
     /**
-     * Ventes groupées par zone
+     * Ventes groupÃ©es par zone
      */
     public function getVentesParZone($dateDebut, $dateFin)
     {
@@ -294,7 +364,7 @@ class Vente extends Model
     }
 
     /**
-     * Ventes validées par agent sur une période donnée
+     * Ventes validÃ©es par agent sur une pÃ©riode donnÃ©e
      */
     public function getVentesParAgent($dateDebut, $dateFin = null)
     {
@@ -344,25 +414,54 @@ class Vente extends Model
             
             $vente = $this->getWithDetails($id);
             
-            // Marquer comme annulée
+            // Marquer comme annulÃ©e
             $this->update($id, ['statut' => 'annulee']);
             
             // Reverser le stock
             $stockModel = new Stock();
+            $emballagesRecus = $vente['emballages_recus'] ?? [];
             foreach ($vente['details'] as $detail) {
                 $btlParCaisse = (int) ($detail['bouteilles_par_caisses'] ?? 24);
                 if ($btlParCaisse <= 0) {
                     $btlParCaisse = 24;
                 }
                 $quantiteCaisses = (int) ($detail['quantite_caisses'] ?? intdiv((int) $detail['quantite'], $btlParCaisse));
-                $caissesVidesRecues = (int) ($detail['caisses_vides_recues'] ?? 0);
 
                 $stockModel->updateOrCreate(
                     $detail['produit_id'],
                     $vente['emplacement_id'],
                     [
                         'quantite_pleine' => $detail['quantite'],
-                        'caisses_pleine' => $quantiteCaisses,
+                        'caisses_pleine' => $quantiteCaisses
+                    ]
+                );
+            }
+
+            if (empty($emballagesRecus)) {
+                $emballagesRecus = array_map(function ($detail) {
+                    return [
+                        'produit_id' => $detail['produit_id'],
+                        'caisses_recues' => $detail['caisses_vides_recues'] ?? 0,
+                        'bouteilles_par_caisses' => $detail['bouteilles_par_caisses'] ?? 24
+                    ];
+                }, $vente['details']);
+            }
+
+            foreach ($emballagesRecus as $emballage) {
+                $caissesVidesRecues = (int) ($emballage['caisses_recues'] ?? 0);
+                if ($caissesVidesRecues <= 0) {
+                    continue;
+                }
+
+                $btlParCaisse = (int) ($emballage['bouteilles_par_caisses'] ?? 24);
+                if ($btlParCaisse <= 0) {
+                    $btlParCaisse = 24;
+                }
+
+                $stockModel->updateOrCreate(
+                    $emballage['produit_id'],
+                    $vente['emplacement_id'],
+                    [
                         'quantite_vide' => -($caissesVidesRecues * $btlParCaisse),
                         'caisses_vide' => -$caissesVidesRecues
                     ]
@@ -446,3 +545,4 @@ class Vente extends Model
         );
     }
 }
+

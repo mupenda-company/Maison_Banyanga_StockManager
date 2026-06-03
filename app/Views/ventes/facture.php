@@ -31,6 +31,13 @@
             padding-bottom: 8px;
             margin-bottom: 8px;
         }
+        .company-logo {
+            display: block;
+            max-width: 46mm;
+            max-height: 52px;
+            margin: 0 auto 6px auto;
+            object-fit: contain;
+        }
         .company-name {
             font-size: 14px;
             font-weight: bold;
@@ -150,7 +157,7 @@
         <!-- En-tête -->
         <div class="ticket-header">
             <?php if ($companyLogo): ?>
-                <img src="<?= $companyLogo ?>" alt="Logo" style="max-height: 30px; margin-bottom: 4px;">
+                <img src="<?= $companyLogo ?>" alt="Logo" class="company-logo">
             <?php endif; ?>
             <div class="company-name"><?= htmlspecialchars($companyName) ?></div>
             <?php if (!empty($params['adresse'])): ?><div class="company-info"><?= htmlspecialchars($params['adresse']) ?></div><?php endif; ?>

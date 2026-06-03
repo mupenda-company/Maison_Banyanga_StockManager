@@ -558,6 +558,18 @@ CREATE TABLE `vente_details` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
+-- Table structure for table `vente_emballages_recus`
+--
+
+CREATE TABLE `vente_emballages_recus` (
+  `id` int UNSIGNED NOT NULL,
+  `vente_id` int UNSIGNED NOT NULL,
+  `produit_id` int UNSIGNED NOT NULL,
+  `caisses_recues` int NOT NULL DEFAULT '0',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
 -- Table structure for table `zones`
 --
 
@@ -815,6 +827,14 @@ ALTER TABLE `vente_details`
   ADD KEY `produit_id` (`produit_id`);
 
 --
+-- Indexes for table `vente_emballages_recus`
+--
+ALTER TABLE `vente_emballages_recus`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `vente_id` (`vente_id`),
+  ADD KEY `produit_id` (`produit_id`);
+
+--
 -- Indexes for table `zones`
 --
 ALTER TABLE `zones`
@@ -992,6 +1012,12 @@ ALTER TABLE `vente_details`
   MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=122;
 
 --
+-- AUTO_INCREMENT for table `vente_emballages_recus`
+--
+ALTER TABLE `vente_emballages_recus`
+  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `zones`
 --
 ALTER TABLE `zones`
@@ -1162,6 +1188,13 @@ ALTER TABLE `ventes`
 ALTER TABLE `vente_details`
   ADD CONSTRAINT `vente_details_ibfk_1` FOREIGN KEY (`vente_id`) REFERENCES `ventes` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `vente_details_ibfk_2` FOREIGN KEY (`produit_id`) REFERENCES `produits` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `vente_emballages_recus`
+--
+ALTER TABLE `vente_emballages_recus`
+  ADD CONSTRAINT `vente_emballages_recus_ibfk_1` FOREIGN KEY (`vente_id`) REFERENCES `ventes` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `vente_emballages_recus_ibfk_2` FOREIGN KEY (`produit_id`) REFERENCES `produits` (`id`) ON DELETE CASCADE;
 
 -- --------------------------------------------------------
 -- Données initiales

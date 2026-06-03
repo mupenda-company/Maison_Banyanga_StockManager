@@ -93,13 +93,15 @@ class VenteController extends Controller
         
         $totalHt = 0;
         $details = [];
+        $emballagesRecus = $this->normaliserEmballagesRecus($data['emballages_recus'] ?? null);
+        $totalCaissesVendues = 0;
         
         foreach ($data['details'] as $index => $detail) {
             if (!is_array($detail)) {
                 return $this->error('Chaque ligne de vente doit être un objet valide.', 422);
             }
 
-            if (!array_key_exists('caisses_vides_recues', $detail) || $detail['caisses_vides_recues'] === '' || $detail['caisses_vides_recues'] === null) {
+            if (empty($emballagesRecus) && (!array_key_exists('caisses_vides_recues', $detail) || $detail['caisses_vides_recues'] === '' || $detail['caisses_vides_recues'] === null)) {
                 return $this->error('Veuillez renseigner les emballages reçus pour la ligne ' . ($index + 1) . '. Indiquez 0 si aucun emballage vide n’a été récupéré.', 422);
             }
 
@@ -113,7 +115,7 @@ class VenteController extends Controller
                 return $this->error('La quantité de caisses doit être supérieure à 0 pour la ligne ' . ($index + 1) . '.', 422);
             }
 
-            if (!is_numeric($detail['caisses_vides_recues'])) {
+            if (array_key_exists('caisses_vides_recues', $detail) && $detail['caisses_vides_recues'] !== '' && $detail['caisses_vides_recues'] !== null && !is_numeric($detail['caisses_vides_recues'])) {
                 return $this->error('Les emballages reçus doivent être un nombre valide pour la ligne ' . ($index + 1) . '.', 422);
             }
 
@@ -126,6 +128,7 @@ class VenteController extends Controller
             $prixUnitaire = $detail['prix_unitaire'] ?? $produit['prix_vente_unitaire'];
             $sousTotal = $quantiteCaisses * $prixUnitaire * ($produit['bouteilles_par_caisses'] ?? 24);
             $totalHt += $sousTotal;
+            $totalCaissesVendues += $quantiteCaisses;
             
             $details[] = [
                 'produit_id' => $detail['produit_id'],
@@ -135,6 +138,19 @@ class VenteController extends Controller
                 'prix_unitaire' => $prixUnitaire,
                 'sous_total' => $sousTotal
             ];
+        }
+
+        if (empty($emballagesRecus)) {
+            $emballagesRecus = $this->normaliserEmballagesRecus(array_map(function ($detail) {
+                return [
+                    'produit_id' => $detail['produit_id'],
+                    'caisses_recues' => $detail['caisses_vides_recues'] ?? 0
+                ];
+            }, $details));
+        }
+
+        if (array_sum(array_column($emballagesRecus, 'caisses_recues')) > $totalCaissesVendues) {
+            return $this->error('Le total des emballages recus ne peut pas depasser le total des caisses vendues.', 422);
         }
         
         $totalTva = $totalHt * ($tva / 100);
@@ -158,7 +174,7 @@ class VenteController extends Controller
             'created_by' => $_SESSION['user_id']
         ];
         
-        $result = $this->venteModel->createWithDetails($venteData, $details);
+        $result = $this->venteModel->createWithDetails($venteData, $details, $emballagesRecus);
         
         if ($result['success']) {
             if ($totalBilletage > 0) {
@@ -168,6 +184,38 @@ class VenteController extends Controller
         }
         
         return $this->error($result['message'], 400);
+    }
+
+    private function normaliserEmballagesRecus($emballagesRecus)
+    {
+        $result = [];
+
+        if (!is_array($emballagesRecus)) {
+            return $result;
+        }
+
+        foreach ($emballagesRecus as $ligne) {
+            if (!is_array($ligne)) {
+                continue;
+            }
+
+            $produitId = (int) ($ligne['produit_id'] ?? 0);
+            $caisses = max(0, (int) ($ligne['caisses_recues'] ?? $ligne['caisses'] ?? 0));
+            if ($produitId <= 0 || $caisses <= 0) {
+                continue;
+            }
+
+            if (!isset($result[$produitId])) {
+                $result[$produitId] = [
+                    'produit_id' => $produitId,
+                    'caisses_recues' => 0
+                ];
+            }
+
+            $result[$produitId]['caisses_recues'] += $caisses;
+        }
+
+        return array_values($result);
     }
     
     /**

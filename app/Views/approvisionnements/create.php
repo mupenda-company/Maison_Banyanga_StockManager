@@ -41,8 +41,9 @@ $approvisionnementsUrl = url('approvisionnements');
                 x-data="{
                     date: '<?= date('Y-m-d') ?>',
                     fournisseur: 'Bralima',
+                    type_achat: 'deposer',
                     notes: '',
-                    lignes: [{ produit_id: '', quantite_achat: 0, unite_achat: 'caisse', type_achat: 'deposer' }],
+                    lignes: [{ produit_id: '', quantite_achat: 0, unite_achat: 'caisse' }],
                     produits: [],
                     loading: false,
                     total: 0,
@@ -51,7 +52,7 @@ $approvisionnementsUrl = url('approvisionnements');
                         this.lignes.forEach(l => {
                             const p = this.produits.find(p => p.id == l.produit_id);
                             if (p) {
-                                this.total += getQuantiteCaisses(l, p) * getPrixCaisse(p, l.type_achat);
+                                this.total += getQuantiteCaisses(l, p) * getPrixCaisse(p, this.type_achat);
                             }
                         });
                     }
@@ -76,7 +77,7 @@ $approvisionnementsUrl = url('approvisionnements');
                             return {
                                 produit_id: parseInt(l.produit_id),
                                 quantite_caisses: getQuantiteCaisses(l, p),
-                                type_achat: l.type_achat
+                                type_achat: type_achat
                             };
                         });
 
@@ -100,7 +101,7 @@ $approvisionnementsUrl = url('approvisionnements');
                     }
                 }"
             >
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                     <div>
                         <label class="label">Date *</label>
                         <input type="date" x-model="date" class="input" required>
@@ -113,6 +114,13 @@ $approvisionnementsUrl = url('approvisionnements');
                         <label class="label">N Bon</label>
                         <input type="text" value="<?= htmlspecialchars($numero_bon) ?>" class="input bg-gray-50" readonly>
                     </div>
+                    <div>
+                        <label class="label">Prix d'achat *</label>
+                        <select x-model="type_achat" class="input" @change="recalc()" required>
+                            <option value="deposer">Prix achat a deposer</option>
+                            <option value="enlever">Prix achat a enlever</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="mb-6">
@@ -120,7 +128,7 @@ $approvisionnementsUrl = url('approvisionnements');
                         <label class="label mb-0">Produits</label>
                         <button
                             type="button"
-                            @click="lignes.push({ produit_id: '', quantite_achat: 0, unite_achat: 'caisse', type_achat: 'deposer' })"
+                            @click="lignes.push({ produit_id: '', quantite_achat: 0, unite_achat: 'caisse' })"
                             class="btn-secondary btn-sm"
                         >
                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -140,7 +148,6 @@ $approvisionnementsUrl = url('approvisionnements');
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Achat</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Unite</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Caisses</th>
-                                    <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Prix achat</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Prix caisse</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Sous-total</th>
                                     <th class="px-3 py-3"></th>
@@ -175,17 +182,11 @@ $approvisionnementsUrl = url('approvisionnements');
                                         <td class="px-3 py-2 text-sm font-semibold">
                                             <span x-text="getQuantiteCaisses(ligne, produits.find(p => p.id == ligne.produit_id))"></span>
                                         </td>
-                                        <td class="px-3 py-2">
-                                            <select x-model="ligne.type_achat" class="input w-28">
-                                                <option value="deposer">Deposer</option>
-                                                <option value="enlever">Enlever</option>
-                                            </select>
-                                        </td>
                                         <td class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
-                                            <span x-text="App.formatMoneyConverted(getPrixCaisse(produits.find(p => p.id == ligne.produit_id), ligne.type_achat) || 0, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></span>
+                                            <span x-text="App.formatMoneyConverted(getPrixCaisse(produits.find(p => p.id == ligne.produit_id), type_achat) || 0, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></span>
                                         </td>
                                         <td class="px-3 py-2 text-sm font-medium">
-                                            <span x-text="App.formatMoneyConverted(getQuantiteCaisses(ligne, produits.find(p => p.id == ligne.produit_id)) * getPrixCaisse(produits.find(p => p.id == ligne.produit_id), ligne.type_achat) || 0, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></span>
+                                            <span x-text="App.formatMoneyConverted(getQuantiteCaisses(ligne, produits.find(p => p.id == ligne.produit_id)) * getPrixCaisse(produits.find(p => p.id == ligne.produit_id), type_achat) || 0, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></span>
                                         </td>
                                         <td class="px-3 py-2">
                                             <button
@@ -204,7 +205,7 @@ $approvisionnementsUrl = url('approvisionnements');
                             </tbody>
                             <tfoot class="bg-gray-50 dark:bg-gray-700">
                                 <tr>
-                                    <td colspan="8" class="px-3 py-3 text-right font-medium text-gray-900 dark:text-white">Total HT:</td>
+                                    <td colspan="7" class="px-3 py-3 text-right font-medium text-gray-900 dark:text-white">Total HT:</td>
                                     <td class="px-3 py-3 font-bold text-gray-900 dark:text-white">
                                         <span x-text="App.formatMoneyConverted(total, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></span>
                                     </td>
