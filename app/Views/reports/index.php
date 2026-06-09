@@ -53,6 +53,8 @@ ob_start();
     </div>
 </div>
 
+<div class="card mb-8"><div class="card-body flex items-center justify-between gap-4"><div><h3 class="text-lg font-semibold">Rapport des manquants par agent</h3><p class="text-sm text-gray-500">Filtrer, imprimer et exporter les manquants pour chaque agent.</p></div><a href="<?= url('manquants?date_debut=' . $dateDebut . '&date_fin=' . $dateFin) ?>" class="btn btn-secondary">Ouvrir le rapport</a></div></div>
+
 <!-- KPI Emballages -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     <div class="stat-card">

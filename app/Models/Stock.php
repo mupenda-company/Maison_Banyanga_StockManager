@@ -31,6 +31,51 @@ class Stock extends Model
     {
         return $this->getStock($produitId, $emplacementId);
     }
+
+    /**
+     * Reconstituer le stock a la fin d'une date depuis l'etat actuel.
+     */
+    public function getHistoricalInventory($date, $filters = [])
+    {
+        $where = "p.actif = 1 AND e.actif = 1 AND (e.type != 'mobile' OR v.emplacement_id IS NOT NULL)";
+        $params = ['date_fin_plein' => $date . ' 23:59:59', 'date_fin_vide' => $date . ' 23:59:59'];
+        foreach (['produit_id' => 'p.id', 'emplacement_id' => 'e.id', 'categorie' => 'p.categorie'] as $key => $column) {
+            if (!empty($filters[$key])) {
+                $where .= " AND {$column} = :{$key}";
+                $params[$key] = $filters[$key];
+            }
+        }
+        $isVide = "(LOWER(COALESCE(m.motif, '')) LIKE '%vide%' OR m.reference_type IN ('retour_emballage', 'emprunt_emballage'))";
+        $sql = "SELECT p.id AS produit_id, p.code AS produit_code, p.nom AS produit_nom,
+                       p.prix_vente_caisses, p.prix_vente_unitaire, p.bouteilles_par_caisses, p.categorie, p.seuil_alerte,
+                       e.id AS emplacement_id, e.nom AS emplacement_nom, e.type AS emplacement_type,
+                       v.id AS vehicule_id, v.immatriculation AS vehicule, v.immatriculation AS vehicule_immatriculation,
+                       u.nom AS agent_nom, u.prenom AS agent_prenom,
+                       GREATEST(0, COALESCE(s.quantite_pleine, 0) - COALESCE(SUM(CASE WHEN m.created_at > :date_fin_plein AND NOT {$isVide} THEN m.quantite ELSE 0 END), 0)) AS quantite_pleine,
+                       GREATEST(0, COALESCE(s.quantite_vide, 0) - COALESCE(SUM(CASE WHEN m.created_at > :date_fin_vide AND {$isVide} THEN m.quantite ELSE 0 END), 0)) AS quantite_vide
+                FROM produits p JOIN emplacements e ON e.actif = 1
+                LEFT JOIN stocks s ON s.produit_id = p.id AND s.emplacement_id = e.id
+                LEFT JOIN mouvements_stock m ON m.produit_id = p.id AND m.emplacement_id = e.id
+                LEFT JOIN vehicules v ON v.emplacement_id = e.id AND v.actif = 1
+                LEFT JOIN users u ON v.agent_responsable_id = u.id
+                WHERE {$where}
+                GROUP BY p.id, e.id, s.quantite_pleine, s.quantite_vide, v.id, u.id
+                ORDER BY e.type, e.nom, p.nom";
+        $rows = $this->db->fetchAll($sql, $params);
+        foreach ($rows as &$row) {
+            $btl = max(1, (int) ($row['bouteilles_par_caisses'] ?? 24));
+            $row['caisses_pleine'] = (float) $row['quantite_pleine'] / $btl;
+            $row['caisses_vide'] = (float) $row['quantite_vide'] / $btl;
+        }
+        unset($row);
+        if (!empty($filters['statut'])) {
+            $rows = array_values(array_filter($rows, function ($row) use ($filters) {
+                $critique = (float) $row['caisses_pleine'] <= (float) ($row['seuil_alerte'] ?? 0);
+                return $filters['statut'] === 'critique' ? $critique : !$critique;
+            }));
+        }
+        return $rows;
+    }
     
     /**
      * Récupérer tous les stocks avec pagination et filtres

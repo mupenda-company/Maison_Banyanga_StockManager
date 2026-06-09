@@ -60,13 +60,15 @@ class VenteController extends Controller
         $produits = $this->produitModel->getWithStock();
         $emplacements = $this->emplacementModel->getFixes();
         $tva = $this->parametreModel->get('taux_tva', 16);
+        $autoriserInterchangeEmballages = $this->parametreModel->get('autoriser_interchange_emballages', '1') === '1';
         
         $this->view('ventes/create', [
             'clients' => $clients,
             'produits' => $produits,
             'emplacements' => $emplacements,
             'tva' => $tva,
-            'numero_facture' => $this->venteModel->generateNumeroFacture()
+            'numero_facture' => $this->venteModel->generateNumeroFacture(),
+            'autoriser_interchange_emballages' => $autoriserInterchangeEmballages
         ]);
     }
     
@@ -93,7 +95,8 @@ class VenteController extends Controller
         
         $totalHt = 0;
         $details = [];
-        $emballagesRecus = $this->normaliserEmballagesRecus($data['emballages_recus'] ?? null);
+        $autoriserInterchangeEmballages = $this->parametreModel->get('autoriser_interchange_emballages', '1') === '1';
+        $emballagesRecus = $autoriserInterchangeEmballages ? $this->normaliserEmballagesRecus($data['emballages_recus'] ?? null) : [];
         $totalCaissesVendues = 0;
         
         foreach ($data['details'] as $index => $detail) {

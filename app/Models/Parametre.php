@@ -81,7 +81,8 @@ class Parametre extends Model
             'numero_compte' => $this->get('numero_compte', ''),
             'devise' => $this->get('devise', 'CDF'),
             'taux_change' => $this->get('taux_change', '2800'),
-            'taux_tva' => $this->get('taux_tva', '16')
+            'taux_tva' => $this->get('taux_tva', '16'),
+            'autoriser_interchange_emballages' => $this->get('autoriser_interchange_emballages', '1')
         ];
     }
     

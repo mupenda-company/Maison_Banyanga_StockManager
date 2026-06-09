@@ -43,7 +43,7 @@
         $parametreModel = new Parametre();
         $devise = $parametreModel->get('devise', 'CDF');
         $baseDevise = $parametreModel->get('devise_base', 'CDF');
-        $tauxChange = $parametreModel->get('taux_change', '2800');
+        $tauxChange = $parametreModel->get('taux_change', '2300');
         $logo = $parametreModel->get('logo');
         $nomEntreprise = $parametreModel->get('nom_entreprise', APP_NAME);
         $couleurPrimaire = $parametreModel->get('couleur_primaire', '#3B82F6');
@@ -78,7 +78,9 @@
             });
         });
     </script>
-    
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     
@@ -247,14 +249,22 @@
                     $params = new Parametre();
                     $logo = $params->get('logo');
                     ?>
-                    <template x-if="window.LOGO_URL">
+                    <template x-if="window.LOGO_URL && window.LOGO_URL.length > 0">
+                        <img :src="window.LOGO_URL" alt="Logo" class="h-8 w-auto" id="app-logo">
+                    </template>
+                    <template x-if="!window.LOGO_URL || window.LOGO_URL.length === 0">
+                        <svg class="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                        </svg>
+                    </template>
+                    <!-- <template x-if="window.LOGO_URL">
                         <img :src="window.LOGO_URL" alt="Logo" class="h-8 w-auto" id="app-logo">
                     </template>
                     <template x-if="!window.LOGO_URL">
                         <svg class="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                         </svg>
-                    </template>
+                    </template> -->
                     <span class="text-xl font-bold text-gray-900 dark:text-white" x-text="window.NOM_ENTREPRISE || '<?= APP_NAME ?>'"></span>
                 </a>
             </div>
@@ -350,6 +360,10 @@
                 
                 <!-- Pertes -->
                 <?php if (can('pertes.voir')): ?>
+                <a href="<?= url('manquants') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/manquants') !== false ? 'active' : '' ?>">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M5.07 19h13.86a2 2 0 001.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16a2 2 0 001.73 3z"/></svg>
+                    Manquants agents
+                </a>
                 <a href="<?= url('pertes') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/pertes') !== false ? 'active' : '' ?>">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>

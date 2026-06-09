@@ -37,6 +37,7 @@ ob_start();
                     <option value="critique" <?= ($filters['statut'] ?? '') === 'critique' ? 'selected' : '' ?>>CRITIQUE</option>
                 </select>
             </div>
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Stock a la date</label><input type="date" name="date_stock" max="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($filters['date_stock'] ?? '') ?>" class="input py-1.5 w-44">
             <div class="flex gap-2 ml-auto">
                 <button type="submit" class="btn-primary py-1.5 px-4 mr-2">Filtrer</button>
                 <a href="<?= url('stocks') ?>" class="btn-secondary py-1.5 px-4">Réinitialiser</a>
@@ -107,6 +108,8 @@ ob_start();
         </svg>
         Historique mouvements
     </a>
+    <button type="button" onclick="window.print()" class="btn-secondary">Imprimer</button>
+    <?php if (!empty($filters['date_stock'])): ?><span class="badge-info">Etat au <?= date('d/m/Y', strtotime($filters['date_stock'])) ?></span><?php endif; ?>
     <?php if (can('stock.gerer')): ?>
     <button onclick="openTransfertModal()" class="btn btn-primary">
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

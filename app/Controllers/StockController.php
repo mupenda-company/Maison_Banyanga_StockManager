@@ -29,7 +29,8 @@ class StockController extends Controller
         $filters = [
             'produit_id' => $_GET['produit_id'] ?? null,
             'emplacement_id' => $_GET['emplacement_id'] ?? null,
-            'statut' => $_GET['statut'] ?? null
+            'statut' => $_GET['statut'] ?? null,
+            'date_stock' => $_GET['date_stock'] ?? null
         ];
 
         // Exporter en Excel
@@ -41,8 +42,21 @@ class StockController extends Controller
         $page = (int) ($_GET['page'] ?? 1);
         $perPage = 5;
         
-        $result = $this->stockModel->getAllPaginated($page, $perPage, $filters);
+        if (!empty($filters['date_stock'])) {
+            $allStocks = $this->stockModel->getHistoricalInventory($filters['date_stock'], $filters);
+            $total = count($allStocks);
+            $result = ['data' => array_slice($allStocks, ($page - 1) * $perPage, $perPage), 'total' => $total, 'last_page' => max(1, (int) ceil($total / $perPage))];
+        } else {
+            $result = $this->stockModel->getAllPaginated($page, $perPage, $filters);
+        }
         $emplacements = $this->emplacementModel->getWithStock();
+        if (!empty($filters['date_stock'])) {
+            foreach ($emplacements as &$emplacement) {
+                $emplacement['total_caisses_pleine'] = 0;
+                foreach ($allStocks as $stock) if ((int) $stock['emplacement_id'] === (int) $emplacement['id']) $emplacement['total_caisses_pleine'] += (float) $stock['caisses_pleine'];
+            }
+            unset($emplacement);
+        }
         $produits = $this->produitModel->getActive();
         
         $this->view('stocks/index', [
@@ -204,8 +218,12 @@ class StockController extends Controller
     {
         $this->requireAuth();
         
-        $result = $this->stockModel->getAllPaginated(1, 1000, $filters);
-        $data = $result['data'];
+        if (!empty($filters['date_stock'])) {
+            $data = $this->stockModel->getHistoricalInventory($filters['date_stock'], $filters);
+        } else {
+            $result = $this->stockModel->getAllPaginated(1, 1000, $filters);
+            $data = $result['data'];
+        }
         
         $filename = "stocks_" . date('Y-m-d_H-i') . ".csv";
         
@@ -244,7 +262,8 @@ class StockController extends Controller
         
         $filters = [
             'emplacement_id' => $_GET['emplacement_id'] ?? null,
-            'categorie' => $_GET['categorie'] ?? null
+            'categorie' => $_GET['categorie'] ?? null,
+            'date_stock' => $_GET['date_stock'] ?? null
         ];
 
         $printMode = isset($_GET['print']) && (string)$_GET['print'] === '1';
@@ -258,7 +277,12 @@ class StockController extends Controller
             return;
         }
         
-        if ($printMode) {
+        if (!empty($filters['date_stock'])) {
+            $allInventaire = $this->stockModel->getHistoricalInventory($filters['date_stock'], $filters);
+            $total = count($allInventaire);
+            $inventaire = $printMode ? $allInventaire : array_slice($allInventaire, ($page - 1) * $perPage, $perPage);
+            if ($printMode) { $page = 1; $perPage = max(1, $total); }
+        } elseif ($printMode) {
             $inventaire = [];
             $p = 1;
             $last = 1;
@@ -284,7 +308,11 @@ class StockController extends Controller
         $categories = $this->produitModel->getCategories();
         
         // Totaux globaux (non paginés pour le résumé)
-        $totaux = $this->stockModel->getInventaireTotaux($filters);
+        if (!empty($filters['date_stock'])) {
+            $totaux = ['pleines' => 0, 'vides' => 0, 'caisses_pleine' => 0, 'caisses_vide' => 0, 'valeur' => 0, 'nb_produits' => 0]; $ids = [];
+            foreach ($allInventaire as $item) { $totaux['pleines'] += (int) $item['quantite_pleine']; $totaux['vides'] += (int) $item['quantite_vide']; $totaux['caisses_pleine'] += (float) $item['caisses_pleine']; $totaux['caisses_vide'] += (float) $item['caisses_vide']; $totaux['valeur'] += (float) $item['caisses_pleine'] * (float) ($item['prix_vente_caisses'] ?? 0); $ids[$item['produit_id']] = true; }
+            $totaux['nb_produits'] = count($ids);
+        } else { $totaux = $this->stockModel->getInventaireTotaux($filters); }
         
         $this->view('stocks/inventaire', [
             'inventaire' => $inventaire,
@@ -309,7 +337,8 @@ class StockController extends Controller
     private function exportInventaireExcel($filters)
     {
         $this->requireAuth();
-        $data = [];
+        $data = !empty($filters['date_stock']) ? $this->stockModel->getHistoricalInventory($filters['date_stock'], $filters) : [];
+        if (empty($filters['date_stock'])) {
         $page = 1;
         $last = 1;
         $perPage = 1000;
@@ -319,6 +348,7 @@ class StockController extends Controller
             $last = (int)$result['last_page'];
             $page++;
         } while ($page <= $last);
+        }
         
         $filename = "inventaire_stock_" . date('Y-m-d_H-i') . ".csv";
         header('Content-Type: text/csv; charset=utf-8');

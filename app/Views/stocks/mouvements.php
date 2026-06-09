@@ -70,10 +70,8 @@ ob_start();
                     <option value="transfert" <?= ($filters['type'] ?? '') == 'transfert' ? 'selected' : '' ?>>Transferts</option>
                 </select>
             </div>
-            <div class="w-40">
-                <label class="label">Date</label>
-                <input type="date" name="date" class="input" value="<?= $filters['date'] ?? '' ?>">
-            </div>
+            <div class="w-40"><label class="label">Date debut</label><input type="date" name="date_debut" class="input" value="<?= $filters['date_debut'] ?? '' ?>"></div>
+            <div class="w-40"><label class="label">Date fin</label><input type="date" name="date_fin" class="input" value="<?= $filters['date_fin'] ?? '' ?>"></div>
             <div class="flex gap-2">
                 <button type="submit" class="btn btn-primary mr-2">Filtrer</button>
                 <a href="<?= url('stocks/mouvements') ?>" class="btn btn-secondary">Reset</a>

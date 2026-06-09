@@ -1,5 +1,7 @@
-﻿<?php 
+<?php 
 $pageTitle = 'Nouvelle vente';
+$autoriserInterchangeEmballages = !empty($autoriser_interchange_emballages);
+
 ob_start();
 ?>
 
@@ -19,7 +21,7 @@ ob_start();
                         <label class="label">Client *</label>
                         <input type="search" x-model="clientSearch" class="input mb-2" placeholder="Rechercher un client...">
                         <select x-model="client_id" class="input" required>
-                            <option value="">SÃ©lectionner un client</option>
+                            <option value="">Sélectionner un client</option>
                             <template x-for="c in filteredClients()" :key="c.id">
                                 <option :value="c.id" x-text="c.nom + (c.zone_nom ? ' (' + c.zone_nom + ')' : '')"></option>
                             </template>
@@ -34,7 +36,7 @@ ob_start();
                         </select>
                     </div>
                     <div>
-                        <label class="label">NÂ° Facture</label>
+                        <label class="label">N° Facture</label>
                         <input type="text" value="<?= htmlspecialchars($numero_facture) ?>" class="input bg-gray-50" readonly>
                     </div>
                 </div>
@@ -63,6 +65,7 @@ ob_start();
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Stock (cs)</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Prix/Caisse</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Caisses</th>
+                                    <?php if (!$autoriserInterchangeEmballages): ?><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Emballages reçus</th><?php endif; ?>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Sous-total</th>
                                     <th class="px-4 py-3"></th>
                                 </tr>
@@ -72,7 +75,7 @@ ob_start();
                                     <tr>
                                         <td class="px-4 py-2">
                                             <select x-model="ligne.produit_id" class="input w-full" @change="onProduitChange(ligne)" required>
-                                                <option value="">SÃ©lectionner</option>
+                                                <option value="">Sélectionner</option>
                                                 <template x-for="p in produits" :key="p.id">
                                                     <option :value="p.id" x-text="p.nom"></option>
                                                 </template>
@@ -87,6 +90,11 @@ ob_start();
                                         <td class="px-4 py-2">
                                             <input type="number" x-model.number="ligne.caisses" class="input w-24" min="1" step="1" required @input="ligne.caisses = Math.round(ligne.caisses || 0); calculateTotals()">
                                         </td>
+                                        <?php if (!$autoriserInterchangeEmballages): ?>
+                                        <td class="px-4 py-2">
+                                            <input type="number" x-model.number="ligne.caisses_vides_recues" class="input w-28" min="0" step="1" @input="ligne.caisses_vides_recues = Math.max(0, Math.round(ligne.caisses_vides_recues || 0))">
+                                        </td>
+                                        <?php endif; ?>
                                         <td class="px-4 py-2 text-sm font-medium">
                                             <span x-text="App.formatMoney((ligne.caisses * (ligne.prix_caisse || 0)), (window.DEVISE || 'CDF'))"></span>
                                         </td>
@@ -107,7 +115,7 @@ ob_start();
                             </tbody>
                             <tfoot class="bg-gray-50 dark:bg-gray-700">
                                 <tr>
-                                    <td colspan="4" class="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">
+                                    <td colspan="<?= $autoriserInterchangeEmballages ? '4' : '5' ?>" class="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">
                                         Total HT:
                                     </td>
                                     <td class="px-4 py-3 font-bold text-gray-900 dark:text-white">
@@ -116,7 +124,7 @@ ob_start();
                                     <td></td>
                                 </tr>
                                 <tr>
-                                    <td colspan="4" class="px-4 py-2 text-right font-medium text-gray-900 dark:text-white">
+                                    <td colspan="<?= $autoriserInterchangeEmballages ? '4' : '5' ?>" class="px-4 py-2 text-right font-medium text-gray-900 dark:text-white">
                                         TVA (<?= $tva ?>%):
                                     </td>
                                     <td class="px-4 py-2 text-gray-900 dark:text-white">
@@ -125,7 +133,7 @@ ob_start();
                                     <td></td>
                                 </tr>
                                 <tr class="bg-primary-50 dark:bg-primary-900/50">
-                                    <td colspan="4" class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">
+                                    <td colspan="<?= $autoriserInterchangeEmballages ? '4' : '5' ?>" class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">
                                         Total TTC:
                                     </td>
                                     <td class="px-4 py-3 font-bold text-primary-600 dark:text-primary-400 text-lg">
@@ -138,7 +146,8 @@ ob_start();
                     </div>
                 </div>
 
-                <!-- Emballages recus -->
+                <?php if ($autoriserInterchangeEmballages): ?>
+                <!-- Emballages reçus -->
                 <div class="mb-6 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
                     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-3">
                         <label class="label mb-0">Emballages recus</label>
@@ -159,6 +168,7 @@ ob_start();
                         </template>
                     </div>
                 </div>
+                <?php endif; ?>
                 
                 <!-- Billetage -->
                 <div class="mb-6 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
@@ -218,7 +228,7 @@ document.addEventListener('alpine:init', () => {
         clientSearch: '',
         emplacement_id: '<?= $emplacements[0]['id'] ?? '' ?>',
         notes: '',
-        lignes: [{ produit_id: '', caisses: 0, prix_caisse: 0 }],
+        lignes: [{ produit_id: '', caisses: 0, caisses_vides_recues: 0, prix_caisse: 0 }],
         clients: <?= json_encode($clients) ?>,
         produits: <?= json_encode($produits) ?>,
         tva: <?= $tva ?>,
@@ -229,6 +239,7 @@ document.addEventListener('alpine:init', () => {
         coupures: { CDF: [50000, 20000, 10000, 5000, 1000, 500, 100], USD: [100, 50, 20, 10, 5, 1] },
         billetage: { CDF: {}, USD: {} },
         emballages_recus: {},
+        autoriserInterchange: <?= $autoriserInterchangeEmballages ? 'true' : 'false' ?>,
 
         init() {
             this.calculateTotals();
@@ -248,12 +259,16 @@ document.addEventListener('alpine:init', () => {
         },
 
         totalEmballagesRecus() {
+            if (!this.autoriserInterchange) {
+                return (this.lignes || []).reduce((sum, ligne) => sum + Math.max(0, Math.round(parseFloat(ligne.caisses_vides_recues) || 0)), 0);
+            }
             return Object.values(this.emballages_recus || {}).reduce((sum, value) => {
                 return sum + Math.max(0, Math.round(parseFloat(value) || 0));
             }, 0);
         },
 
         getEmballagesRecusPayload() {
+            if (!this.autoriserInterchange) return [];
             return Object.entries(this.emballages_recus || {})
                 .map(([produitId, caisses]) => ({
                     produit_id: parseInt(produitId),
@@ -332,7 +347,11 @@ document.addEventListener('alpine:init', () => {
                 if (detailsLignes.length === 0) throw new Error('Ajoutez au moins un produit');
 
                 if (this.totalEmballagesRecus() > this.totalCaissesVendues()) {
-                    throw new Error('Le total des emballages recus ne peut pas depasser le total des caisses vendues.');
+                    throw new Error('Le total des emballages reçus ne peut pas dépasser le total des caisses vendues.');
+                }
+                if (!this.autoriserInterchange) {
+                    const ligneInvalide = detailsLignes.find(l => Math.max(0, Math.round(parseFloat(l.caisses_vides_recues) || 0)) > Math.max(0, Math.round(parseFloat(l.caisses) || 0)));
+                    if (ligneInvalide) throw new Error('Les emballages reçus ne peuvent pas dépasser les caisses vendues sur une ligne.');
                 }
 
                 if (this.hasBilletage() && Math.abs(this.totalBilletage() - this.totalTtc) > 0.01) {
@@ -355,7 +374,7 @@ document.addEventListener('alpine:init', () => {
                         produit_id: parseInt(l.produit_id),
                         quantite: caisses * btlParCaisse,
                         quantite_caisses: caisses,
-                        caisses_vides_recues: 0,
+                        caisses_vides_recues: this.autoriserInterchange ? 0 : Math.max(0, Math.round(parseFloat(l.caisses_vides_recues) || 0)),
                         prix_unitaire: prixCaisseBase / btlParCaisse
                     };
                 });
@@ -366,7 +385,7 @@ document.addEventListener('alpine:init', () => {
                     emplacement_id: parseInt(this.emplacement_id),
                     notes: this.notes,
                     details: details,
-                    emballages_recus: emballagesRecus,
+                    emballages_recus: this.autoriserInterchange ? emballagesRecus : [],
                     billetage: this.billetage
                 });
                 

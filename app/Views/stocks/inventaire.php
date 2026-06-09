@@ -21,6 +21,7 @@ if (!empty($filters['emplacement_id'])) {
 if (!empty($filters['categorie'])) {
     $baseQuery['categorie'] = $filters['categorie'];
 }
+if (!empty($filters['date_stock'])) { $baseQuery['date_stock'] = $filters['date_stock']; }
 $printUrl = '?' . http_build_query(array_merge($baseQuery, ['print' => 1]));
 $exportUrl = '?' . http_build_query(array_merge($baseQuery, ['export' => 'excel']));
 ob_start();
@@ -93,6 +94,7 @@ ob_start();
                     <?php endforeach; ?>
                 </select>
             </div>
+            <div><label class="text-sm font-medium">Stock a la date</label><input type="date" name="date_stock" max="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($filters['date_stock'] ?? '') ?>" class="input py-1.5 w-44"></div>
             <div class="flex gap-2 ml-auto">
                 <button type="submit" class="btn-primary py-1.5 px-4 mr-2">Filtrer</button>
                 <a href="<?= url('stocks/inventaire') ?>" class="btn-secondary py-1.5 px-4">Réinitialiser</a>

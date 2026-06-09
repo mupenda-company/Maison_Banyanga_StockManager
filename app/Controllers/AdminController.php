@@ -354,7 +354,7 @@ class AdminController extends Controller
             'nom_entreprise', 'logo', 'couleur_primaire',
             'adresse', 'telephone', 'email_contact',
             'contact', 'rccm', 'id_nat', 'nif', 'numero_compte',
-            'devise', 'taux_change', 'taux_tva'
+            'devise', 'taux_change', 'taux_tva', 'autoriser_interchange_emballages'
         ];
         
         foreach ($allowedParams as $param) {

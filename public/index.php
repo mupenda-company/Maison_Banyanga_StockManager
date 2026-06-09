@@ -159,6 +159,14 @@ $routes = [
     'GET::/pertes/stats' => ['PerteController', 'stats'],
     
     // Dépenses
+    // Manquants agents
+    'GET::/manquants' => ['ManquantController', 'index'],
+    'GET::/manquants/create' => ['ManquantController', 'create'],
+    'POST::/api/manquants' => ['ManquantController', 'store'],
+    'DELETE::/api/manquants/(\d+)' => ['ManquantController', 'delete'],
+    'POST::/api/manquants/(\d+)/paiement' => ['ManquantController', 'payer'],
+    'GET::/manquants/export' => ['ManquantController', 'export'],
+
     'GET::/depenses' => ['DepenseController', 'index'],
     'GET::/depenses/create' => ['DepenseController', 'create'],
     'GET::/depenses/print' => ['DepenseController', 'printAll'],

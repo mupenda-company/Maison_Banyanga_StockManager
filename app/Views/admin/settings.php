@@ -96,6 +96,14 @@ ob_start();
                         <input type="number" x-model.number="params.taux_tva" class="input" min="0" max="100" step="0.1">
                     </div>
                     <div>
+                        <label class="label">Interchange des emballages</label>
+                        <select x-model="params.autoriser_interchange_emballages" class="input">
+                            <option value="1">Autoriser l'interchange</option>
+                            <option value="0">Refuser l'interchange</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Si refusé, les emballages reçus seront saisis produit par produit dans la vente.</p>
+                    </div>
+                    <div>
                         <label class="label">Couleur primaire</label>
                         <div class="flex items-center space-x-3">
                             <input type="color" x-model="params.couleur_primaire" class="w-12 h-10 rounded cursor-pointer">
@@ -163,6 +171,7 @@ function settingsComponent() {
             devise: '<?= htmlspecialchars($params['devise'] ?? 'CDF') ?>',
             taux_change: <?= floatval($params['taux_change'] ?? 2800) ?>,
             taux_tva: <?= floatval($params['taux_tva'] ?? 16) ?>,
+            autoriser_interchange_emballages: '<?= htmlspecialchars($params['autoriser_interchange_emballages'] ?? '1') ?>',
             couleur_primaire: '<?= htmlspecialchars($params['couleur_primaire'] ?? '#3B82F6') ?>'
         },
         logoPreview: '<?= $params['logo'] ? asset('uploads/' . $params['logo']) : '' ?>',
