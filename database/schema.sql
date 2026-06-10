@@ -195,6 +195,40 @@ CREATE TABLE `emprunts_emballages` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
+-- Table structure for table `manquants_agents`
+--
+
+CREATE TABLE `manquants_agents` (
+  `id` int UNSIGNED NOT NULL,
+  `agent_id` int UNSIGNED NOT NULL,
+  `produit_id` int UNSIGNED DEFAULT NULL,
+  `quantite_caisses` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `montant` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `montant_paye` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `date_manquant` date NOT NULL,
+  `date_reglement` date DEFAULT NULL,
+  `motif` text COLLATE utf8mb4_unicode_ci,
+  `notes_reglement` text COLLATE utf8mb4_unicode_ci,
+  `statut` enum('ouvert','partiel','paye','regle') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ouvert',
+  `created_by` int UNSIGNED DEFAULT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Table structure for table `manquant_paiements`
+--
+
+CREATE TABLE `manquant_paiements` (
+  `id` int UNSIGNED NOT NULL,
+  `manquant_id` int UNSIGNED NOT NULL,
+  `montant` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `date_paiement` date NOT NULL,
+  `note` text COLLATE utf8mb4_unicode_ci,
+  `created_by` int UNSIGNED DEFAULT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+--
 -- Table structure for table `missions`
 --
 
@@ -655,6 +689,22 @@ ALTER TABLE `emprunts_emballages`
   ADD KEY `created_by` (`created_by`);
 
 --
+-- Indexes for table `manquants_agents`
+--
+ALTER TABLE `manquants_agents`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_manquants_agent_date` (`agent_id`,`date_manquant`),
+  ADD KEY `idx_manquants_produit` (`produit_id`),
+  ADD KEY `fk_manquants_createur` (`created_by`);
+
+--
+-- Indexes for table `manquant_paiements`
+--
+ALTER TABLE `manquant_paiements`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_manquant_paiements_manquant` (`manquant_id`),
+  ADD KEY `fk_manquant_paiements_user` (`created_by`);
+--
 -- Indexes for table `missions`
 --
 ALTER TABLE `missions`
@@ -898,6 +948,17 @@ ALTER TABLE `emprunts_emballages`
   MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
+-- AUTO_INCREMENT for table `manquants_agents`
+--
+ALTER TABLE `manquants_agents`
+  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
+-- AUTO_INCREMENT for table `manquant_paiements`
+--
+ALTER TABLE `manquant_paiements`
+  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+--
 -- AUTO_INCREMENT for table `missions`
 --
 ALTER TABLE `missions`
@@ -1080,6 +1141,20 @@ ALTER TABLE `emprunts_emballages`
   ADD CONSTRAINT `emprunts_emballages_ibfk_3` FOREIGN KEY (`emplacement_id`) REFERENCES `emplacements` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `emprunts_emballages_ibfk_4` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
+--
+-- Constraints for table `manquants_agents`
+--
+ALTER TABLE `manquants_agents`
+  ADD CONSTRAINT `fk_manquants_agent` FOREIGN KEY (`agent_id`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `fk_manquants_createur` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_manquants_produit` FOREIGN KEY (`produit_id`) REFERENCES `produits` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `manquant_paiements`
+--
+ALTER TABLE `manquant_paiements`
+  ADD CONSTRAINT `fk_manquant_paiements_manquant` FOREIGN KEY (`manquant_id`) REFERENCES `manquants_agents` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_manquant_paiements_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 --
 -- Constraints for table `missions`
 --

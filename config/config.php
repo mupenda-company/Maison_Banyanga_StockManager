@@ -16,7 +16,7 @@ $isLocal = in_array($hostname, ['localhost', '127.0.0.1', '::1'])
 // Configuration de la base de données
 if ($isLocal) {
     define('DB_HOST', 'localhost');
-    define('DB_NAME', 'bralima_logistique');
+    define('DB_NAME', 'mugabo_logistique');
     define('DB_USER', 'root');
     define('DB_PASS', '');
 } else {
@@ -145,3 +145,6 @@ function env($key, $default = null) {
 }
 
 require_once ROOT_PATH . '/app/helpers.php';
+if (file_exists(ROOT_PATH . '/vendor/autoload.php')) {
+    require_once ROOT_PATH . '/vendor/autoload.php';
+}
