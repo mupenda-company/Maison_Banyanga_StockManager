@@ -143,7 +143,7 @@ ob_start();
     </div>
 
     <!-- Récolté ce mois (local) -->
-    <div class="stat-card">
+    <!-- <div class="stat-card">
         <div class="flex items-center justify-between">
             <div class="min-w-0 flex-1 mr-2">
                 <p class="stat-label">Récolte locale</p>
@@ -155,10 +155,10 @@ ob_start();
                 <svg class="w-5 h-5 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
             </div>
         </div>
-        <!-- <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
             Deduction locale ristournes
-        </p> -->
-    </div>
+        </p>
+    </div> -->
 </div>
 
 <!-- Deuxième rangée : Dettes + Panier -->
