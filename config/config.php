@@ -20,6 +20,7 @@ if ($isLocal) {
     define('DB_USER', 'root');
     define('DB_PASS', '');
 } else {
+    // maison banyanga
     define('DB_HOST', 'localhost');
     define('DB_NAME', 'maisonba_bralima_logistique');
     define('DB_USER', 'maisonba_NelsonMupenda');
