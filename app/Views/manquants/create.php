@@ -1,4 +1,6 @@
-<?php $pageTitle = 'Enregistrer un manquant'; ob_start(); ?>
+<?php $pageTitle = 'Enregistrer un manquant'; 
+ob_start(); 
+?>
 <div class="mb-6">
     <a href="<?= url('manquants') ?>" class="text-primary-600 hover:text-primary-700 flex items-center gap-2">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
@@ -39,4 +41,6 @@ document.addEventListener('alpine:init', () => Alpine.data('manquantForm', () =>
     }
 })));
 </script>
-<?php $content = ob_get_clean(); require ROOT_PATH . '/app/Views/layouts/app.php'; ?>
+<?php $content = ob_get_clean(); 
+require ROOT_PATH . '/app/Views/layouts/app.php'; 
+?>

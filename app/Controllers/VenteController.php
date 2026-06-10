@@ -709,50 +709,120 @@ class VenteController extends Controller
             $salesByClient[$cid]['total_restourne'] = ($salesByClient[$cid]['total_restourne'] ?? 0) + $detail['total_restourne'];
         }
         
-        // Générer le CSV
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="ventes_' . date('Y-m-d') . '.csv"');
+        // // Générer le CSV
+        // header('Content-Type: text/csv; charset=utf-8');
+        // header('Content-Disposition: attachment; filename="ventes_' . $dateDebut .' - '. $dateFin .'.csv"');
         
-        $output = fopen('php://output', 'w');
+        // $output = fopen('php://output', 'w');
         
-        // En-têtes CSV: Numéro, Zone, Téléphone, Nom Client, [produits...], Nombre de caisses, Total (CA), Ristourne
-        $headers = ['Numéro', 'Zone', 'Téléphone', 'Nom Client'];
+        // // En-têtes CSV: Numéro, Zone, Téléphone, Nom Client, [produits...], Nombre de caisses, Total (CA), Ristourne
+        // $headers = ['Numero', 'Zone', 'Telephone', 'Nom Client'];
+        // foreach ($produits as $produit) {
+        //     $headers[] = $produit['nom'];
+        // }
+        // $headers[] = 'Nombre de caisses';
+        // $headers[] = 'Total (Chiffre d\'affaire)';
+        // $headers[] = 'Ristourne';
+        // fputcsv($output, $headers);
+        
+        // // Tous les clients, même ceux sans ventes
+        // foreach ($allClients as $client) {
+        //     $cid = $client['id'];
+        //     $hasSales = isset($salesByClient[$cid]);
+        //     $clientData = $hasSales ? $salesByClient[$cid] : null;
+            
+        //     $row = [
+        //         $cid,
+        //         $client['zone_nom'] ?? '',
+        //         $client['telephone'] ?? '',
+        //         $client['nom']
+        //     ];
+            
+        //     $totalCaisses = 0;
+        //     foreach ($produits as $produit) {
+        //         $qty = $hasSales ? ($clientData['produits_qty'][$produit['nom']] ?? 0) : 0;
+        //         $row[] = $qty;
+        //         $totalCaisses += $qty;
+        //     }
+            
+        //     $row[] = $totalCaisses;
+        //     $row[] = $hasSales ? number_format($clientData['total_ttc'], 0) : '0';
+        //     $row[] = $hasSales ? number_format($clientData['ristourne'], 0) : '0';
+            
+        //     fputcsv($output, $row);
+        // }
+        
+        // fclose($output);
+        // exit;
+        require_once ROOT_PATH . '/vendor/autoload.php';
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Ventes');
+
+        // En-têtes en gras
+        $headers = ['Numero', 'Zone', 'Telephone', 'Nom Client'];
         foreach ($produits as $produit) {
             $headers[] = $produit['nom'];
         }
         $headers[] = 'Nombre de caisses';
         $headers[] = 'Total (Chiffre d\'affaire)';
         $headers[] = 'Ristourne';
-        fputcsv($output, $headers);
-        
-        // Tous les clients, même ceux sans ventes
+
+        $sheet->fromArray($headers, null, 'A1');
+
+        // Style header : gras + fond gris
+        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($headers));
+        $sheet->getStyle('A1:' . $lastCol . '1')->applyFromArray([
+            'font' => ['bold' => true],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'D9D9D9']
+            ]
+        ]);
+
+        // Données
+        $rowNum = 2;
         foreach ($allClients as $client) {
             $cid = $client['id'];
             $hasSales = isset($salesByClient[$cid]);
             $clientData = $hasSales ? $salesByClient[$cid] : null;
-            
+
             $row = [
                 $cid,
                 $client['zone_nom'] ?? '',
                 $client['telephone'] ?? '',
                 $client['nom']
             ];
-            
+
             $totalCaisses = 0;
             foreach ($produits as $produit) {
                 $qty = $hasSales ? ($clientData['produits_qty'][$produit['nom']] ?? 0) : 0;
-                $row[] = $qty;
+                $row[] = (int) $qty;   // nombre entier, pas de virgule parasite
                 $totalCaisses += $qty;
             }
-            
-            $row[] = $totalCaisses;
-            $row[] = $hasSales ? number_format($clientData['total_ttc'], 2) : '0.00';
-            $row[] = $hasSales ? number_format($clientData['ristourne'], 2) : '0.00';
-            
-            fputcsv($output, $row);
+
+            $row[] = (int) $totalCaisses;
+            $row[] = $hasSales ? (float) $clientData['total_ttc'] : 0;
+            $row[] = $hasSales ? (float) $clientData['ristourne'] : 0;
+
+            $sheet->fromArray($row, null, 'A' . $rowNum);
+            $rowNum++;
         }
-        
-        fclose($output);
+
+        // Largeur automatique pour toutes les colonnes
+        foreach (range('A', $lastCol) as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        // Téléchargement
+        $filename = 'ventes_' . $dateDebut . '_' . $dateFin . '.xlsx';
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save('php://output');
         exit;
     }
 }

@@ -4,8 +4,14 @@
  */
 
 // Détection local vs serveur — une seule fois, proprement
-$isLocal = in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1', '::1'])
-           || str_starts_with($_SERVER['HTTP_HOST'] ?? '', 'localhost:');
+$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$hostname = explode(':', $host)[0]; // enlève le port éventuel
+
+$isLocal = in_array($hostname, ['localhost', '127.0.0.1', '::1'])
+           || str_starts_with($hostname, 'localhost')
+           || preg_match('/^192\.168\.\d+\.\d+$/', $hostname)  // ← réseau local
+           || preg_match('/^10\.\d+\.\d+\.\d+$/', $hostname)   // ← autre réseau privé
+           || preg_match('/^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/', $hostname); // ← 172.16-31.x.x
 
 // Configuration de la base de données
 if ($isLocal) {
