@@ -20,11 +20,11 @@ if ($isLocal) {
     define('DB_USER', 'root');
     define('DB_PASS', '');
 } else {
-    // suncity
+    // maison banyanga
     define('DB_HOST', 'localhost');
-    define('DB_NAME', 'suncity_bralima_logistique');
-    define('DB_USER', 'suncity_NelsonMupenda');
-    define('DB_PASS', 'HgK9Em3H=}lJ_[jj');
+    define('DB_NAME', 'maisonba_bralima_logistique');
+    define('DB_USER', 'maisonba_NelsonMupenda');
+    define('DB_PASS', '?D@WiIAJU!HF^S{d');
 }
 define('DB_CHARSET', 'utf8mb4');
 
