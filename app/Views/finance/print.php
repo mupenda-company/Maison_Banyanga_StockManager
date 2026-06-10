@@ -50,7 +50,7 @@ $nomEntreprise = (new Parametre())->get('nom_entreprise', APP_NAME);
             <div class="summary-card"><div class="summary-label">TVA collectee</div><div class="summary-value"><?= format_money_converted($tvaCollectee) ?></div></div>
             <div class="summary-card"><div class="summary-label">Pertes</div><div class="summary-value"><?= format_money_converted($pertesValeur) ?></div></div>
             <div class="summary-card"><div class="summary-label">Depenses</div><div class="summary-value"><?= format_money_converted($totalDepenses) ?></div></div>
-            <div class="summary-card"><div class="summary-label">Recolte locale</div><div class="summary-value"><?= format_money_converted($totalRecolteLocale) ?></div></div>
+            <!-- <div class="summary-card"><div class="summary-label">Recolte locale</div><div class="summary-value"><?= format_money_converted($totalRecolteLocale) ?></div></div> -->
         </section>
 
         <section class="section">
