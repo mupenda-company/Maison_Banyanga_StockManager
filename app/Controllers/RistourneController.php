@@ -36,6 +36,14 @@ class RistourneController extends Controller
             $this->exportExcel($ristournes, $filters);
             return;
         }
+
+        if ($printMode) {
+            $this->view('ristournes/print', [
+                'ristournes' => $ristournes,
+                'filters' => $filters
+            ]);
+            return;
+        }
         
         $this->view('ristournes/index', [
             'ristournes' => $ristournes,

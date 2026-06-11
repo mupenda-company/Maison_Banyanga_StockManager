@@ -39,6 +39,42 @@ class StockController extends Controller
             return;
         }
 
+        if (isset($_GET['print']) && (string) $_GET['print'] === '1') {
+            if (!empty($filters['date_stock'])) {
+                $stocks = $this->stockModel->getHistoricalInventory($filters['date_stock'], $filters);
+            } else {
+                $stocks = [];
+                $p = 1;
+                $last = 1;
+                do {
+                    $result = $this->stockModel->getAllPaginated($p, 500, $filters);
+                    $stocks = array_merge($stocks, $result['data']);
+                    $last = (int) $result['last_page'];
+                    $p++;
+                } while ($p <= $last);
+            }
+
+            $emplacements = $this->emplacementModel->getWithStock();
+            if (!empty($filters['date_stock'])) {
+                foreach ($emplacements as &$emplacement) {
+                    $emplacement['total_caisses_pleine'] = 0;
+                    foreach ($stocks as $stock) {
+                        if ((int) $stock['emplacement_id'] === (int) $emplacement['id']) {
+                            $emplacement['total_caisses_pleine'] += (float) $stock['caisses_pleine'];
+                        }
+                    }
+                }
+                unset($emplacement);
+            }
+
+            $this->view('stocks/print', [
+                'stocks' => $stocks,
+                'emplacements' => $emplacements,
+                'filters' => $filters
+            ]);
+            return;
+        }
+
         $page = (int) ($_GET['page'] ?? 1);
         $perPage = 5;
         
@@ -343,7 +379,7 @@ class StockController extends Controller
             $totaux['nb_produits'] = count($ids);
         } else { $totaux = $this->stockModel->getInventaireTotaux($filters); }
         
-        $this->view('stocks/inventaire', [
+        $viewData = [
             'inventaire' => $inventaire,
             'produits' => $produits,
             'emplacements' => $emplacements,
@@ -357,7 +393,14 @@ class StockController extends Controller
                 'total' => $total,
                 'per_page' => $perPage
             ]
-        ]);
+        ];
+
+        if ($printMode) {
+            $this->view('stocks/print-inventaire', $viewData);
+            return;
+        }
+
+        $this->view('stocks/inventaire', $viewData);
     }
 
     /**
@@ -504,14 +547,21 @@ class StockController extends Controller
             'per_page' => $perPage
         ];
         
-        $this->view('stocks/mouvements', [
+        $viewData = [
             'mouvements' => $mouvements,
             'produits' => $produits,
             'emplacements' => $emplacements,
             'filters' => $filters,
             'pagination' => $pagination,
             'print_mode' => $printMode
-        ]);
+        ];
+
+        if ($printMode) {
+            $this->view('stocks/print-mouvements', $viewData);
+            return;
+        }
+
+        $this->view('stocks/mouvements', $viewData);
     }
 
     /**

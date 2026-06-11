@@ -50,6 +50,16 @@ class PerteController extends Controller
         // Stats du mois
         $stats = $this->perteModel->getStats(date('Y-m-01'), date('Y-m-d'));
         $pertesParAgent = $this->perteModel->getByAgent($filters['date_debut'] ?: date('Y-m-01'), $filters['date_fin'] ?: date('Y-m-d'));
+
+        if ($printMode) {
+            $this->view('pertes/print', [
+                'pertes' => $pertes,
+                'filters' => $filters,
+                'stats' => $stats,
+                'pertesParAgent' => $pertesParAgent
+            ]);
+            return;
+        }
         
         $this->view('pertes/index', [
             'pertes' => $pertes,

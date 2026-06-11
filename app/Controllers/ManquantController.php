@@ -26,6 +26,15 @@ class ManquantController extends Controller
             return $this->exportRows($rows);
         }
 
+        if (isset($_GET['print'])) {
+            $this->view('manquants/print', [
+                'manquants' => $rows,
+                'resume' => $this->model->getSummaryByAgent($filters),
+                'filters' => $filters
+            ]);
+            return;
+        }
+
         $this->view('manquants/index', [
             'manquants' => $rows,
             'resume' => $this->model->getSummaryByAgent($filters),

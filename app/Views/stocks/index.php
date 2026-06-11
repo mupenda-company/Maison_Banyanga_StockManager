@@ -1,5 +1,6 @@
 <?php 
 $pageTitle = 'Gestion des stocks';
+$printUrl = '?' . http_build_query(array_merge($_GET, ['print' => 1]));
 ob_start();
 ?>
 
@@ -108,7 +109,7 @@ ob_start();
         </svg>
         Historique mouvements
     </a>
-    <button type="button" onclick="window.print()" class="btn-secondary">Imprimer</button>
+    <button type="button" onclick="window.open('<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>','_blank')" class="btn-secondary">Imprimer</button>
     <?php if (!empty($filters['date_stock'])): ?><span class="badge-info">Etat au <?= date('d/m/Y', strtotime($filters['date_stock'])) ?></span><?php endif; ?>
     <?php if (can('stock.gerer')): ?>
     <button onclick="openTransfertModal()" class="btn btn-primary">
