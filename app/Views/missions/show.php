@@ -2,6 +2,35 @@
 $pageTitle = 'Détail mission';
 $isRestourne = (($mission['type_mission'] ?? 'vente') === 'ristourne');
 $firstChargement = $mission['chargements'][0] ?? [];
+$retourMissionLignes = [];
+if (!$isRestourne) {
+    foreach ($mission['chargements'] ?? [] as $item) {
+        $partiAvec = (int) ($item['caisses_total'] ?? 0);
+        $venduSysteme = (int) ($item['caisses_vendues_auto'] ?? $item['caisses_vendues'] ?? 0);
+        $retourPleinAttendu = (int) ($item['caisses_a_remettre_pleines'] ?? max(0, $partiAvec - $venduSysteme));
+        $retourVideAttendu = (int) ($item['caisses_a_remettre_vides'] ?? $venduSysteme);
+        $btlParCaisse = (int) ($item['bouteilles_par_caisses'] ?? 24);
+        if ($btlParCaisse <= 0) {
+            $btlParCaisse = 24;
+        }
+        $prixCaisse = (float) ($item['prix_caisse'] ?? $item['prix_vente_caisses'] ?? 0);
+        if ($prixCaisse <= 0) {
+            $prixCaisse = (float) ($item['prix_vente_unitaire'] ?? 0) * $btlParCaisse;
+        }
+        $retourMissionLignes[] = [
+            'produit_id' => (int) ($item['produit_id'] ?? 0),
+            'produit_nom' => (string) ($item['produit_nom'] ?? ''),
+            'produit_code' => (string) ($item['produit_code'] ?? ''),
+            'parti_avec' => $partiAvec,
+            'vendu_systeme' => $venduSysteme,
+            'retour_plein_attendu' => $retourPleinAttendu,
+            'retour_vide_attendu' => $retourVideAttendu,
+            'retour_plein_physique' => (int) ($item['caisses_retournees_physiques'] ?? $retourPleinAttendu),
+            'retour_vide_physique' => (int) ($item['caisses_vides_retournees_physiques'] ?? $retourVideAttendu),
+            'prix_caisse' => $prixCaisse,
+        ];
+    }
+}
 ob_start();
 ?>
 
@@ -472,6 +501,9 @@ ob_start();
             justification_cloture: '',
             isRestourne: <?= $isRestourne ? 'true' : 'false' ?>,
             montantAttendu: <?= (float) ($isRestourne ? ($mission['montant_livre'] ?? 0) : ($mission['montant_attendu'] ?? 0)) ?>,
+            lignesRetour: <?= htmlspecialchars(json_encode($retourMissionLignes, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?>,
+            retours: Object.fromEntries((<?= htmlspecialchars(json_encode($retourMissionLignes, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?> || []).map(l => [l.produit_id, l.retour_plein_physique])),
+            videsRetournes: Object.fromEntries((<?= htmlspecialchars(json_encode($retourMissionLignes, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?> || []).map(l => [l.produit_id, l.retour_vide_physique])),
             coupures: { CDF: [50000, 20000, 10000, 5000, 1000, 500, 100], USD: [100, 50, 20, 10, 5, 1] },
             billetage: { CDF: {}, USD: {} },
             totalBilletage() {
@@ -484,6 +516,31 @@ ob_start();
                 });
                 return total;
             },
+            retourPlein(produitId) {
+                return Math.max(0, parseInt(this.retours[produitId] || 0));
+            },
+            retourVide(produitId) {
+                return Math.max(0, parseInt(this.videsRetournes[produitId] || 0));
+            },
+            venduPhysique(ligne) {
+                return Math.max(0, (parseInt(ligne.parti_avec) || 0) - this.retourPlein(ligne.produit_id));
+            },
+            montantPhysique() {
+                if (this.isRestourne) return this.montantAttendu;
+                return (this.lignesRetour || []).reduce((total, ligne) => total + (this.venduPhysique(ligne) * (parseFloat(ligne.prix_caisse) || 0)), 0);
+            },
+            ecartSystemePhysique() {
+                return this.montantPhysique() - this.montantAttendu;
+            },
+            totalRetourPlein() {
+                return (this.lignesRetour || []).reduce((total, ligne) => total + this.retourPlein(ligne.produit_id), 0);
+            },
+            totalRetourVide() {
+                return (this.lignesRetour || []).reduce((total, ligne) => total + this.retourVide(ligne.produit_id), 0);
+            },
+            montantReferenceBilletage() {
+                return this.isRestourne ? this.montantAttendu : this.montantPhysique();
+            },
             async submit() {
                 const ok = await App.confirm({
                     title: 'Clôturer la mission ?',
@@ -495,14 +552,16 @@ ob_start();
                 if (!ok) return;
                 this.loading = true;
                 try {
-                    if (this.totalBilletage() > 0 && Math.abs(this.totalBilletage() - this.montantAttendu) > 0.01) {
+                    if (false && this.totalBilletage() > 0 && Math.abs(this.totalBilletage() - this.montantAttendu) > 0.01) {
                         throw new Error('Le billetage ne correspond pas au montant attendu.');
                     }
 
                     const payload = {
                         justification_cloture: this.justification_cloture,
-                        montant_encaisse: this.totalBilletage() > 0 ? this.totalBilletage() : this.montantAttendu,
-                        billetage: this.billetage
+                        montant_encaisse: this.totalBilletage() > 0 ? this.totalBilletage() : this.montantReferenceBilletage(),
+                        billetage: this.billetage,
+                        retours: this.retours,
+                        vides_retournes: this.videsRetournes
                     };
 
                     await App.api('/api/missions/<?= $mission['id'] ?>/terminer', 'POST', payload);
@@ -591,7 +650,7 @@ ob_start();
                             <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
                                 <div class="flex items-center justify-between mb-3">
                                     <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">Billetage</p>
-                                    <p class="text-sm font-semibold" :class="Math.abs(totalBilletage() - montantAttendu) <= 0.01 ? 'text-green-600' : 'text-red-600'" x-text="'Ecart: ' + App.formatMoneyConverted(totalBilletage() - montantAttendu, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></p>
+                                    <p class="text-sm font-semibold" :class="Math.abs(totalBilletage() - montantReferenceBilletage()) <= 0.01 ? 'text-green-600' : 'text-red-600'" x-text="'Ecart: ' + App.formatMoneyConverted(totalBilletage() - montantReferenceBilletage(), (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></p>
                                 </div>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
@@ -621,6 +680,75 @@ ob_start();
                             </div>
 
                             <?php if (!$isRestourne): ?>
+                            <div class="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <div class="px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+                                    <p class="text-sm font-semibold text-gray-900 dark:text-white">Retour physique du vendeur</p>
+                                    <p class="text-xs text-gray-500 mt-1">Completez les caisses pleines et les emballages réellement revenus avec le vendeur.</p>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                                    <div class="p-3 border rounded-lg">
+                                        <p class="text-[11px] uppercase text-gray-500">Montant ventes système</p>
+                                        <p class="text-lg font-bold text-primary-600" x-text="App.formatMoneyConverted(montantAttendu, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></p>
+                                    </div>
+                                    <div class="p-3 border rounded-lg">
+                                        <p class="text-[11px] uppercase text-gray-500">Montant dû physique</p>
+                                        <p class="text-lg font-bold text-green-600" x-text="App.formatMoneyConverted(montantPhysique(), (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></p>
+                                    </div>
+                                    <div class="p-3 border rounded-lg">
+                                        <p class="text-[11px] uppercase text-gray-500">Ecart physique / système</p>
+                                        <p class="text-lg font-bold" :class="Math.abs(ecartSystemePhysique()) <= 0.01 ? 'text-green-600' : 'text-red-600'" x-text="App.formatMoneyConverted(ecartSystemePhysique(), (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></p>
+                                    </div>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full text-sm">
+                                        <thead class="bg-white dark:bg-gray-800">
+                                            <tr class="text-left text-[11px] uppercase tracking-wide text-gray-500">
+                                                <th class="px-4 py-3">Produit</th>
+                                                <th class="px-4 py-3 text-right">Parti avec</th>
+                                                <th class="px-4 py-3 text-right">Vendu système</th>
+                                                <th class="px-4 py-3 text-right">Retour plein attendu</th>
+                                                <th class="px-4 py-3 text-right">Retour plein physique</th>
+                                                <th class="px-4 py-3 text-right">Emballage attendu</th>
+                                                <th class="px-4 py-3 text-right">Emballage physique</th>
+                                                <th class="px-4 py-3 text-right">Montant physique</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
+                                            <template x-for="ligne in lignesRetour" :key="'retour-' + ligne.produit_id">
+                                                <tr>
+                                                    <td class="px-4 py-3">
+                                                        <div class="font-medium text-gray-900 dark:text-white" x-text="ligne.produit_nom"></div>
+                                                        <div class="text-xs text-gray-500" x-text="ligne.produit_code"></div>
+                                                    </td>
+                                                    <td class="px-4 py-3 text-right font-medium" x-text="ligne.parti_avec + ' cs'"></td>
+                                                    <td class="px-4 py-3 text-right font-medium text-green-600" x-text="ligne.vendu_systeme + ' cs'"></td>
+                                                    <td class="px-4 py-3 text-right font-medium text-orange-600" x-text="ligne.retour_plein_attendu + ' cs'"></td>
+                                                    <td class="px-4 py-3 text-right">
+                                                        <input type="number" min="0" :max="ligne.parti_avec" step="1" class="input w-24 text-right" x-model.number="retours[ligne.produit_id]">
+                                                        <p class="text-[11px] mt-1" :class="retourPlein(ligne.produit_id) - ligne.retour_plein_attendu === 0 ? 'text-gray-500' : 'text-red-600'" x-text="'Ecart: ' + (retourPlein(ligne.produit_id) - ligne.retour_plein_attendu) + ' cs'"></p>
+                                                    </td>
+                                                    <td class="px-4 py-3 text-right font-medium text-purple-600" x-text="ligne.retour_vide_attendu + ' cs'"></td>
+                                                    <td class="px-4 py-3 text-right">
+                                                        <input type="number" min="0" step="1" class="input w-24 text-right" x-model.number="videsRetournes[ligne.produit_id]">
+                                                        <p class="text-[11px] mt-1" :class="retourVide(ligne.produit_id) - ligne.retour_vide_attendu === 0 ? 'text-gray-500' : 'text-red-600'" x-text="'Ecart: ' + (retourVide(ligne.produit_id) - ligne.retour_vide_attendu) + ' cs'"></p>
+                                                    </td>
+                                                    <td class="px-4 py-3 text-right font-semibold" x-text="App.formatMoneyConverted(venduPhysique(ligne) * ligne.prix_caisse, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                        <tfoot class="bg-gray-50 dark:bg-gray-900/50">
+                                            <tr>
+                                                <td colspan="4" class="px-4 py-3 text-right font-bold">Totaux physiques</td>
+                                                <td class="px-4 py-3 text-right font-bold" x-text="totalRetourPlein() + ' cs'"></td>
+                                                <td></td>
+                                                <td class="px-4 py-3 text-right font-bold" x-text="totalRetourVide() + ' cs'"></td>
+                                                <td class="px-4 py-3 text-right font-bold" x-text="App.formatMoneyConverted(montantPhysique(), (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="hidden">
                             <div class="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                                 <div class="px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
                                     <p class="text-sm font-semibold text-gray-900 dark:text-white">Détail automatique par gamme</p>
@@ -659,6 +787,7 @@ ob_start();
                                         </tbody>
                                     </table>
                                 </div>
+                            </div>
                             </div>
                             <?php endif; ?>
 

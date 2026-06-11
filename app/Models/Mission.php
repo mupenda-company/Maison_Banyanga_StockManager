@@ -10,13 +10,17 @@ class Mission extends Model
         'numero_mission', 'type_mission', 'vehicule_id', 'chauffeur_id', 'client_id', 'ristourne_id',
         'date_depart', 'date_retour', 'zone_id', 'notes', 'justification_cloture', 'statut',
         'montant_encaisse', 'montant_ristourne_initial', 'montant_livre',
-        'caisses_vides_retournees', 'created_by'
+        'caisses_vides_retournees', 'manquant_id', 'montant_retour_physique',
+        'ecart_montant_systeme', 'caisses_retournees_physiques',
+        'caisses_vides_retournees_physiques', 'ecart_caisses_pleines',
+        'ecart_caisses_vides', 'created_by'
     ];
 
     private static bool $justificationColumnChecked = false;
     private static bool $chargementDepartColumnChecked = false;
     private static bool $missionTypeColumnChecked = false;
     private static bool $restourneColumnsChecked = false;
+    private static bool $missionReturnColumnsChecked = false;
 
     public function __construct()
     {
@@ -25,6 +29,54 @@ class Mission extends Model
         $this->ensureChargementDepartColumn();
         $this->ensureMissionTypeColumn();
         $this->ensureRestourneColumns();
+        $this->ensureMissionReturnColumns();
+    }
+
+    private function ensureMissionReturnColumns(): void
+    {
+        if (self::$missionReturnColumnsChecked) {
+            return;
+        }
+
+        $columns = [
+            'missions' => [
+                'manquant_id' => "ALTER TABLE missions ADD manquant_id INT UNSIGNED NULL AFTER caisses_vides_retournees",
+                'montant_retour_physique' => "ALTER TABLE missions ADD montant_retour_physique DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER montant_encaisse",
+                'ecart_montant_systeme' => "ALTER TABLE missions ADD ecart_montant_systeme DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER montant_retour_physique",
+                'caisses_retournees_physiques' => "ALTER TABLE missions ADD caisses_retournees_physiques INT NOT NULL DEFAULT 0 AFTER caisses_vides_retournees",
+                'caisses_vides_retournees_physiques' => "ALTER TABLE missions ADD caisses_vides_retournees_physiques INT NOT NULL DEFAULT 0 AFTER caisses_retournees_physiques",
+                'ecart_caisses_pleines' => "ALTER TABLE missions ADD ecart_caisses_pleines INT NOT NULL DEFAULT 0 AFTER caisses_vides_retournees_physiques",
+                'ecart_caisses_vides' => "ALTER TABLE missions ADD ecart_caisses_vides INT NOT NULL DEFAULT 0 AFTER ecart_caisses_pleines",
+            ],
+            'mission_chargements' => [
+                'caisses_retournees_physiques' => "ALTER TABLE mission_chargements ADD caisses_retournees_physiques INT NOT NULL DEFAULT 0 AFTER quantite_retournee",
+                'caisses_vides_retournees_physiques' => "ALTER TABLE mission_chargements ADD caisses_vides_retournees_physiques INT NOT NULL DEFAULT 0 AFTER caisses_retournees_physiques",
+            ],
+            'manquants_agents' => [
+                'mission_id' => "ALTER TABLE manquants_agents ADD mission_id INT UNSIGNED NULL AFTER agent_id",
+                'type_manquant' => "ALTER TABLE manquants_agents ADD type_manquant VARCHAR(30) NOT NULL DEFAULT 'manuel' AFTER mission_id",
+                'quantite_emballages' => "ALTER TABLE manquants_agents ADD quantite_emballages DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER quantite_caisses",
+            ],
+        ];
+
+        foreach ($columns as $table => $tableColumns) {
+            foreach ($tableColumns as $column => $sql) {
+                $exists = (bool) $this->db->fetchColumn(
+                    "SELECT COUNT(*)
+                     FROM information_schema.COLUMNS
+                     WHERE TABLE_SCHEMA = DATABASE()
+                       AND TABLE_NAME = :table_name
+                       AND COLUMN_NAME = :column_name",
+                    ['table_name' => $table, 'column_name' => $column]
+                );
+
+                if (!$exists) {
+                    $this->db->query($sql);
+                }
+            }
+        }
+
+        self::$missionReturnColumnsChecked = true;
     }
 
     private function ensureJustificationClosureColumn(): void
@@ -386,8 +438,14 @@ class Mission extends Model
             $mission['caisses_vides_recues_total'] = (int) ($mission['ventes']['caisses_vides_recues'] ?? 0);
             $mission['caisses_vides_retournees'] = (int) ($mission['caisses_vides_retournees'] ?? 0);
             $mission['retours_vides_total'] = $mission['caisses_vides_retournees'];
-            $mission['caisses_vides_attendues'] = $mission['caisses_vides_recues_total'];
+            $mission['caisses_vides_attendues'] = $mission['caisses_vendues_total'];
             $mission['caisses_vides_ecart'] = $mission['caisses_vides_attendues'] - $mission['caisses_vides_retournees'];
+            $mission['montant_retour_physique'] = (float) ($mission['montant_retour_physique'] ?? 0);
+            $mission['ecart_montant_systeme'] = (float) ($mission['ecart_montant_systeme'] ?? 0);
+            $mission['caisses_retournees_physiques'] = (int) ($mission['caisses_retournees_physiques'] ?? 0);
+            $mission['caisses_vides_retournees_physiques'] = (int) ($mission['caisses_vides_retournees_physiques'] ?? $mission['caisses_vides_retournees']);
+            $mission['ecart_caisses_pleines'] = (int) ($mission['ecart_caisses_pleines'] ?? 0);
+            $mission['ecart_caisses_vides'] = (int) ($mission['ecart_caisses_vides'] ?? 0);
             $mission['montant_ecart'] = round((float) ($mission['montant_encaisse'] ?? 0) - $mission['montant_attendu'], 2);
             $mission['justification_cloture'] = trim((string) ($mission['justification_cloture'] ?? ''));
             
@@ -411,11 +469,20 @@ class Mission extends Model
                 $item['caisses_vides_recues'] = (int) ($videsRecuesParProduit[$produitId] ?? 0);
                 $item['caisses_vides_recues_auto'] = (int) ($venteProduit['caisses_vides_recues'] ?? $item['caisses_vides_recues']);
                 $item['caisses_a_remettre_pleines'] = max(0, $item['quantite_caisses'] - $item['caisses_vendues_auto']);
-                $item['caisses_a_remettre_vides'] = max(0, $item['caisses_vides_recues_auto']);
+                $item['caisses_a_remettre_vides'] = max(0, $item['caisses_vendues_auto']);
+                $item['caisses_retournees_physiques'] = ($mission['statut'] === 'terminee')
+                    ? (int) ($item['caisses_retournees_physiques'] ?? 0)
+                    : $item['caisses_a_remettre_pleines'];
+                $item['caisses_vides_retournees_physiques'] = ($mission['statut'] === 'terminee')
+                    ? (int) ($item['caisses_vides_retournees_physiques'] ?? 0)
+                    : $item['caisses_a_remettre_vides'];
+                $item['ecart_retour_pleines'] = $item['caisses_retournees_physiques'] - $item['caisses_a_remettre_pleines'];
+                $item['ecart_retour_vides'] = $item['caisses_vides_retournees_physiques'] - $item['caisses_a_remettre_vides'];
                 $item['caisses_total'] = $item['quantite_caisses'];
                 $item['stock_depart_bouteilles'] = $stockDepartCaisses * $btlParCaisse;
                 $item['stock_total_bouteilles'] = $item['caisses_total'] * $btlParCaisse;
                 $item['montant_vendu'] = $item['caisses_vendues_auto'] * $prixCaisse;
+                $item['montant_retour_physique'] = max(0, $item['caisses_total'] - $item['caisses_retournees_physiques']) * $prixCaisse;
                 $item['sous_total'] = $item['caisses_total'] * $prixCaisse;
                 $total += $item['sous_total'];
                 $totalCaisses += $item['caisses_total'];
@@ -464,6 +531,8 @@ class Mission extends Model
             // Charger le véhicule et déduire de l'entrepôt
             $stockModel = new Stock();
             $mouvementModel = new MouvementStock();
+            $totalManquantCaisses = 0;
+            $totalManquantMontant = 0.0;
             
             foreach ($chargements as $chargement) {
                 $produit = (new Produit())->find($chargement['produit_id']);
@@ -524,6 +593,8 @@ class Mission extends Model
                     'prix_caisse' => (float) ($produit['prix_vente_caisses'] ?: (($produit['prix_vente_unitaire'] ?? 0) * $bouteillesParCaisse)),
                 ];
                 $this->db->insert('mission_chargements', $chargementInsert);
+                $totalManquantCaisses += $quantiteCaissesFinale;
+                $totalManquantMontant += $quantiteCaissesFinale * (float) $chargementInsert['prix_caisse'];
                 
                 // Transférer du stock principal vers le véhicule
                 $stockModel->updateOrCreate(
@@ -560,7 +631,27 @@ class Mission extends Model
                     'created_by' => $data['created_by']
                 ]);
             }
-            
+            $agentId = (int) ($vehicule['agent_responsable_id'] ?? 0);
+            if (($data['type_mission'] ?? 'vente') === 'vente' && $agentId > 0 && $totalManquantCaisses > 0) {
+                $manquantId = $this->db->insert('manquants_agents', [
+                    'agent_id' => $agentId,
+                    'mission_id' => $missionId,
+                    'type_manquant' => 'mission',
+                    'produit_id' => null,
+                    'quantite_caisses' => $totalManquantCaisses,
+                    'quantite_emballages' => $totalManquantCaisses,
+                    'montant' => round($totalManquantMontant, 2),
+                    'montant_paye' => 0,
+                    'date_manquant' => date('Y-m-d', strtotime($data['date_depart'] ?? 'now')),
+                    'motif' => 'Mission ' . ($data['numero_mission'] ?? $missionId) . ' - chargement initial',
+                    'notes_reglement' => 'Manquant ouvert automatiquement au lancement de la mission.',
+                    'statut' => 'ouvert',
+                    'created_by' => $data['created_by'] ?? ($_SESSION['user_id'] ?? null),
+                ]);
+
+                $this->update($missionId, ['manquant_id' => $manquantId]);
+            }
+
             $this->db->commit();
             return ['success' => true, 'id' => $missionId];
             
@@ -1276,6 +1367,184 @@ class Mission extends Model
 
                 $ventesParProduit[$produitId] = $venteProduit;
             }
+
+            $totalVidesRetournes = 0;
+            $totalCaissesVendues = 0;
+            $totalCaissesRetournees = 0;
+            $totalCaissesRetourAttendues = 0;
+            $totalVidesAttendues = 0;
+            $totalMontantPhysique = 0.0;
+            $totalValeurRetoursPleins = 0.0;
+            $totalValeurChargement = 0.0;
+            $emplacementVehicule = (int) ($mission['vehicule']['emplacement_id'] ?? 0);
+
+            foreach ($chargements as $chargement) {
+                $produitId = (int) ($chargement['produit_id'] ?? 0);
+                if ($produitId <= 0) {
+                    continue;
+                }
+
+                $produit = (new Produit())->find($produitId);
+                if (!$produit) {
+                    continue;
+                }
+
+                $bouteillesParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+                if ($bouteillesParCaisse <= 0) {
+                    $bouteillesParCaisse = 24;
+                }
+
+                $caissesChargees = max(0, (int) ($chargement['caisses_total'] ?? $chargement['quantite_caisses'] ?? 0));
+                $venteProduit = $ventesParProduit[$produitId] ?? [];
+                $caissesVendues = max(0, (int) ($venteProduit['caisses_vendues'] ?? 0));
+                $bouteillesVendues = max(0, (int) ($venteProduit['bouteilles_vendues'] ?? 0));
+                if ($bouteillesVendues <= 0 && $caissesVendues > 0) {
+                    $bouteillesVendues = $caissesVendues * $bouteillesParCaisse;
+                }
+
+                $prixCaisse = (float) ($chargement['prix_caisse'] ?? 0);
+                if ($prixCaisse <= 0) {
+                    $prixCaisse = (float) ($produit['prix_vente_caisses'] ?: (($produit['prix_vente_unitaire'] ?? 0) * $bouteillesParCaisse));
+                }
+
+                $caissesRetourAttendues = max(0, $caissesChargees - $caissesVendues);
+                $caissesVidesAttendues = $caissesVendues;
+                $caissesRetournees = array_key_exists($produitId, $invendus)
+                    ? max(0, (int) $invendus[$produitId])
+                    : $caissesRetourAttendues;
+                $caissesVidesRetournees = array_key_exists($produitId, $vides_retournes)
+                    ? max(0, (int) $vides_retournes[$produitId])
+                    : $caissesVidesAttendues;
+
+                if ($caissesRetournees > $caissesChargees) {
+                    throw new Exception('Retour plein incoherent pour ' . ($produit['nom'] ?? 'produit #' . $produitId) . ' : retour superieur au chargement.');
+                }
+
+                $quantiteRetournee = $caissesRetournees * $bouteillesParCaisse;
+                $caissesVenduesPhysiques = max(0, $caissesChargees - $caissesRetournees);
+                $montantPhysiqueProduit = $caissesVenduesPhysiques * $prixCaisse;
+
+                $totalCaissesVendues += $caissesVendues;
+                $totalCaissesRetournees += $caissesRetournees;
+                $totalVidesRetournes += $caissesVidesRetournees;
+                $totalCaissesRetourAttendues += $caissesRetourAttendues;
+                $totalVidesAttendues += $caissesVidesAttendues;
+                $totalMontantPhysique += $montantPhysiqueProduit;
+                $totalValeurRetoursPleins += $caissesRetournees * $prixCaisse;
+                $totalValeurChargement += $caissesChargees * $prixCaisse;
+
+                $this->db->query(
+                    "UPDATE mission_chargements
+                     SET quantite_vendue = ?, quantite_retournee = ?, caisses_retournees_physiques = ?, caisses_vides_retournees_physiques = ?
+                     WHERE mission_id = ? AND produit_id = ?",
+                    [$bouteillesVendues, $quantiteRetournee, $caissesRetournees, $caissesVidesRetournees, $id, $produitId]
+                );
+
+                // Les caisses pleines retournées restent dans le véhicule.
+
+                if ($caissesVidesRetournees > 0 && $emplacementPrincipalId > 0) {
+                    $quantiteBouteillesVides = $caissesVidesRetournees * $bouteillesParCaisse;
+                    if ($emplacementVehicule > 0) {
+                        $stockVideVehicule = $this->db->fetch(
+                            "SELECT COALESCE(caisses_vide, 0) as caisses_vide
+                             FROM stocks
+                             WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id
+                             LIMIT 1",
+                            ['produit_id' => $produitId, 'emplacement_id' => $emplacementVehicule]
+                        );
+                        $caissesVidesVehicule = max(0, (int) ($stockVideVehicule['caisses_vide'] ?? 0));
+                        $caissesVidesASortirVehicule = min($caissesVidesRetournees, $caissesVidesVehicule);
+                        if ($caissesVidesASortirVehicule > 0) {
+                            $stockModel->updateOrCreate($produitId, $emplacementVehicule, [
+                                'quantite_vide' => -($caissesVidesASortirVehicule * $bouteillesParCaisse),
+                                'caisses_vide' => -$caissesVidesASortirVehicule
+                            ]);
+                            $mouvementModel->create([
+                                'produit_id' => $produitId,
+                                'emplacement_id' => $emplacementVehicule,
+                                'type_mouvement' => 'sortie',
+                                'quantite' => -($caissesVidesASortirVehicule * $bouteillesParCaisse),
+                                'reference_type' => 'mission',
+                                'reference_id' => $id,
+                                'motif' => 'Sortie emballages vides mission ' . $mission['numero_mission'],
+                                'created_by' => $_SESSION['user_id'] ?? ($mission['created_by'] ?? null)
+                            ]);
+                        }
+                    }
+
+                    $stockModel->updateOrCreate($produitId, $emplacementPrincipalId, [
+                        'quantite_vide' => $quantiteBouteillesVides,
+                        'caisses_vide' => $caissesVidesRetournees
+                    ]);
+                    $mouvementModel->create([
+                        'produit_id' => $produitId,
+                        'emplacement_id' => $emplacementPrincipalId,
+                        'type_mouvement' => 'entree',
+                        'quantite' => $quantiteBouteillesVides,
+                        'reference_type' => 'mission',
+                        'reference_id' => $id,
+                        'motif' => 'Retour emballages vides mission ' . $mission['numero_mission'],
+                        'created_by' => $_SESSION['user_id'] ?? ($mission['created_by'] ?? null)
+                    ]);
+                }
+            }
+
+            $montantSysteme = (float) ($mission['montant_attendu'] ?? 0);
+            $ecartMontantSysteme = round($totalMontantPhysique - $montantSysteme, 2);
+            $ecartCaissesPleines = $totalCaissesRetournees - $totalCaissesRetourAttendues;
+            $ecartCaissesVides = $totalVidesRetournes - $totalVidesAttendues;
+            $couvertureManquant = min($totalValeurChargement, max(0, (float) $montant_encaisse) + $totalValeurRetoursPleins);
+
+            $updateData = [
+                'statut' => 'terminee',
+                'date_retour' => date('Y-m-d H:i:s'),
+                'montant_retour_physique' => round($totalMontantPhysique, 2),
+                'ecart_montant_systeme' => $ecartMontantSysteme,
+                'caisses_retournees_physiques' => $totalCaissesRetournees,
+                'caisses_vides_retournees_physiques' => $totalVidesRetournes,
+                'ecart_caisses_pleines' => $ecartCaissesPleines,
+                'ecart_caisses_vides' => $ecartCaissesVides,
+                'caisses_vides_retournees' => $totalVidesRetournes,
+                'montant_encaisse' => $montant_encaisse,
+                'notes' => ($mission['notes'] ?? '') . "\nMission terminee avec retour physique. Vendu systeme: " . $totalCaissesVendues . " cs, retour plein: " . $totalCaissesRetournees . " cs, retour vide: " . $totalVidesRetournes . " cs. Montant physique: " . round($totalMontantPhysique, 2) . ", montant systeme: " . round($montantSysteme, 2) . ", encaisse: " . $montant_encaisse
+            ];
+
+            $justificationCloture = trim((string) $justificationCloture);
+            if ($justificationCloture !== '') {
+                $updateData['justification_cloture'] = $justificationCloture;
+            }
+
+            $manquantId = (int) ($mission['manquant_id'] ?? 0);
+            if ($manquantId <= 0) {
+                $manquantId = (int) $this->db->fetchColumn(
+                    "SELECT id FROM manquants_agents WHERE mission_id = :mission_id AND type_manquant = 'mission' ORDER BY id DESC LIMIT 1",
+                    ['mission_id' => $id]
+                );
+            }
+
+            if ($manquantId > 0) {
+                $statutManquant = ($couvertureManquant + 0.01 >= $totalValeurChargement && $ecartCaissesVides >= 0) ? 'paye' : ($couvertureManquant > 0 ? 'partiel' : 'ouvert');
+                $this->db->query(
+                    "UPDATE manquants_agents
+                     SET montant_paye = :montant_paye,
+                         date_reglement = :date_reglement,
+                         notes_reglement = :notes_reglement,
+                         statut = :statut
+                     WHERE id = :id",
+                    [
+                        'montant_paye' => round($couvertureManquant, 2),
+                        'date_reglement' => $statutManquant === 'paye' ? date('Y-m-d') : null,
+                        'notes_reglement' => 'Cloture mission ' . ($mission['numero_mission'] ?? $id) . ' - retour plein: ' . $totalCaissesRetournees . ' cs, retour vide: ' . $totalVidesRetournes . ' cs, montant encaisse: ' . round((float) $montant_encaisse, 2) . ', montant du physique: ' . round($totalMontantPhysique, 2) . '.',
+                        'statut' => $statutManquant,
+                        'id' => $manquantId,
+                    ]
+                );
+            }
+
+            $this->update($id, $updateData);
+
+            $this->db->commit();
+            return ['success' => true];
 
             $invendusAuto = [];
             $videsRetournesAuto = [];

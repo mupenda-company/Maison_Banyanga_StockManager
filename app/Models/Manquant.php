@@ -4,8 +4,9 @@ class Manquant extends Model
 {
     protected $table = 'manquants_agents';
     protected $fillable = [
-        'agent_id', 'produit_id', 'quantite_caisses', 'montant', 'montant_paye',
-        'date_manquant', 'date_reglement', 'motif', 'notes_reglement', 'statut', 'created_by'
+        'agent_id', 'mission_id', 'type_manquant', 'produit_id', 'quantite_caisses',
+        'quantite_emballages', 'montant', 'montant_paye', 'date_manquant',
+        'date_reglement', 'motif', 'notes_reglement', 'statut', 'created_by'
     ];
 
     public function getWithDetails($filters = [])

@@ -201,8 +201,11 @@ CREATE TABLE `emprunts_emballages` (
 CREATE TABLE `manquants_agents` (
   `id` int UNSIGNED NOT NULL,
   `agent_id` int UNSIGNED NOT NULL,
+  `mission_id` int UNSIGNED DEFAULT NULL,
+  `type_manquant` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'manuel',
   `produit_id` int UNSIGNED DEFAULT NULL,
   `quantite_caisses` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `quantite_emballages` decimal(12,2) NOT NULL DEFAULT '0.00',
   `montant` decimal(15,2) NOT NULL DEFAULT '0.00',
   `montant_paye` decimal(15,2) NOT NULL DEFAULT '0.00',
   `date_manquant` date NOT NULL,
@@ -249,7 +252,14 @@ CREATE TABLE `missions` (
   `montant_restant_admin` decimal(15,2) NOT NULL DEFAULT '0.00',
   `justification_cloture` text COLLATE utf8mb4_unicode_ci,
   `montant_encaisse` decimal(15,2) DEFAULT '0.00',
+  `montant_retour_physique` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `ecart_montant_systeme` decimal(15,2) NOT NULL DEFAULT '0.00',
   `caisses_vides_retournees` int NOT NULL DEFAULT '0',
+  `manquant_id` int UNSIGNED DEFAULT NULL,
+  `caisses_retournees_physiques` int NOT NULL DEFAULT '0',
+  `caisses_vides_retournees_physiques` int NOT NULL DEFAULT '0',
+  `ecart_caisses_pleines` int NOT NULL DEFAULT '0',
+  `ecart_caisses_vides` int NOT NULL DEFAULT '0',
   `statut` enum('en_cours','terminee','annulee') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'en_cours',
   `created_by` int UNSIGNED DEFAULT NULL,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
@@ -269,6 +279,8 @@ CREATE TABLE `mission_chargements` (
   `caisses_deja_dans_vehicule` int NOT NULL DEFAULT '0' COMMENT 'Caisses déjà présentes dans le véhicule au départ',
   `quantite_chargee` int NOT NULL COMMENT 'Quantité en bouteilles',
   `quantite_retournee` int DEFAULT '0' COMMENT 'Quantité retournée à la fin de mission',
+  `caisses_retournees_physiques` int NOT NULL DEFAULT '0',
+  `caisses_vides_retournees_physiques` int NOT NULL DEFAULT '0',
   `quantite_vendue` int DEFAULT '0' COMMENT 'Quantité vendue pendant la mission'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -696,6 +708,8 @@ ALTER TABLE `manquants_agents`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_manquants_agent_date` (`agent_id`,`date_manquant`),
   ADD KEY `idx_manquants_produit` (`produit_id`),
+  ADD KEY `idx_manquants_mission` (`mission_id`),
+  ADD KEY `idx_manquants_type` (`type_manquant`),
   ADD KEY `fk_manquants_createur` (`created_by`);
 
 --
@@ -714,6 +728,7 @@ ALTER TABLE `missions`
   ADD KEY `vehicule_id` (`vehicule_id`),
   ADD KEY `chauffeur_id` (`chauffeur_id`),
   ADD KEY `zone_id` (`zone_id`),
+  ADD KEY `manquant_id` (`manquant_id`),
   ADD KEY `created_by` (`created_by`);
 
 --
