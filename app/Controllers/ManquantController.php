@@ -95,6 +95,33 @@ class ManquantController extends Controller
         return $this->success(null, 'Manquant supprimé');
     }
 
+
+    private function styleHeaderRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $nbCols): void
+    {
+        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($nbCols);
+        $sheet->getStyle('A1:' . $lastCol . '1')->applyFromArray([
+            'font' => ['bold' => true],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'D9D9D9'],
+            ],
+        ]);
+        foreach (range(1, $nbCols) as $col) {
+            $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
+        }
+    }
+
+    // Helper pour envoyer le fichier xlsx au navigateur
+    private function sendXlsx(\PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet, string $filename): void
+    {
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save('php://output');
+        exit;
+    }
+
     public function export()
     {
         $_GET['export'] = 1;
@@ -103,25 +130,29 @@ class ManquantController extends Controller
 
     private function exportRows($rows)
     {
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename=manquants_agents_' . date('Y-m-d_H-i') . '.csv');
-        $out = fopen('php://output', 'w');
-        fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
-        fputcsv($out, ['Date', 'Agent', 'Produit', 'Caisses', 'Montant', 'Payé', 'Reste', 'Statut', 'Motif']);
-        foreach ($rows as $row) {
-            fputcsv($out, [
-                $row['date_manquant'],
-                $row['agent_nom'],
-                $row['produit_nom'] ?: '-',
-                $row['quantite_caisses'],
-                $row['montant'],
-                $row['montant_paye'],
-                $row['reste_montant'],
-                $row['statut'],
-                $row['motif']
-            ]);
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet()->setTitle('Manquants');
+
+        $headers = ['Date', 'Agent', 'Produit', 'Caisses', 'Montant', 'Payé', 'Reste', 'Statut', 'Motif'];
+        $sheet->fromArray($headers, null, 'A1');
+
+        $row = 2;
+        foreach ($rows as $r) {
+            $sheet->fromArray([
+                $r['date_manquant'],
+                $r['agent_nom'],
+                $r['produit_nom'] ?: '-',
+                (float) $r['quantite_caisses'],
+                (float) $r['montant'],
+                (float) $r['montant_paye'],
+                (float) $r['reste_montant'],
+                $r['statut'],
+                $r['motif'],
+            ], null, 'A' . $row++);
         }
-        fclose($out);
-        exit;
+
+        $this->styleHeaderRow($sheet, count($headers));
+        $this->sendXlsx($spreadsheet, 'manquants_agents_' . date('Y-m-d_H-i') . '.xlsx');
     }
+
 }

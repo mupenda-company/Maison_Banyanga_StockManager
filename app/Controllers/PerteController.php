@@ -63,50 +63,76 @@ class PerteController extends Controller
         ]);
     }
 
+    private function styleHeaderRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $nbCols): void
+    {
+        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($nbCols);
+        $sheet->getStyle('A1:' . $lastCol . '1')->applyFromArray([
+            'font' => ['bold' => true],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'D9D9D9'],
+            ],
+        ]);
+        foreach (range(1, $nbCols) as $col) {
+            $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
+        }
+    }
+
+    // Helper pour envoyer le fichier xlsx au navigateur
+    private function sendXlsx(\PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet, string $filename): void
+    {
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save('php://output');
+        exit;
+    }
+
     private function exportExcel($pertes)
     {
         $this->requireAuth();
 
-        $filename = 'pertes_' . date('Y-m-d_H-i') . '.csv';
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename=' . $filename);
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet()->setTitle('Pertes');
 
-        $output = fopen('php://output', 'w');
-        fprintf($output, chr(0xEF) . chr(0xBB) . chr(0xBF));
-        fputcsv($output, ['Date', 'Produit', 'Code', 'Type stock', 'Categorie', 'Quantite', 'Valeur', 'Agent', 'Emplacement', 'Motif']);
+        $headers = ['Date', 'Produit', 'Code', 'Type stock', 'Categorie', 'Quantite', 'Valeur', 'Agent', 'Emplacement', 'Motif'];
+        $sheet->fromArray($headers, null, 'A1');
 
+        $row = 2;
         foreach ($pertes as $perte) {
-            $caisses = (float)($perte['quantite'] ?? 0);
+            $caisses      = (float)($perte['quantite'] ?? 0);
             $btlParCaisse = (int)($perte['bouteilles_par_caisses'] ?? 24);
-            $totalBouteilles = round($caisses * $btlParCaisse);
-            $caissesPleines = intdiv($totalBouteilles, $btlParCaisse);
-            $bouteillesReste = $totalBouteilles % $btlParCaisse;
+            $totalBtl     = round($caisses * $btlParCaisse);
+            $cs           = intdiv($totalBtl, $btlParCaisse);
+            $btlReste     = $totalBtl % $btlParCaisse;
 
-            if ($caissesPleines > 0 && $bouteillesReste > 0) {
-                $quantiteExport = $caissesPleines . ' cs + ' . $bouteillesReste . ' btl';
-            } elseif ($caissesPleines > 0) {
-                $quantiteExport = $caissesPleines . ' cs';
+            if ($cs > 0 && $btlReste > 0) {
+                $qte = $cs . ' cs + ' . $btlReste . ' btl';
+            } elseif ($cs > 0) {
+                $qte = $cs . ' cs';
             } else {
-                $quantiteExport = $totalBouteilles . ' btl';
+                $qte = $totalBtl . ' btl';
             }
 
-            fputcsv($output, [
+            $sheet->fromArray([
                 !empty($perte['date_perte']) ? date('d/m/Y', strtotime($perte['date_perte'])) : '',
                 $perte['produit_nom'] ?? '',
                 $perte['produit_code'] ?? '',
                 $perte['type_stock'] ?? '',
                 $perte['type_perte'] ?? '',
-                $quantiteExport,
-                number_format((float) ($perte['valeur_perte'] ?? 0), 2, '.', ''),
+                $qte,
+                (float)($perte['valeur_perte'] ?? 0),
                 trim(($perte['agent_prenom'] ?? '') . ' ' . ($perte['agent_nom'] ?? '')),
                 $perte['emplacement_nom'] ?? '',
-                $perte['motif'] ?? ''
-            ]);
+                $perte['motif'] ?? '',
+            ], null, 'A' . $row++);
         }
 
-        fclose($output);
-        exit;
+        $this->styleHeaderRow($sheet, count($headers));
+        $this->sendXlsx($spreadsheet, 'pertes_' . date('Y-m-d_H-i') . '.xlsx');
     }
+
     
     /**
      * Formulaire de création

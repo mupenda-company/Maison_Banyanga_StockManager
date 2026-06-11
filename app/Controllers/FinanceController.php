@@ -40,57 +40,122 @@ class FinanceController extends Controller
         $this->view('finance/print', $data);
     }
 
+
+    private function styleHeaderRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $nbCols): void
+    {
+        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($nbCols);
+        $sheet->getStyle('A1:' . $lastCol . '1')->applyFromArray([
+            'font' => ['bold' => true],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'D9D9D9'],
+            ],
+        ]);
+        foreach (range(1, $nbCols) as $col) {
+            $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
+        }
+    }
+
+    // Helper pour envoyer le fichier xlsx au navigateur
+    private function sendXlsx(\PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet, string $filename): void
+    {
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save('php://output');
+        exit;
+    }
+
+
     public function export()
     {
         $this->requireAuth();
         $this->requirePermission('finance.voir');
 
         $data = $this->getFinanceData();
-        $filename = 'detail_finance_' . $data['dateDebut'] . '_' . $data['dateFin'] . '.csv';
 
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename=' . $filename);
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet()->setTitle('Finance');
 
-        $output = fopen('php://output', 'w');
-        fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+        $sheet->fromArray(['Detail financier'], null, 'A1');
+        $sheet->fromArray(['Periode', $data['dateDebut'] . ' au ' . $data['dateFin']], null, 'A2');
 
-        fputcsv($output, ['Detail financier']);
-        fputcsv($output, ['Periode', $data['dateDebut'] . ' au ' . $data['dateFin']]);
-        fputcsv($output, []);
+        // Résumé
+        $sheet->fromArray(['Resume', 'Valeur'], null, 'A4');
+        $resume = [
+            ["Chiffre d'affaires HT",  (float)($data['statsVentes']['total_ht'] ?? 0)],
+            ['TVA collectee',           (float) $data['tvaCollectee']],
+            ["Chiffre d'affaires TTC",  (float) $data['caTotal']],
+            ['Valeur des pertes',       (float) $data['pertesValeur']],
+            ['Depenses',                (float) $data['totalDepenses']],
+            ['Solde net',               (float) $data['benefice']],
+            ['Dettes emballages (caisses)', (int)($data['dettesAppro']['total_dettes'] ?? 0)],
+            ['Panier moyen',            (float)($data['statsVentes']['moyenne_vente'] ?? 0)],
+        ];
+        $row = 5;
+        foreach ($resume as $line) {
+            $sheet->fromArray($line, null, 'A' . $row++);
+        }
 
-        fputcsv($output, ['Resume', 'Valeur']);
-        fputcsv($output, ["Chiffre d'affaires HT", number_format((float)($data['statsVentes']['total_ht'] ?? 0), 2, '.', '')]);
-        fputcsv($output, ['TVA collectee', number_format((float)$data['tvaCollectee'], 2, '.', '')]);
-        fputcsv($output, ["Chiffre d'affaires TTC", number_format((float)$data['caTotal'], 2, '.', '')]);
-        fputcsv($output, ['Valeur des pertes', number_format((float)$data['pertesValeur'], 2, '.', '')]);
-        fputcsv($output, ['Depenses', number_format((float)$data['totalDepenses'], 2, '.', '')]);
-        fputcsv($output, ['Solde net', number_format((float)$data['benefice'], 2, '.', '')]);
-        fputcsv($output, ['Recolte locale', number_format((float)$data['totalRecolteLocale'], 2, '.', '')]);
-        fputcsv($output, ['Dettes emballages (caisses)', (int)($data['dettesAppro']['total_dettes'] ?? 0)]);
-        fputcsv($output, ['Panier moyen', number_format((float)($data['statsVentes']['moyenne_vente'] ?? 0), 2, '.', '')]);
-        fputcsv($output, []);
+        // Style header résumé
+        $sheet->getStyle('A4:B4')->applyFromArray([
+            'font' => ['bold' => true],
+            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => 'D9D9D9']],
+        ]);
 
-        $this->writeCsvSection($output, 'Evolution du CA par jour', ['Jour', 'Nombre de ventes', 'CA', 'TVA'], $data['ventesParJour'], function ($row) {
-            return [$row['jour'] ?? '', $row['nb_ventes'] ?? 0, number_format((float)($row['ca_jour'] ?? 0), 2, '.', ''), number_format((float)($row['tva_jour'] ?? 0), 2, '.', '')];
-        });
-        $this->writeCsvSection($output, 'Ventes par zone', ['Zone', 'Ventes', 'CA'], $data['ventesParZone'], function ($row) {
-            return [$row['zone_nom'] ?? '', $row['nb_ventes'] ?? 0, number_format((float)($row['total_ca'] ?? 0), 2, '.', '')];
-        });
-        $this->writeCsvSection($output, 'Ventes par produit', ['Produit', 'Caisses', 'CA'], $data['ventesParProduit'], function ($row) {
-            return [$row['nom'] ?? '', number_format((float)($row['total_caisses'] ?? 0), 2, '.', ''), number_format((float)($row['total_vente'] ?? 0), 2, '.', '')];
-        });
-        $this->writeCsvSection($output, 'Top clients', ['Client', 'Numero client', 'Ventes', 'CA'], $data['topClients'], function ($row) {
-            return [$row['nom'] ?? '', $row['numero_client'] ?? '', $row['nb_ventes'] ?? 0, number_format((float)($row['total_ca'] ?? 0), 2, '.', '')];
-        });
-        $this->writeCsvSection($output, 'Pertes par type', ['Type', 'Nombre', 'Valeur', 'Caisses'], $data['pertesParType'], function ($row) {
-            return [$row['type_perte'] ?? 'Autre', $row['nb'] ?? 0, number_format((float)($row['valeur'] ?? 0), 2, '.', ''), number_format((float)($row['quantite'] ?? 0), 2, '.', '')];
-        });
-        $this->writeCsvSection($output, 'Depenses par categorie', ['Categorie', 'Nombre', 'Total'], $data['depensesParCategorie'], function ($row) {
-            return [$row['categorie'] ?? '', $row['nb'] ?? 0, number_format((float)($row['total'] ?? 0), 2, '.', '')];
-        });
+        // Sections détaillées — helper local
+        $addSection = function (string $titre, array $headers, array $rows, callable $mapper) use ($sheet, &$row) {
+            $row++; // ligne vide
+            $sheet->setCellValue('A' . $row++, $titre);
+            $sheet->fromArray($headers, null, 'A' . $row);
+            $sheet->getStyle('A' . $row . ':' . \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($headers)) . $row)->applyFromArray([
+                'font' => ['bold' => true],
+                'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => 'D9D9D9']],
+            ]);
+            $row++;
+            foreach ($rows as $r) {
+                $sheet->fromArray($mapper($r), null, 'A' . $row++);
+            }
+        };
 
-        fclose($output);
-        exit;
+        $addSection('Evolution du CA par jour',
+            ['Jour', 'Nombre de ventes', 'CA', 'TVA'],
+            $data['ventesParJour'],
+            fn($r) => [$r['jour'] ?? '', $r['nb_ventes'] ?? 0, (float)($r['ca_jour'] ?? 0), (float)($r['tva_jour'] ?? 0)]
+        );
+        $addSection('Ventes par zone',
+            ['Zone', 'Ventes', 'CA'],
+            $data['ventesParZone'],
+            fn($r) => [$r['zone_nom'] ?? '', $r['nb_ventes'] ?? 0, (float)($r['total_ca'] ?? 0)]
+        );
+        $addSection('Ventes par produit',
+            ['Produit', 'Caisses', 'CA'],
+            $data['ventesParProduit'],
+            fn($r) => [$r['nom'] ?? '', (float)($r['total_caisses'] ?? 0), (float)($r['total_vente'] ?? 0)]
+        );
+        $addSection('Top clients',
+            ['Client', 'Numero client', 'Ventes', 'CA'],
+            $data['topClients'],
+            fn($r) => [$r['nom'] ?? '', $r['numero_client'] ?? '', $r['nb_ventes'] ?? 0, (float)($r['total_ca'] ?? 0)]
+        );
+        $addSection('Pertes par type',
+            ['Type', 'Nombre', 'Valeur', 'Caisses'],
+            $data['pertesParType'],
+            fn($r) => [$r['type_perte'] ?? 'Autre', $r['nb'] ?? 0, (float)($r['valeur'] ?? 0), (float)($r['quantite'] ?? 0)]
+        );
+        $addSection('Depenses par categorie',
+            ['Categorie', 'Nombre', 'Total'],
+            $data['depensesParCategorie'],
+            fn($r) => [$r['categorie'] ?? '', $r['nb'] ?? 0, (float)($r['total'] ?? 0)]
+        );
+
+        foreach (range(1, 8) as $col) {
+            $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
+        }
+
+        $filename = 'detail_finance_' . $data['dateDebut'] . '_' . $data['dateFin'] . '.xlsx';
+        $this->sendXlsx($spreadsheet, $filename);
     }
 
     private function getFinanceData()
@@ -220,23 +285,6 @@ class FinanceController extends Controller
         ];
     }
 
-    private function writeCsvSection($output, $title, array $headers, array $rows, callable $mapper)
-    {
-        fputcsv($output, [$title]);
-        fputcsv($output, $headers);
-
-        if (empty($rows)) {
-            fputcsv($output, ['Aucune donnee']);
-            fputcsv($output, []);
-            return;
-        }
-
-        foreach ($rows as $row) {
-            fputcsv($output, $mapper($row));
-        }
-
-        fputcsv($output, []);
-    }
 
     /**
      * API données financières (pour les graphiques)

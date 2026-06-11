@@ -1,17 +1,25 @@
 <?php
 $pageTitle = 'Objectifs mensuels';
 $periode = $periode ?? date('Y-m');
+$typeObjectif = ($typeObjectif ?? 'vente') === 'approvisionnement' ? 'approvisionnement' : 'vente';
 $produits = $produits ?? [];
 $objectifsParProduit = $objectifsParProduit ?? [];
 $summary = $summary ?? [
     'objectif_total' => 0,
+    'realise_total' => 0,
     'vendu_total' => 0,
+    'approvisionnement_total' => 0,
     'reste_total' => 0,
     'progression' => 0,
     'nb_produits' => 0,
 ];
 
 $periodeLabel = date('m/Y', strtotime($periode . '-01'));
+$typeLabel = $typeObjectif === 'approvisionnement' ? 'Approvisionnement' : 'Vente';
+$actionLabel = $typeObjectif === 'approvisionnement' ? 'approvisionner' : 'vendre';
+$realiseLabel = $typeObjectif === 'approvisionnement' ? 'Approvisionne ce mois' : 'Vendu ce mois';
+$resteLabel = $typeObjectif === 'approvisionnement' ? 'Reste a approvisionner' : 'Reste a vendre';
+$realiseTotal = (int) ($summary['realise_total'] ?? ($typeObjectif === 'approvisionnement' ? ($summary['approvisionnement_total'] ?? 0) : ($summary['vendu_total'] ?? 0)));
 ob_start();
 ?>
 <div class="max-w-7xl mx-auto" x-data="objectifsComponent()">
@@ -19,12 +27,12 @@ ob_start();
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Objectifs mensuels</h1>
             <p class="text-gray-500 dark:text-gray-400">
-                Définissez le nombre de caisses à vendre pour chaque produit. Les ventes du mois réduisent automatiquement le reste à atteindre.
+                Definissez les objectifs de vente ou d'approvisionnement par produit. Les mouvements valides du mois reduisent automatiquement le reste a atteindre.
             </p>
         </div>
         <div class="flex flex-wrap gap-2">
             <a href="<?= url('admin/settings') ?>" class="btn btn-secondary">
-                Retour aux paramètres
+                Retour aux parametres
             </a>
             <button type="button" @click="saveObjectifs()" class="btn btn-primary" :disabled="saving">
                 <span x-text="saving ? 'Enregistrement...' : 'Enregistrer les objectifs'"></span>
@@ -36,8 +44,15 @@ ob_start();
         <div class="card-body">
             <form method="GET" action="<?= url('admin/objectifs') ?>" class="flex flex-wrap items-end gap-4">
                 <div>
-                    <label class="label">Période</label>
+                    <label class="label">Periode</label>
                     <input type="month" name="periode" value="<?= htmlspecialchars($periode) ?>" class="input">
+                </div>
+                <div>
+                    <label class="label">Type d'objectif</label>
+                    <select name="type" class="input">
+                        <option value="vente" <?= $typeObjectif === 'vente' ? 'selected' : '' ?>>Vente</option>
+                        <option value="approvisionnement" <?= $typeObjectif === 'approvisionnement' ? 'selected' : '' ?>>Approvisionnement</option>
+                    </select>
                 </div>
                 <button type="submit" class="btn btn-secondary">Charger</button>
             </form>
@@ -46,7 +61,7 @@ ob_start();
 
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
         <div class="stat-card">
-            <div class="stat-label">Période</div>
+            <div class="stat-label">Periode</div>
             <div class="stat-value text-primary-600"><?= htmlspecialchars($periodeLabel) ?></div>
         </div>
         <div class="stat-card">
@@ -54,11 +69,11 @@ ob_start();
             <div class="stat-value text-blue-600"><?= number_format((int) ($summary['objectif_total'] ?? 0), 0, ',', ' ') ?> cs</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Vendu ce mois</div>
-            <div class="stat-value text-green-600"><?= number_format((int) ($summary['vendu_total'] ?? 0), 0, ',', ' ') ?> cs</div>
+            <div class="stat-label"><?= htmlspecialchars($realiseLabel) ?></div>
+            <div class="stat-value text-green-600"><?= number_format($realiseTotal, 0, ',', ' ') ?> cs</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Reste à vendre</div>
+            <div class="stat-label"><?= htmlspecialchars($resteLabel) ?></div>
             <div class="stat-value text-orange-600"><?= number_format((int) ($summary['reste_total'] ?? 0), 0, ',', ' ') ?> cs</div>
         </div>
     </div>
@@ -74,14 +89,14 @@ ob_start();
                 </div>
                 <div class="text-right text-sm text-gray-500 dark:text-gray-400">
                     <p><?= number_format((int) ($summary['nb_produits'] ?? 0), 0, ',', ' ') ?> produit(s) suivis</p>
-                    <p>Objectif du mois : <?= htmlspecialchars($periodeLabel) ?></p>
+                    <p><?= htmlspecialchars($typeLabel) ?> : <?= htmlspecialchars($periodeLabel) ?></p>
                 </div>
             </div>
             <div class="w-full h-3 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
                 <div class="h-full rounded-full bg-primary-600" style="width: <?= min(100, (float) ($summary['progression'] ?? 0)) ?>%"></div>
             </div>
             <p class="text-xs text-gray-500 mt-2">
-                Le tableau ci-dessous montre l’objectif défini par produit, les caisses déjà vendues et le reste à vendre.
+                Le tableau ci-dessous montre l'objectif defini par produit, les caisses deja <?= htmlspecialchars($typeObjectif === 'approvisionnement' ? 'approvisionnees' : 'vendues') ?> et le reste a <?= htmlspecialchars($actionLabel) ?>.
             </p>
         </div>
     </div>
@@ -90,7 +105,7 @@ ob_start();
         <div class="card-header flex items-center justify-between">
             <div>
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Objectifs par produit</h2>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Les ventes validées du mois s’imputent automatiquement sur ces objectifs.</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Les <?= htmlspecialchars(strtolower($typeLabel)) ?>s valides du mois s'imputent automatiquement sur ces objectifs.</p>
             </div>
             <span class="text-sm text-gray-500 dark:text-gray-400">
                 Mois : <span class="font-semibold"><?= htmlspecialchars($periodeLabel) ?></span>
@@ -108,7 +123,7 @@ ob_start();
                             <tr>
                                 <th>Produit</th>
                                 <th class="text-right">Objectif (cs)</th>
-                                <th class="text-right">Vendu (cs)</th>
+                                <th class="text-right"><?= htmlspecialchars($typeObjectif === 'approvisionnement' ? 'Approvisionne' : 'Vendu') ?> (cs)</th>
                                 <th class="text-right">Reste (cs)</th>
                                 <th>Progression</th>
                             </tr>
@@ -117,9 +132,9 @@ ob_start();
                             <?php foreach ($produits as $index => $produit):
                                 $row = $objectifsParProduit[(int) $produit['id']] ?? [];
                                 $objectif = (int) ($row['objectif_caisses'] ?? 0);
-                                $vendu = (int) ($row['ventes_caisses'] ?? 0);
-                                $reste = (int) ($row['reste_caisses'] ?? max(0, $objectif - $vendu));
-                                $progress = $objectif > 0 ? min(100, ($vendu / $objectif) * 100) : 0;
+                                $realise = (int) ($row['realise_caisses'] ?? ($typeObjectif === 'approvisionnement' ? ($row['approvisionnement_caisses'] ?? 0) : ($row['ventes_caisses'] ?? 0)));
+                                $reste = (int) ($row['reste_caisses'] ?? max(0, $objectif - $realise));
+                                $progress = $objectif > 0 ? min(100, ($realise / $objectif) * 100) : 0;
                             ?>
                             <tr>
                                 <td>
@@ -139,7 +154,7 @@ ob_start();
                                     >
                                 </td>
                                 <td class="text-right font-semibold text-green-600">
-                                    <?= number_format($vendu, 0, ',', ' ') ?>
+                                    <?= number_format($realise, 0, ',', ' ') ?>
                                 </td>
                                 <td class="text-right font-semibold text-orange-600">
                                     <?= number_format($reste, 0, ',', ' ') ?>
@@ -163,7 +178,7 @@ ob_start();
         </div>
         <div class="flex items-center justify-between gap-4 p-4 border-t border-gray-200 dark:border-gray-700">
             <p class="text-sm text-gray-500 dark:text-gray-400">
-                Conseil : tu peux ajuster les objectifs chaque début de mois.
+                Conseil : tu peux ajuster les objectifs chaque debut de mois.
             </p>
             <button type="submit" class="btn btn-primary" :disabled="saving">
                 <span x-text="saving ? 'Enregistrement...' : 'Enregistrer les objectifs'"></span>
@@ -176,6 +191,7 @@ ob_start();
 function objectifsComponent() {
     return {
         periode: '<?= htmlspecialchars($periode) ?>',
+        type: '<?= htmlspecialchars($typeObjectif) ?>',
         saving: false,
         async saveObjectifs() {
             this.saving = true;
@@ -191,6 +207,7 @@ function objectifsComponent() {
 
                 const result = await App.api('/api/admin/objectifs', 'POST', {
                     periode: this.periode,
+                    type: this.type,
                     objectifs
                 });
 

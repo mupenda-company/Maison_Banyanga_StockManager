@@ -95,7 +95,8 @@ class DashboardController extends Controller
         $pertesStats = $this->perteModel->getStats($firstDayMonth, date('Y-m-d'));
 
         // Objectifs du mois
-        $objectifMois = $this->objectifProduitModel->getMonthlyOverview((int) date('Y'), (int) date('m'));
+        $objectifVenteMois = $this->objectifProduitModel->getMonthlyOverview((int) date('Y'), (int) date('m'), 'vente');
+        $objectifApprovisionnementMois = $this->objectifProduitModel->getMonthlyOverview((int) date('Y'), (int) date('m'), 'approvisionnement');
         
         $this->view('dashboard/index', [
             'statsToday' => $statsToday,
@@ -109,7 +110,9 @@ class DashboardController extends Controller
             'derniersMouvements' => $derniersMouvements,
             'ventesParProduit' => $ventesParProduit,
             'pertesStats' => $pertesStats,
-            'objectifMois' => $objectifMois,
+            'objectifMois' => $objectifVenteMois,
+            'objectifVenteMois' => $objectifVenteMois,
+            'objectifApprovisionnementMois' => $objectifApprovisionnementMois,
             'clientsStats' => [
                 'clients_count' => $clientsCountMonth,
                 'last_client' => $lastClient['nom'] ?? 'Aucun client',

@@ -489,135 +489,126 @@ class VenteController extends Controller
         ]);
     }
     
+    private function styleHeaderRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $nbCols): void
+    {
+        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($nbCols);
+        $sheet->getStyle('A1:' . $lastCol . '1')->applyFromArray([
+            'font' => ['bold' => true],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'D9D9D9'],
+            ],
+        ]);
+        foreach (range(1, $nbCols) as $col) {
+            $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
+        }
+    }
+
+    // Helper pour envoyer le fichier xlsx au navigateur
+    private function sendXlsx(\PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet, string $filename): void
+    {
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save('php://output');
+        exit;
+    }
+
     /**
-     * Exporter les ventes par véhicule en CSV
+     * Exporter les ventes par véhicule en Excel
      */
     public function exportParVehicule()
     {
         $this->requirePermission('ventes.voir');
-        
+
         $vehiculeId = $_GET['vehicule_id'] ?? null;
-        $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
-        $dateFin = $_GET['date_fin'] ?? date('Y-m-d');
-        
-        if (!$vehiculeId) {
-            return $this->error('Véhicule non spécifié', 400);
-        }
-        
-        // Récupérer les informations du véhicule
-        $vehicule = $this->db->fetch(
-            "SELECT id, immatriculation FROM vehicules WHERE id = :id",
-            ['id' => (int) $vehiculeId]
-        );
-        
-        if (!$vehicule) {
-            return $this->error('Véhicule non trouvé', 404);
-        }
-        
-        // Récupérer les ventes avec détails
+        $dateDebut  = $_GET['date_debut'] ?? date('Y-m-01');
+        $dateFin    = $_GET['date_fin']   ?? date('Y-m-d');
+
+        if (!$vehiculeId) return $this->error('Véhicule non spécifié', 400);
+
+        $vehicule = $this->db->fetch("SELECT id, immatriculation FROM vehicules WHERE id = :id", ['id' => (int) $vehiculeId]);
+        if (!$vehicule) return $this->error('Véhicule non trouvé', 404);
+
         $ventes = $this->db->fetchAll(
             "SELECT v.id, v.numero_facture, v.date_vente, v.total_ttc,
                     c.id as client_id, c.nom as client_nom, c.telephone as client_telephone,
-                    z.nom as zone_nom,
-                    m.numero_mission
-             FROM ventes v
-             JOIN clients c ON v.client_id = c.id
-             LEFT JOIN zones z ON c.zone_id = z.id
-             LEFT JOIN missions m ON v.mission_id = m.id
-             WHERE m.vehicule_id = :vehicule_id
-             AND DATE(v.date_vente) BETWEEN :date_debut AND :date_fin
-             AND v.statut = 'validee'
-             ORDER BY v.date_vente DESC",
-            [
-                'vehicule_id' => (int) $vehiculeId,
-                'date_debut' => $dateDebut,
-                'date_fin' => $dateFin
-            ]
+                    z.nom as zone_nom, m.numero_mission
+            FROM ventes v
+            JOIN clients c ON v.client_id = c.id
+            LEFT JOIN zones z ON c.zone_id = z.id
+            LEFT JOIN missions m ON v.mission_id = m.id
+            WHERE m.vehicule_id = :vehicule_id
+            AND DATE(v.date_vente) BETWEEN :date_debut AND :date_fin
+            AND v.statut = 'validee'
+            ORDER BY v.date_vente DESC",
+            ['vehicule_id' => (int) $vehiculeId, 'date_debut' => $dateDebut, 'date_fin' => $dateFin]
         );
-        
-        // Récupérer les détails de chaque vente
+
         foreach ($ventes as &$vente) {
             $vente['details'] = $this->db->fetchAll(
-                "SELECT p.nom as produit_nom, p.code as produit_code,
-                        vd.quantite_caisses, vd.caisses_vides_recues,
-                        (vd.quantite_caisses - vd.caisses_vides_recues) as dette_caisses,
-                        vd.quantite as bouteilles,
-                        vd.sous_total
-                 FROM vente_details vd
-                 JOIN produits p ON vd.produit_id = p.id
-                 WHERE vd.vente_id = :vente_id",
+                "SELECT p.nom as produit_nom, vd.quantite_caisses, vd.caisses_vides_recues, vd.sous_total
+                FROM vente_details vd JOIN produits p ON vd.produit_id = p.id
+                WHERE vd.vente_id = :vente_id",
                 ['vente_id' => $vente['id']]
             );
         }
-        
-        // Grouper par client avec détails par produit
+
         $clientsData = [];
         foreach ($ventes as $vente) {
-            $clientId = $vente['client_id'];
-            if (!isset($clientsData[$clientId])) {
-                $clientsData[$clientId] = [
-                    'numero' => $vente['client_id'],
-                    'zone' => $vente['zone_nom'],
-                    'telephone' => $vente['client_telephone'],
-                    'nom' => $vente['client_nom'],
-                    'produits' => [],
-                    'total_caisses' => 0,
-                    'chiffre_affaire' => 0,
-                    'restourne' => 0,
-                    'nombre_ventes' => 0
+            $cid = $vente['client_id'];
+            if (!isset($clientsData[$cid])) {
+                $clientsData[$cid] = [
+                    'numero' => $cid, 'zone' => $vente['zone_nom'],
+                    'telephone' => $vente['client_telephone'], 'nom' => $vente['client_nom'],
+                    'produits' => [], 'total_caisses' => 0, 'chiffre_affaire' => 0,
+                    'restourne' => 0, 'nombre_ventes' => 0,
                 ];
             }
-            
-            $clientsData[$clientId]['nombre_ventes']++;
-            
+            $clientsData[$cid]['nombre_ventes']++;
             foreach ($vente['details'] as $detail) {
-                $produitNom = $detail['produit_nom'];
-                if (!isset($clientsData[$clientId]['produits'][$produitNom])) {
-                    $clientsData[$clientId]['produits'][$produitNom] = [
-                        'total_caisses' => 0,
-                        'nombre_ventes' => 0
-                    ];
+                $pn = $detail['produit_nom'];
+                if (!isset($clientsData[$cid]['produits'][$pn])) {
+                    $clientsData[$cid]['produits'][$pn] = ['total_caisses' => 0, 'nombre_ventes' => 0];
                 }
-                $clientsData[$clientId]['produits'][$produitNom]['total_caisses'] += $detail['quantite_caisses'];
-                $clientsData[$clientId]['produits'][$produitNom]['nombre_ventes']++;
-                
-                $clientsData[$clientId]['total_caisses'] += $detail['quantite_caisses'];
-                $clientsData[$clientId]['chiffre_affaire'] += $detail['sous_total'];
-                $clientsData[$clientId]['restourne'] += $detail['caisses_vides_recues'];
+                $clientsData[$cid]['produits'][$pn]['total_caisses'] += $detail['quantite_caisses'];
+                $clientsData[$cid]['produits'][$pn]['nombre_ventes']++;
+                $clientsData[$cid]['total_caisses']   += $detail['quantite_caisses'];
+                $clientsData[$cid]['chiffre_affaire'] += $detail['sous_total'];
+                $clientsData[$cid]['restourne']       += $detail['caisses_vides_recues'];
             }
         }
-        
-        // Générer le CSV
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="ventes_vehicule_' . $vehicule['immatriculation'] . '_' . date('Y-m-d') . '.csv"');
-        
-        $output = fopen('php://output', 'w');
-        
-        // En-têtes CSV
-        fputcsv($output, ['Numéro', 'Zone', 'Téléphone', 'Nom Client', 'Produit', 'Total Caisses', 'Chiffre d\'Affaire', 'Restourne', 'Nombre Ventes']);
-        
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet()->setTitle('Ventes véhicule');
+
+        $headers = ['Numéro', 'Zone', 'Téléphone', 'Nom Client', 'Produit', 'Total Caisses', "Chiffre d'Affaire", 'Retourne', 'Nombre Ventes'];
+        $sheet->fromArray($headers, null, 'A1');
+
+        $row = 2;
         foreach ($clientsData as $client) {
             foreach ($client['produits'] as $produitNom => $produitData) {
-                fputcsv($output, [
+                $sheet->fromArray([
                     $client['numero'],
                     $client['zone'],
                     $client['telephone'],
                     $client['nom'],
                     $produitNom,
-                    $produitData['total_caisses'],
-                    number_format($client['chiffre_affaire'], 2),
-                    $client['restourne'],
-                    $produitData['nombre_ventes']
-                ]);
+                    (int) $produitData['total_caisses'],
+                    (float) $client['chiffre_affaire'],
+                    (int) $client['restourne'],
+                    (int) $produitData['nombre_ventes'],
+                ], null, 'A' . $row++);
             }
         }
-        
-        fclose($output);
-        exit;
-    }
-    
+
+        $this->styleHeaderRow($sheet, count($headers));
+        $filename = 'ventes_vehicule_' . $vehicule['immatriculation'] . '_' . date('Y-m-d') . '.xlsx';
+        $this->sendXlsx($spreadsheet, $filename);
+    }       
     /**
-     * Exporter toutes les ventes en CSV avec produits en colonnes
+     * Exporter toutes les ventes en Excel avec produits en colonnes
      */
     public function exportAll()
     {
@@ -709,52 +700,6 @@ class VenteController extends Controller
             $salesByClient[$cid]['total_restourne'] = ($salesByClient[$cid]['total_restourne'] ?? 0) + $detail['total_restourne'];
         }
         
-        // // Générer le CSV
-        // header('Content-Type: text/csv; charset=utf-8');
-        // header('Content-Disposition: attachment; filename="ventes_' . $dateDebut .' - '. $dateFin .'.csv"');
-        
-        // $output = fopen('php://output', 'w');
-        
-        // // En-têtes CSV: Numéro, Zone, Téléphone, Nom Client, [produits...], Nombre de caisses, Total (CA), Ristourne
-        // $headers = ['Numero', 'Zone', 'Telephone', 'Nom Client'];
-        // foreach ($produits as $produit) {
-        //     $headers[] = $produit['nom'];
-        // }
-        // $headers[] = 'Nombre de caisses';
-        // $headers[] = 'Total (Chiffre d\'affaire)';
-        // $headers[] = 'Ristourne';
-        // fputcsv($output, $headers);
-        
-        // // Tous les clients, même ceux sans ventes
-        // foreach ($allClients as $client) {
-        //     $cid = $client['id'];
-        //     $hasSales = isset($salesByClient[$cid]);
-        //     $clientData = $hasSales ? $salesByClient[$cid] : null;
-            
-        //     $row = [
-        //         $cid,
-        //         $client['zone_nom'] ?? '',
-        //         $client['telephone'] ?? '',
-        //         $client['nom']
-        //     ];
-            
-        //     $totalCaisses = 0;
-        //     foreach ($produits as $produit) {
-        //         $qty = $hasSales ? ($clientData['produits_qty'][$produit['nom']] ?? 0) : 0;
-        //         $row[] = $qty;
-        //         $totalCaisses += $qty;
-        //     }
-            
-        //     $row[] = $totalCaisses;
-        //     $row[] = $hasSales ? number_format($clientData['total_ttc'], 0) : '0';
-        //     $row[] = $hasSales ? number_format($clientData['ristourne'], 0) : '0';
-            
-        //     fputcsv($output, $row);
-        // }
-        
-        // fclose($output);
-        // exit;
-        require_once ROOT_PATH . '/vendor/autoload.php';
 
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();

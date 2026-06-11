@@ -52,94 +52,120 @@ class ApprovisionnementController extends Controller
         ]);
     }
 
-    /**
-     * Exporter les approvisionnements en Excel (CSV)
-     */
-    private function exportExcel($filters)
+    private function styleHeaderRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $nbCols): void
     {
-        $this->requireAuth();
-        
-        $approvisionnements = $this->approvisionnementModel->getAllPaginated(1, 1000, $filters);
-        $data = $approvisionnements['data'];
-        
-        $filename = "approvisionnements_" . date('Y-m-d_H-i') . ".csv";
-        
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename=' . $filename);
-        
-        $output = fopen('php://output', 'w');
-        
-        // Entête UTF-8 pour Excel
-        fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
-        
-        // En-têtes des colonnes
-        fputcsv($output, ['N° Bon', 'Date', 'Fournisseur', 'Total HT', 'Statut', 'Date Création']);
-        
-        foreach ($data as $appro) {
-            fputcsv($output, [
-                $appro['numero_bon'],
-                date('d/m/Y', strtotime($appro['date_approvisionnement'])),
-                $appro['fournisseur'] ?? 'Bralima',
-                $appro['total_ht'],
-                ucfirst($appro['statut']),
-                date('d/m/Y H:i', strtotime($appro['created_at']))
-            ]);
+        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($nbCols);
+        $sheet->getStyle('A1:' . $lastCol . '1')->applyFromArray([
+            'font' => ['bold' => true],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'D9D9D9'],
+            ],
+        ]);
+        foreach (range(1, $nbCols) as $col) {
+            $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
         }
-        
-        fclose($output);
+    }
+
+    // Helper pour envoyer le fichier xlsx au navigateur
+    private function sendXlsx(\PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet, string $filename): void
+    {
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save('php://output');
         exit;
     }
     
-    /**
-     * Formulaire de création
-     */
+   
     private function exportProduitsExcel($filters)
     {
         $this->requireAuth();
 
         $report = $this->buildProduitsApprovisionnementReport($filters);
-        $filename = "approvisionnements_produits_" . date('Y-m-d_H-i') . ".csv";
 
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename=' . $filename);
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet()->setTitle('Appro par produit');
 
-        $output = fopen('php://output', 'w');
-        fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+        // Bloc info en haut
+        $sheet->fromArray(['Etat des approvisionnements par produit'], null, 'A1');
+        $sheet->fromArray(['Du', $filters['date_debut'] ?: 'Debut'], null, 'A2');
+        $sheet->fromArray(['Au', $filters['date_fin'] ?: 'Fin'], null, 'A3');
+        $sheet->fromArray(['Statut', $filters['statut'] ?: 'Tous'], null, 'A4');
+        $sheet->fromArray(['Taux systeme', '1 USD = ' . number_format(get_taux_change(), 2, '.', '') . ' CDF'], null, 'A5');
+        $sheet->fromArray([
+            'Total prix achat',
+            (float) $report['totals']['pt'],
+            'CDF',
+            (float) convert_money($report['totals']['pt'], get_base_devise(), 'USD'),
+            'USD',
+        ], null, 'A6');
 
-        fputcsv($output, ['Etat des approvisionnements par produit']);
-        fputcsv($output, ['Du', $filters['date_debut'] ?: 'Debut']);
-        fputcsv($output, ['Au', $filters['date_fin'] ?: 'Fin']);
-        fputcsv($output, ['Statut', $filters['statut'] ?: 'Tous']);
-        fputcsv($output, ['Taux systeme', '1 USD = ' . number_format(get_taux_change(), 2, '.', '') . ' CDF']);
-        fputcsv($output, ['Total prix achat', number_format($report['totals']['pt'], 2, '.', ''), 'CDF', number_format(convert_money($report['totals']['pt'], get_base_devise(), 'USD'), 2, '.', ''), 'USD']);
-        fputcsv($output, []);
-        fputcsv($output, ['PRODUITS', 'N P', 'ACHAT', 'PLT', 'P.A.AD', 'P.A.A.E', 'P.T', 'P.V.U', 'P.V.T', 'ECART', 'TOTAL EC', 'ECART A EN', 'TOTAL A ENL']);
+        // En-têtes données
+        $headers = ['PRODUITS', 'N P', 'ACHAT', 'PLT', 'P.A.AD', 'P.A.A.E', 'P.T', 'P.V.U', 'P.V.T', 'ECART', 'TOTAL EC', 'ECART A EN', 'TOTAL A ENL'];
+        $sheet->fromArray($headers, null, 'A8');
 
-        foreach ($report['items'] as $row) {
-            fputcsv($output, [
-                $row['produit'],
-                $row['np'],
-                number_format($row['achat'], 0, '.', ''),
-                number_format($row['plt'], 2, '.', ''),
-                number_format($row['paad'], 2, '.', ''),
-                number_format($row['paae'], 2, '.', ''),
-                number_format($row['pt'], 2, '.', ''),
-                number_format($row['pvu'], 2, '.', ''),
-                number_format($row['pvt'], 2, '.', ''),
-                number_format($row['ecart'], 2, '.', ''),
-                number_format($row['total_ec'], 2, '.', ''),
-                number_format($row['ecart_a_en'], 2, '.', ''),
-                number_format($row['total_a_enl'], 2, '.', ''),
-            ]);
+        $row = 9;
+        foreach ($report['items'] as $r) {
+            $sheet->fromArray([
+                $r['produit'],
+                $r['np'],
+                (float) $r['achat'],
+                (float) $r['plt'],
+                (float) $r['paad'],
+                (float) $r['paae'],
+                (float) $r['pt'],
+                (float) $r['pvu'],
+                (float) $r['pvt'],
+                (float) $r['ecart'],
+                (float) $r['total_ec'],
+                (float) $r['ecart_a_en'],
+                (float) $r['total_a_enl'],
+            ], null, 'A' . $row++);
         }
 
-        fputcsv($output, []);
-        fputcsv($output, ['TOTAUX CDF', '', number_format($report['totals']['achat'], 0, '.', ''), number_format($report['totals']['plt'], 2, '.', ''), '', '', number_format(convert_money($report['totals']['pt'], get_base_devise(), 'CDF'), 2, '.', ''), '', number_format(convert_money($report['totals']['pvt'], get_base_devise(), 'CDF'), 2, '.', ''), '', number_format(convert_money($report['totals']['total_ec'], get_base_devise(), 'CDF'), 2, '.', ''), '', number_format(convert_money($report['totals']['total_a_enl'], get_base_devise(), 'CDF'), 2, '.', '')]);
-        fputcsv($output, ['TOTAUX USD', '', '', '', '', '', number_format(convert_money($report['totals']['pt'], get_base_devise(), 'USD'), 2, '.', ''), '', number_format(convert_money($report['totals']['pvt'], get_base_devise(), 'USD'), 2, '.', ''), '', number_format(convert_money($report['totals']['total_ec'], get_base_devise(), 'USD'), 2, '.', ''), '', number_format(convert_money($report['totals']['total_a_enl'], get_base_devise(), 'USD'), 2, '.', '')]);
+        // Ligne totaux CDF
+        $sheet->fromArray([
+            'TOTAUX CDF', '',
+            (float) $report['totals']['achat'],
+            (float) $report['totals']['plt'],
+            '', '',
+            (float) convert_money($report['totals']['pt'],  get_base_devise(), 'CDF'),
+            '',
+            (float) convert_money($report['totals']['pvt'], get_base_devise(), 'CDF'),
+            '',
+            (float) convert_money($report['totals']['total_ec'],    get_base_devise(), 'CDF'),
+            '',
+            (float) convert_money($report['totals']['total_a_enl'], get_base_devise(), 'CDF'),
+        ], null, 'A' . $row++);
 
-        fclose($output);
-        exit;
+        // Ligne totaux USD
+        $sheet->fromArray([
+            'TOTAUX USD', '', '', '', '', '',
+            (float) convert_money($report['totals']['pt'],  get_base_devise(), 'USD'),
+            '',
+            (float) convert_money($report['totals']['pvt'], get_base_devise(), 'USD'),
+            '',
+            (float) convert_money($report['totals']['total_ec'],    get_base_devise(), 'USD'),
+            '',
+            (float) convert_money($report['totals']['total_a_enl'], get_base_devise(), 'USD'),
+        ], null, 'A' . $row);
+
+        // Style header ligne 8
+        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($headers));
+        $sheet->getStyle('A8:' . $lastCol . '8')->applyFromArray([
+            'font' => ['bold' => true],
+            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => 'D9D9D9']],
+        ]);
+        foreach (range(1, count($headers)) as $col) {
+            $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
+        }
+
+        $filename = 'approvisionnements_produits_' . date('Y-m-d_H-i') . '.xlsx';
+        $this->sendXlsx($spreadsheet, $filename);
     }
+
 
     private function printProduits($filters)
     {
@@ -397,46 +423,59 @@ class ApprovisionnementController extends Controller
         }
 
         $rows = $this->buildDetailRows($approvisionnement);
-        $filename = 'approvisionnement_' . ($approvisionnement['numero_bon'] ?? $id) . '.csv';
 
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename=' . $filename);
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet()->setTitle('Detail appro');
 
-        $output = fopen('php://output', 'w');
-        fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+        $sheet->fromArray(['Approvisionnement', $approvisionnement['numero_bon'] ?? $id], null, 'A1');
+        $sheet->fromArray(['Date', $approvisionnement['date_approvisionnement'] ?? ''], null, 'A2');
+        $sheet->fromArray(['Fournisseur', $approvisionnement['fournisseur'] ?? 'Bralima'], null, 'A3');
+        $sheet->fromArray(['Taux systeme', '1 USD = ' . number_format(get_taux_change(), 2, '.', '') . ' CDF'], null, 'A4');
+        $sheet->fromArray([
+            'Total prix achat',
+            (float) $rows['totals']['pt'],
+            'CDF',
+            (float) convert_money($rows['totals']['pt'], get_base_devise(), 'USD'),
+            'USD',
+        ], null, 'A5');
 
-        fputcsv($output, ['Approvisionnement', $approvisionnement['numero_bon'] ?? $id]);
-        fputcsv($output, ['Date', $approvisionnement['date_approvisionnement'] ?? '']);
-        fputcsv($output, ['Fournisseur', $approvisionnement['fournisseur'] ?? 'Bralima']);
-        fputcsv($output, ['Taux systeme', '1 USD = ' . number_format(get_taux_change(), 2, '.', '') . ' CDF']);
-        fputcsv($output, ['Total prix achat', number_format($rows['totals']['pt'], 2, '.', ''), 'CDF', number_format(convert_money($rows['totals']['pt'], get_base_devise(), 'USD'), 2, '.', ''), 'USD']);
-        fputcsv($output, []);
-        fputcsv($output, ['PRODUITS', 'N P', 'ACHAT', 'PLT', 'P.A.AD', 'P.A.A.E', 'P.T', 'P.V.U', 'P.V.T', 'ECART', 'TOTAL EC', 'ECART A EN', 'TOTAL A ENL']);
+        $headers = ['PRODUITS', 'N P', 'ACHAT', 'PLT', 'P.A.AD', 'P.A.A.E', 'P.T', 'P.V.U', 'P.V.T', 'ECART', 'TOTAL EC', 'ECART A EN', 'TOTAL A ENL'];
+        $sheet->fromArray($headers, null, 'A7');
 
+        $rowIndex = 8;
         foreach ($rows['items'] as $row) {
-            fputcsv($output, [
+            $sheet->fromArray([
                 $row['produit'],
-                $row['np'],
-                $row['achat'],
-                number_format($row['plt'], 2, '.', ''),
-                number_format($row['paad'], 2, '.', ''),
-                number_format($row['paae'], 2, '.', ''),
-                number_format($row['pt'], 2, '.', ''),
-                number_format($row['pvu'], 2, '.', ''),
-                number_format($row['pvt'], 2, '.', ''),
-                number_format($row['ecart'], 2, '.', ''),
-                number_format($row['total_ec'], 2, '.', ''),
-                number_format($row['ecart_a_en'], 2, '.', ''),
-                number_format($row['total_a_enl'], 2, '.', ''),
-            ]);
+                (int) $row['np'],
+                (float) $row['achat'],
+                (float) $row['plt'],
+                (float) $row['paad'],
+                (float) $row['paae'],
+                (float) $row['pt'],
+                (float) $row['pvu'],
+                (float) $row['pvt'],
+                (float) $row['ecart'],
+                (float) $row['total_ec'],
+                (float) $row['ecart_a_en'],
+                (float) $row['total_a_enl'],
+            ], null, 'A' . $rowIndex++);
         }
 
-        fputcsv($output, []);
-        fputcsv($output, ['TOTAUX CDF', '', $rows['totals']['achat'], number_format($rows['totals']['plt'], 2, '.', ''), '', '', number_format(convert_money($rows['totals']['pt'], get_base_devise(), 'CDF'), 2, '.', ''), '', number_format(convert_money($rows['totals']['pvt'], get_base_devise(), 'CDF'), 2, '.', ''), '', number_format(convert_money($rows['totals']['total_ec'], get_base_devise(), 'CDF'), 2, '.', ''), '', number_format(convert_money($rows['totals']['total_a_enl'], get_base_devise(), 'CDF'), 2, '.', '')]);
-        fputcsv($output, ['TOTAUX USD', '', '', '', '', '', number_format(convert_money($rows['totals']['pt'], get_base_devise(), 'USD'), 2, '.', ''), '', number_format(convert_money($rows['totals']['pvt'], get_base_devise(), 'USD'), 2, '.', ''), '', number_format(convert_money($rows['totals']['total_ec'], get_base_devise(), 'USD'), 2, '.', ''), '', number_format(convert_money($rows['totals']['total_a_enl'], get_base_devise(), 'USD'), 2, '.', '')]);
+        $rowIndex++;
+        $sheet->fromArray(['TOTAUX CDF', '', (float) $rows['totals']['achat'], (float) $rows['totals']['plt'], '', '', (float) convert_money($rows['totals']['pt'], get_base_devise(), 'CDF'), '', (float) convert_money($rows['totals']['pvt'], get_base_devise(), 'CDF'), '', (float) convert_money($rows['totals']['total_ec'], get_base_devise(), 'CDF'), '', (float) convert_money($rows['totals']['total_a_enl'], get_base_devise(), 'CDF')], null, 'A' . $rowIndex++);
+        $sheet->fromArray(['TOTAUX USD', '', '', '', '', '', (float) convert_money($rows['totals']['pt'], get_base_devise(), 'USD'), '', (float) convert_money($rows['totals']['pvt'], get_base_devise(), 'USD'), '', (float) convert_money($rows['totals']['total_ec'], get_base_devise(), 'USD'), '', (float) convert_money($rows['totals']['total_a_enl'], get_base_devise(), 'USD')], null, 'A' . $rowIndex);
 
-        fclose($output);
-        exit;
+        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($headers));
+        $sheet->getStyle('A7:' . $lastCol . '7')->applyFromArray([
+            'font' => ['bold' => true],
+            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => 'D9D9D9']],
+        ]);
+        foreach (range(1, count($headers)) as $col) {
+            $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
+        }
+
+        $filename = 'approvisionnement_' . ($approvisionnement['numero_bon'] ?? $id) . '_' . date('Y-m-d_H-i') . '.xlsx';
+        $this->sendXlsx($spreadsheet, $filename);
     }
 
     private function buildDetailRows(array $approvisionnement)

@@ -115,19 +115,98 @@ ob_start();
 </div>
 
 <?php
-    $objectifSummary = $objectifMois['summary'] ?? [
+    $objectifDefaultSummary = [
         'objectif_total' => 0,
+        'realise_total' => 0,
         'vendu_total' => 0,
+        'approvisionnement_total' => 0,
         'reste_total' => 0,
         'progression' => 0,
         'nb_produits' => 0,
     ];
+
+    $objectifCards = [
+        [
+            'title' => 'Objectif vente',
+            'description' => 'Suivi des caisses a vendre pour le mois en cours.',
+            'realise_label' => 'Vendu ce mois',
+            'reste_label' => 'Reste a vendre',
+            'link' => url('admin/objectifs?type=vente'),
+            'summary' => $objectifVenteMois['summary'] ?? ($objectifMois['summary'] ?? $objectifDefaultSummary),
+            'accent' => 'text-green-600',
+            'fallback_key' => 'vendu_total',
+        ],
+        [
+            'title' => 'Objectif approvisionnement',
+            'description' => 'Suivi des caisses a approvisionner pour le mois en cours.',
+            'realise_label' => 'Approvisionne ce mois',
+            'reste_label' => 'Reste a approvisionner',
+            'link' => url('admin/objectifs?type=approvisionnement'),
+            'summary' => $objectifApprovisionnementMois['summary'] ?? $objectifDefaultSummary,
+            'accent' => 'text-blue-600',
+            'fallback_key' => 'approvisionnement_total',
+        ],
+    ];
+
+    $objectifSummary = array_merge($objectifDefaultSummary, $objectifCards[0]['summary'] ?? []);
+?>
+
+<?php
+    $objectifApproSummary = array_merge($objectifDefaultSummary, $objectifCards[1]['summary'] ?? []);
+    $approRealiseTotal = (int) ($objectifApproSummary['realise_total'] ?? 0);
+    if ($approRealiseTotal === 0) {
+        $approRealiseTotal = (int) ($objectifApproSummary['approvisionnement_total'] ?? 0);
+    }
 ?>
 
 <div class="card mb-8">
     <div class="card-header flex items-center justify-between gap-4">
         <div>
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Objectif du mois</h2>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Objectif approvisionnement du mois</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Suivi des caisses a approvisionner pour le mois en cours.</p>
+        </div>
+        <div class="text-right">
+            <p class="text-xs uppercase text-gray-500">Progression</p>
+            <p class="text-2xl font-bold text-primary-600"><?= number_format((float) ($objectifApproSummary['progression'] ?? 0), 1, ',', ' ') ?>%</p>
+        </div>
+    </div>
+    <div class="card-body space-y-5">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="stat-card">
+                <p class="stat-label">Objectif total</p>
+                <p class="stat-value text-blue-600"><?= number_format((int) ($objectifApproSummary['objectif_total'] ?? 0), 0, ',', ' ') ?> cs</p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-label">Approvisionne ce mois</p>
+                <p class="stat-value text-blue-600"><?= number_format($approRealiseTotal, 0, ',', ' ') ?> cs</p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-label">Reste a approvisionner</p>
+                <p class="stat-value text-orange-600"><?= number_format((int) ($objectifApproSummary['reste_total'] ?? 0), 0, ',', ' ') ?> cs</p>
+            </div>
+        </div>
+
+        <div>
+            <div class="w-full h-3 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                <div class="h-full rounded-full bg-primary-600" style="width: <?= min(100, (float) ($objectifApproSummary['progression'] ?? 0)) ?>%"></div>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">
+                <?= (int) ($objectifApproSummary['nb_produits'] ?? 0) ?> produit(s) suivis pour le mois en cours.
+            </p>
+        </div>
+
+        <?php if (can('admin.voir')): ?>
+        <div class="flex justify-end">
+            <a href="<?= url('admin/objectifs?type=approvisionnement') ?>" class="btn btn-secondary">Gérer les objectifs</a>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<div class="card mb-8">
+    <div class="card-header flex items-center justify-between gap-4">
+        <div>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Objectif vente du mois</h2>
             <p class="text-sm text-gray-500 dark:text-gray-400">Suivi des caisses à vendre pour le mois en cours.</p>
         </div>
         <div class="text-right">
@@ -162,7 +241,7 @@ ob_start();
 
         <?php if (can('admin.voir')): ?>
         <div class="flex justify-end">
-            <a href="<?= url('admin/objectifs') ?>" class="btn btn-secondary">Gérer les objectifs</a>
+            <a href="<?= url('admin/objectifs?type=vente') ?>" class="btn btn-secondary">Gérer les objectifs</a>
         </div>
         <?php endif; ?>
     </div>

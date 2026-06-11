@@ -53,6 +53,31 @@ class ReportController extends Controller
 
         $this->view('reports/ventes_par_agent', $this->getVentesParAgentReportData());
     }
+    private function styleHeaderRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $nbCols): void
+    {
+        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($nbCols);
+        $sheet->getStyle('A1:' . $lastCol . '1')->applyFromArray([
+            'font' => ['bold' => true],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'D9D9D9'],
+            ],
+        ]);
+        foreach (range(1, $nbCols) as $col) {
+            $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
+        }
+    }
+
+    // Helper pour envoyer le fichier xlsx au navigateur
+    private function sendXlsx(\PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet, string $filename): void
+    {
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save('php://output');
+        exit;
+    }
 
     public function exportVentesParAgent()
     {
@@ -60,53 +85,65 @@ class ReportController extends Controller
         $this->requirePermission('rapports.voir');
 
         $data = $this->getVentesParAgentReportData();
-        $filename = 'ventes_par_agent_' . $data['dateDebut'] . '_' . $data['dateFin'] . '.csv';
 
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename=' . $filename);
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet()->setTitle('Ventes par agent');
 
-        $output = fopen('php://output', 'w');
-        fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+        // Résumé
+        $sheet->fromArray(['Rapport ventes par agent'], null, 'A1');
+        $sheet->fromArray(['Periode', $data['dateDebut'] . ' au ' . $data['dateFin']], null, 'A2');
+        $sheet->fromArray(['Total ventes',    $data['totalVentes']], null, 'A3');
+        $sheet->fromArray(['Agents concernes',$data['nbAgents']],    null, 'A4');
+        $sheet->fromArray(['Total caisses',   (float) $data['totalCaisses']], null, 'A5');
+        $sheet->fromArray(['CA total',        (float) $data['totalCa']],     null, 'A6');
 
-        fputcsv($output, ['Rapport ventes par agent']);
-        fputcsv($output, ['Periode', $data['dateDebut'] . ' au ' . $data['dateFin']]);
-        fputcsv($output, ['Total ventes', $data['totalVentes']]);
-        fputcsv($output, ['Agents concernes', $data['nbAgents']]);
-        fputcsv($output, ['Total caisses', number_format((float)$data['totalCaisses'], 0, '.', '')]);
-        fputcsv($output, ['CA total', number_format((float)$data['totalCa'], 2, '.', '')]);
-        fputcsv($output, []);
+        // En-têtes
+        $headers = ['Agent', 'Role', 'Date', 'Facture', 'Client', 'Emplacement', 'Caisses', 'Total TTC'];
+        $sheet->fromArray($headers, null, 'A8');
+        $this->styleHeaderRow($sheet, count($headers));  // style ligne 1, on va re-styler ligne 8
 
-        fputcsv($output, ['Agent', 'Role', 'Date', 'Facture', 'Client', 'Emplacement', 'Caisses', 'Total TTC']);
+        // Re-style header sur ligne 8 (styleHeaderRow cible ligne 1 — on duplique ici)
+        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($headers));
+        $sheet->getStyle('A8:' . $lastCol . '8')->applyFromArray([
+            'font' => ['bold' => true],
+            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => 'D9D9D9']],
+        ]);
+
+        $row = 9;
         foreach ($data['ventesParAgent'] as $agent) {
             foreach ($agent['ventes'] as $vente) {
-                fputcsv($output, [
+                $sheet->fromArray([
                     $agent['agent_nom'],
                     $agent['agent_role'],
                     !empty($vente['date_vente']) ? date('d/m/Y H:i', strtotime($vente['date_vente'])) : '',
                     $vente['numero_facture'] ?? '',
                     $vente['client_nom'] ?? 'N/A',
                     $vente['emplacement_nom'] ?? 'N/A',
-                    number_format((float)($vente['total_caisses'] ?? 0), 0, '.', ''),
-                    number_format((float)($vente['total_ttc'] ?? 0), 2, '.', ''),
-                ]);
+                    (float)($vente['total_caisses'] ?? 0),
+                    (float)($vente['total_ttc'] ?? 0),
+                ], null, 'A' . $row++);
             }
 
-            fputcsv($output, [
+            // Ligne sous-total en gras
+            $sheet->fromArray([
                 'Sous-total ' . $agent['agent_nom'],
-                '',
-                '',
-                '',
-                '',
-                '',
-                number_format((float)($agent['total_caisses'] ?? 0), 0, '.', ''),
-                number_format((float)($agent['total_ca'] ?? 0), 2, '.', ''),
-            ]);
-            fputcsv($output, []);
+                '', '', '', '', '',
+                (float)($agent['total_caisses'] ?? 0),
+                (float)($agent['total_ca'] ?? 0),
+            ], null, 'A' . $row);
+            $sheet->getStyle('A' . $row . ':H' . $row)->getFont()->setBold(true);
+            $row += 2; // +1 ligne vide
         }
 
-        fclose($output);
-        exit;
+        foreach (range(1, count($headers)) as $col) {
+            $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
+        }
+
+        $filename = 'ventes_par_agent_' . $data['dateDebut'] . '_' . $data['dateFin'] . '.xlsx';
+        $this->sendXlsx($spreadsheet, $filename);
     }
+
+
 
     private function getVentesParAgentReportData()
     {

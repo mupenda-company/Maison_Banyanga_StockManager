@@ -44,33 +44,60 @@ class RistourneController extends Controller
             'print_mode' => $printMode
         ]);
     }
+    private function styleHeaderRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $nbCols): void
+    {
+        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($nbCols);
+        $sheet->getStyle('A1:' . $lastCol . '1')->applyFromArray([
+            'font' => ['bold' => true],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'D9D9D9'],
+            ],
+        ]);
+        foreach (range(1, $nbCols) as $col) {
+            $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
+        }
+    }
+
+    // Helper pour envoyer le fichier xlsx au navigateur
+    private function sendXlsx(\PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet, string $filename): void
+    {
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save('php://output');
+        exit;
+    }
 
     private function exportExcel($ristournes, $filters)
     {
         $this->requireAuth();
 
-        $filename = 'ristournes_' . ($filters['mois'] ?? date('n')) . '_' . ($filters['annee'] ?? date('Y')) . '_' . date('Y-m-d_H-i') . '.csv';
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename=' . $filename);
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet()->setTitle('Ristournes');
 
-        $output = fopen('php://output', 'w');
-        fprintf($output, chr(0xEF) . chr(0xBB) . chr(0xBF));
-        fputcsv($output, ['Client', 'Periode', 'Chiffre affaires', 'Taux (%)', 'Montant ristourne', 'Statut', 'Date paiement']);
+        $headers = ['Client', 'Periode', 'Chiffre affaires', 'Taux (%)', 'Montant ristourne', 'Statut', 'Date paiement'];
+        $sheet->fromArray($headers, null, 'A1');
 
+        $row = 2;
         foreach ($ristournes as $r) {
-            fputcsv($output, [
+            $sheet->fromArray([
                 $r['client_nom'] ?? '',
                 !empty($r['periode_debut']) ? date('m/Y', strtotime($r['periode_debut'])) : '',
-                number_format((float) ($r['ca_total'] ?? 0), 2, '.', ''),
-                number_format((float) ($r['taux_applique'] ?? 0), 2, '.', ''),
-                number_format((float) ($r['montant_ristourne'] ?? 0), 2, '.', ''),
+                (float)($r['ca_total'] ?? 0),
+                (float)($r['taux_applique'] ?? 0),
+                (float)($r['montant_ristourne'] ?? 0),
                 $r['statut'] ?? '',
-                !empty($r['date_paiement']) ? date('d/m/Y H:i', strtotime($r['date_paiement'])) : ''
-            ]);
+                !empty($r['date_paiement']) ? date('d/m/Y H:i', strtotime($r['date_paiement'])) : '',
+            ], null, 'A' . $row++);
         }
 
-        fclose($output);
-        exit;
+        $this->styleHeaderRow($sheet, count($headers));
+
+        $mois   = $filters['mois']  ?? date('n');
+        $annee  = $filters['annee'] ?? date('Y');
+        $this->sendXlsx($spreadsheet, 'ristournes_' . $mois . '_' . $annee . '_' . date('Y-m-d_H-i') . '.xlsx');
     }
 
     /**

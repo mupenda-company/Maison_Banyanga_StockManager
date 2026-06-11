@@ -269,8 +269,9 @@ class AdminController extends Controller
             $periode = date('Y-m');
         }
 
+        $typeObjectif = ($_GET['type'] ?? 'vente') === 'approvisionnement' ? 'approvisionnement' : 'vente';
         [$annee, $mois] = array_map('intval', explode('-', $periode));
-        $overview = $this->objectifProduitModel->getMonthlyOverview($annee, $mois);
+        $overview = $this->objectifProduitModel->getMonthlyOverview($annee, $mois, $typeObjectif);
         $produits = $this->produitModel->getActive();
 
         $objectifsParProduit = [];
@@ -282,6 +283,7 @@ class AdminController extends Controller
             'periode' => $periode,
             'annee' => $annee,
             'mois' => $mois,
+            'typeObjectif' => $typeObjectif,
             'produits' => $produits,
             'objectifsParProduit' => $objectifsParProduit,
             'summary' => $overview['summary'],
@@ -306,6 +308,7 @@ class AdminController extends Controller
         }
 
         [$annee, $mois] = array_map('intval', explode('-', $periode));
+        $typeObjectif = ($data['type'] ?? 'vente') === 'approvisionnement' ? 'approvisionnement' : 'vente';
         $objectifs = $data['objectifs'] ?? [];
 
         if (!is_array($objectifs)) {
@@ -325,7 +328,8 @@ class AdminController extends Controller
                     $annee,
                     $mois,
                     $objectif['objectif_caisses'] ?? 0,
-                    $_SESSION['user_id'] ?? null
+                    $_SESSION['user_id'] ?? null,
+                    $typeObjectif
                 );
             }
 

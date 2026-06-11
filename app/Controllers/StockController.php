@@ -210,49 +210,78 @@ class StockController extends Controller
             return $this->error($e->getMessage(), 400);
         }
     }
+    private function styleHeaderRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $nbCols): void
+    {
+        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($nbCols);
+        $sheet->getStyle('A1:' . $lastCol . '1')->applyFromArray([
+            'font' => ['bold' => true],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'D9D9D9'],
+            ],
+        ]);
+        foreach (range(1, $nbCols) as $col) {
+            $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
+        }
+    }
+
+    // Helper pour envoyer le fichier xlsx au navigateur
+    private function sendXlsx(\PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet, string $filename): void
+    {
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save('php://output');
+        exit;
+    }
 
     /**
-     * Exporter les stocks en Excel (CSV)
+     * Exporter les stocks en Excel 
      */
     private function exportExcel($filters)
     {
         $this->requireAuth();
-        
+
         if (!empty($filters['date_stock'])) {
             $data = $this->stockModel->getHistoricalInventory($filters['date_stock'], $filters);
         } else {
             $result = $this->stockModel->getAllPaginated(1, 1000, $filters);
-            $data = $result['data'];
+            $data   = $result['data'];
         }
-        
-        $filename = "stocks_" . date('Y-m-d_H-i') . ".csv";
-        
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename=' . $filename);
-        
-        $output = fopen('php://output', 'w');
-        fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF)); // BOM UTF-8
-        
-        fputcsv($output, ['Produit', 'Code', 'Emplacement', 'Type', 'Stock Plein (cs)', 'Stock Plein (btl)', 'Stock Vide (cs)', 'Statut']);
-        
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet()->setTitle('Stocks');
+
+        $headers = ['Produit', 'Code', 'Emplacement', 'Type', 'Stock Plein (cs)', 'Stock Plein (btl)', 'Stock Vide (cs)', 'Statut'];
+        $sheet->fromArray($headers, null, 'A1');
+
+        $row = 2;
         foreach ($data as $s) {
             $statut = ($s['caisses_pleine'] <= ($s['seuil_alerte'] ?? 0)) ? 'CRITIQUE' : 'OK';
-            fputcsv($output, [
+            $sheet->fromArray([
                 $s['produit_nom'],
                 $s['produit_code'],
                 $s['emplacement_nom'],
                 ucfirst($s['emplacement_type']),
                 (int) round($s['caisses_pleine']),
-                $s['quantite_pleine'],
+                (int) $s['quantite_pleine'],
                 (int) round($s['caisses_vide']),
-                $statut
-            ]);
+                $statut,
+            ], null, 'A' . $row++);
         }
-        
-        fclose($output);
-        exit;
-    }
-    
+
+        // Style conditionnel : rouge pour les lignes CRITIQUE
+        for ($i = 2; $i < $row; $i++) {
+            if ($sheet->getCell('H' . $i)->getValue() === 'CRITIQUE') {
+                $sheet->getStyle('A' . $i . ':H' . $i)->getFont()->getColor()->setARGB('FFCC0000');
+            }
+        }
+
+        $this->styleHeaderRow($sheet, count($headers));
+        $this->sendXlsx($spreadsheet, 'stocks_' . date('Y-m-d_H-i') . '.xlsx');
+}
+
     /**
      * Inventaire complet
      */
@@ -337,30 +366,30 @@ class StockController extends Controller
     private function exportInventaireExcel($filters)
     {
         $this->requireAuth();
-        $data = !empty($filters['date_stock']) ? $this->stockModel->getHistoricalInventory($filters['date_stock'], $filters) : [];
-        if (empty($filters['date_stock'])) {
-        $page = 1;
-        $last = 1;
-        $perPage = 1000;
-        do {
-            $result = $this->stockModel->getInventairePaginated($page, $perPage, $filters);
-            $data = array_merge($data, $result['data']);
-            $last = (int)$result['last_page'];
-            $page++;
-        } while ($page <= $last);
+
+        $data = [];
+        if (!empty($filters['date_stock'])) {
+            $data = $this->stockModel->getHistoricalInventory($filters['date_stock'], $filters);
+        } else {
+            $page = 1;
+            $last = 1;
+            do {
+                $result = $this->stockModel->getInventairePaginated($page, 1000, $filters);
+                $data   = array_merge($data, $result['data']);
+                $last   = (int) $result['last_page'];
+                $page++;
+            } while ($page <= $last);
         }
-        
-        $filename = "inventaire_stock_" . date('Y-m-d_H-i') . ".csv";
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename=' . $filename);
-        
-        $output = fopen('php://output', 'w');
-        fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
-        
-        fputcsv($output, ['Produit', 'Code', 'Catégorie', 'Emplacement', 'Type', 'Véhicule', 'Agent', 'Stock Plein (cs)', 'Stock Vide (cs)']);
-        
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet()->setTitle('Inventaire stock');
+
+        $headers = ['Produit', 'Code', 'Catégorie', 'Emplacement', 'Type', 'Véhicule', 'Agent', 'Stock Plein (cs)', 'Stock Vide (cs)'];
+        $sheet->fromArray($headers, null, 'A1');
+
+        $row = 2;
         foreach ($data as $item) {
-            fputcsv($output, [
+            $sheet->fromArray([
                 $item['produit_nom'],
                 $item['produit_code'],
                 $item['categorie'],
@@ -368,14 +397,16 @@ class StockController extends Controller
                 ucfirst($item['emplacement_type']),
                 $item['vehicule'] ?: '-',
                 $item['agent_nom'] ? $item['agent_prenom'] . ' ' . $item['agent_nom'] : '-',
-                number_format($item['caisses_pleine'], 2, '.', ''),
-                number_format($item['caisses_vide'], 2, '.', '')
-            ]);
+                round((float) $item['caisses_pleine'], 2),
+                round((float) $item['caisses_vide'], 2),
+            ], null, 'A' . $row++);
         }
-        fclose($output);
-        exit;
+
+        $this->styleHeaderRow($sheet, count($headers));
+        $this->sendXlsx($spreadsheet, 'inventaire_stock_' . date('Y-m-d_H-i') . '.xlsx');
     }
-    
+
+
     /**
      * Stock par emplacement
      */
@@ -489,29 +520,28 @@ class StockController extends Controller
     private function exportMouvementsExcel($filters)
     {
         $this->requireAuth();
+
+        // Récupération paginée (inchangée)
         $data = [];
         $page = 1;
         $last = 1;
-        $perPage = 1000;
         do {
-            $result = $this->mouvementModel->getHistorique($filters, $page, $perPage);
-            $data = array_merge($data, $result['data']);
-            $last = (int) $result['last_page'];
+            $result = $this->mouvementModel->getHistorique($filters, $page, 1000);
+            $data   = array_merge($data, $result['data']);
+            $last   = (int) $result['last_page'];
             $page++;
         } while ($page <= $last);
-        
-        $filename = "mouvements_stock_" . date('Y-m-d_H-i') . ".csv";
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename=' . $filename);
-        
-        $output = fopen('php://output', 'w');
-        fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
-        
-        fputcsv($output, ['Date', 'Type', 'Produit', 'Emplacement', 'Quantité (cs)', 'Référence', 'Par']);
-        
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet()->setTitle('Mouvements stock');
+
+        $headers = ['Date', 'Type', 'Produit', 'Emplacement', 'Quantité (cs)', 'Référence', 'Par'];
+        $sheet->fromArray($headers, null, 'A1');
+
+        $row = 2;
         foreach ($data as $m) {
-            $produit = new Produit();
-            $p = $produit->find($m['produit_id']);
+            $produit     = new Produit();
+            $p           = $produit->find($m['produit_id']);
             $btlParCaisse = $p['bouteilles_par_caisses'] ?: 24;
             $caisses = isset($m['quantite_caisses_reference']) && $m['quantite_caisses_reference'] !== null
                 ? abs((float) $m['quantite_caisses_reference'])
@@ -522,20 +552,21 @@ class StockController extends Controller
                 $emplacement .= ' -> ' . $m['emplacement_dest'];
             }
 
-            fputcsv($output, [
+            $sheet->fromArray([
                 date('d/m/Y H:i', strtotime($m['created_at'])),
                 ucfirst($m['type_mouvement']),
                 $m['produit_nom'],
                 $emplacement,
-                number_format($caisses, 2, '.', ''),
+                round($caisses, 2),
                 $m['reference_id'] ? $m['reference_type'] . ' #' . $m['reference_id'] : '-',
-                $m['user_nom']
-            ]);
+                $m['user_nom'],
+            ], null, 'A' . $row++);
         }
-        fclose($output);
-        exit;
+
+        $this->styleHeaderRow($sheet, count($headers));
+        $this->sendXlsx($spreadsheet, 'mouvements_stock_' . date('Y-m-d_H-i') . '.xlsx');
     }
-    
+
     /**
      * API pour le stock global
      */

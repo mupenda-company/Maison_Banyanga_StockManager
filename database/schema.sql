@@ -323,6 +323,7 @@ CREATE TABLE `objectifs_produits` (
   `produit_id` int UNSIGNED NOT NULL,
   `annee` year NOT NULL,
   `mois` tinyint UNSIGNED NOT NULL,
+  `type_objectif` enum('vente','approvisionnement') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'vente',
   `objectif_caisses` int NOT NULL DEFAULT '0' COMMENT 'Objectif mensuel en caisses',
   `created_by` int UNSIGNED DEFAULT NULL,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
@@ -747,7 +748,7 @@ ALTER TABLE `mouvements_stock`
 --
 ALTER TABLE `objectifs_produits`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uk_objectifs_produit_mois` (`produit_id`,`annee`,`mois`),
+  ADD UNIQUE KEY `uk_objectifs_produit_mois_type` (`produit_id`,`annee`,`mois`,`type_objectif`),
   ADD KEY `created_by` (`created_by`);
 
 --
