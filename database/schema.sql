@@ -1290,7 +1290,6 @@ ALTER TABLE `vente_emballages_recus`
 -- --------------------------------------------------------
 -- Données initiales
 -- --------------------------------------------------------
-
 -- Utilisateur admin par défaut
 INSERT INTO `users` (`username`, `telephone`, `password`, `nom`, `prenom`, `role`) VALUES
 ('admin', '0927161930', '$2y$10$P6GArcijgFX6rQVQQTxxg.TusYWUJObGMjjfuMtJOB1B.dHskS2JC', 'Administrateur', 'Système', 'admin');

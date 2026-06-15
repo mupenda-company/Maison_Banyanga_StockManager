@@ -28,18 +28,31 @@ class Produit extends Model
      */
     public function getWithStock()
     {
+        $emplacementModel = new Emplacement();
+        $emplacementPrincipal = $emplacementModel->getPrincipal();
+        $emplacementPrincipalId = (int) ($emplacementPrincipal['id'] ?? 0);
+
         return $this->db->fetchAll(
             "SELECT p.*, 
-                    COALESCE(SUM(s.quantite_pleine), 0) as stock_plein,
-                    COALESCE(SUM(s.quantite_vide), 0) as stock_vide,
-                    COALESCE(SUM(s.caisses_pleine), 0) as stock_caisses_pleine,
-                    COALESCE(SUM(s.caisses_vide), 0) as stock_caisses_vide
-             FROM {$this->table} p
-             LEFT JOIN stocks s ON p.id = s.produit_id
-             LEFT JOIN emplacements e ON s.emplacement_id = e.id
-             WHERE p.actif = 1
-             GROUP BY p.id
-             ORDER BY p.nom"
+                    COALESCE(s.quantite_pleine, 0) as stock_plein,
+                    COALESCE(s.quantite_vide, 0) as stock_vide,
+                    COALESCE(s.caisses_pleine, 0) as stock_caisses_pleine,
+                    COALESCE(s.caisses_vide, 0) as stock_caisses_vide,
+
+                    COALESCE(s.quantite_pleine, 0) as stock_entrepot_plein,
+                    COALESCE(s.quantite_vide, 0) as stock_entrepot_vide,
+                    COALESCE(s.caisses_pleine, 0) as stock_entrepot_caisses,
+                    COALESCE(s.caisses_vide, 0) as stock_entrepot_caisses_vide
+
+            FROM {$this->table} p
+            LEFT JOIN stocks s 
+                ON p.id = s.produit_id 
+            AND s.emplacement_id = :emplacement_id
+            WHERE p.actif = 1
+            ORDER BY p.nom",
+            [
+                'emplacement_id' => $emplacementPrincipalId
+            ]
         );
     }
     

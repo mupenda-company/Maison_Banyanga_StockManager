@@ -18,7 +18,13 @@ ob_start();
                     zone_id: '',
                     date_depart: '<?= date('Y-m-d\TH:i') ?>',
                     notes: '',
-                    chargements: [{ produit_id: '', quantite_caisses: 0, stock_depart_caisses: 0, auto_vehicle_stock: false }],
+                    chargements: [{ 
+                        produit_id: '', 
+                        quantite_caisses: 0, 
+                        stock_depart_caisses: 0,
+                        stock_entrepot_caisses: 0,
+                        auto_vehicle_stock: false 
+                    }],
                     vehicules: [],
                     produits: [],
                     zones: [],
@@ -27,8 +33,21 @@ ob_start();
                     getProduit(produitId) {
                         return this.produits.find(p => String(p.id) === String(produitId)) || null;
                     },
+                    getStockEntrepot(produitId) {
+                        const p = this.getProduit(produitId);
+                        return p ? Math.round(parseFloat(p.stock_caisses_pleine || 0)) : 0;
+                    },
+                    getStockVehicule(produitId) {
+                        const ligne = this.chargements.find(c => String(c.produit_id) === String(produitId) && c.auto_vehicle_stock);
+                        return ligne ? Math.round(parseFloat(ligne.stock_depart_caisses || 0)) : 0;
+                    },
+                    getCaissesAAjouter(chargement) {
+                        const final = Math.round(parseFloat(chargement.quantite_caisses || 0));
+                        const vehicule = Math.round(parseFloat(chargement.stock_depart_caisses || 0));
+                        return Math.max(0, final - vehicule);
+                    },
                     newChargement() {
-                        return { produit_id: '', quantite_caisses: 0, stock_depart_caisses: 0, auto_vehicle_stock: false };
+                        return { produit_id: '', quantite_caisses: 0, stock_depart_caisses: 0, stock_entrepot_caisses: 0, auto_vehicle_stock: false };
                     },
                     async loadVehiculeStock() {
                         if (!this.vehicule_id) {
@@ -50,6 +69,7 @@ ob_start();
                                     produit_code: item.produit_code || '',
                                     quantite_caisses: parseFloat(item.caisses_pleine || 0),
                                     stock_depart_caisses: parseFloat(item.caisses_pleine || 0),
+                                    stock_entrepot_caisses: this.getStockEntrepot(item.produit_id),
                                     auto_vehicle_stock: true
                                 }));
 
@@ -206,9 +226,11 @@ ob_start();
                         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                             <thead class="bg-gray-50 dark:bg-gray-700">
                                 <tr>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Produit</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Stock</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Caisses finales</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produit</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock véhicule</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock entrepôt</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock final mission</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">À ajouter</th>
                                     <th class="px-4 py-3"></th>
                                 </tr>
                             </thead>
@@ -237,6 +259,26 @@ ob_start();
                                             </div>
                                         </td>
                                         <td class="px-4 py-2 text-sm">
+                                            <span class="font-bold text-green-700"
+                                                x-text="Math.round(parseFloat(chargement.stock_depart_caisses || 0)) + ' cs'"></span>
+                                        </td>
+
+                                        <td class="px-4 py-2 text-sm">
+                                            <span class="font-bold text-primary-600"
+                                                x-text="getStockEntrepot(chargement.produit_id) + ' cs'"></span>
+                                        </td>
+
+                                        <td class="px-4 py-2">
+                                            <input type="number" x-model.number="chargement.quantite_caisses"
+                                                @input="chargement.quantite_caisses = Math.max(0, Math.round(chargement.quantite_caisses || 0));"
+                                                class="input w-28" min="0" step="1" placeholder="Stock final">
+                                        </td>
+
+                                        <td class="px-4 py-2 text-sm">
+                                            <span class="font-bold text-orange-600"
+                                                x-text="getCaissesAAjouter(chargement) + ' cs'"></span>
+                                        </td>
+                                        <!-- <td class="px-4 py-2 text-sm">
                                             <template x-if="chargement.auto_vehicle_stock">
                                                 <div class="flex flex-col">
                                                     <span class="font-bold text-green-700" x-text="Math.round(parseFloat(chargement.stock_depart_caisses || 0)) + ' cs'"></span>
@@ -259,7 +301,7 @@ ob_start();
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                                 </svg>
                                             </button>
-                                        </td>
+                                        </td> -->
                                     </tr>
                                 </template>
                             </tbody>
