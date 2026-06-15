@@ -641,10 +641,23 @@ class VenteController extends Controller
         
         // Récupérer TOUS les clients
         $allClients = $this->db->fetchAll(
-            "SELECT c.id, c.nom, c.telephone, z.nom as zone_nom
-             FROM clients c
-             LEFT JOIN zones z ON c.zone_id = z.id
-             ORDER BY c.nom"
+            "SELECT 
+                c.id, 
+                c.nom, 
+                c.telephone, 
+                z.nom as zone_nom,
+                COALESCE(SUM(vd.quantite_caisses), 0) as total_caisses
+            FROM clients c
+            JOIN ventes v ON v.client_id = c.id
+            JOIN vente_details vd ON vd.vente_id = v.id
+            LEFT JOIN zones z ON c.zone_id = z.id
+            WHERE DATE(v.date_vente) BETWEEN :date_debut AND :date_fin
+            AND v.statut = 'validee'
+            " . $clientClause . $emplacementClause . "
+            GROUP BY c.id, c.nom, c.telephone, z.nom
+            HAVING total_caisses >= 1
+            ORDER BY c.nom",
+            $params
         );
         
         // Récupérer les ventes groupées par client avec détails par produit
@@ -730,8 +743,11 @@ class VenteController extends Controller
         $rowNum = 2;
         foreach ($allClients as $client) {
             $cid = $client['id'];
-            $hasSales = isset($salesByClient[$cid]);
-            $clientData = $hasSales ? $salesByClient[$cid] : null;
+            $clientData = $salesByClient[$cid] ?? null;
+
+            if (!$clientData) {
+                continue;
+            }
 
             $row = [
                 $cid,
@@ -742,14 +758,14 @@ class VenteController extends Controller
 
             $totalCaisses = 0;
             foreach ($produits as $produit) {
-                $qty = $hasSales ? ($clientData['produits_qty'][$produit['nom']] ?? 0) : 0;
+                $qty = $clientData['produits_qty'][$produit['nom']] ?? 0;
                 $row[] = (int) $qty;   // nombre entier, pas de virgule parasite
                 $totalCaisses += $qty;
             }
 
             $row[] = (int) $totalCaisses;
-            $row[] = $hasSales ? (float) $clientData['total_ttc'] : 0;
-            $row[] = $hasSales ? (float) $clientData['ristourne'] : 0;
+            $row[] = (float) $clientData['total_ttc'];
+            $row[] = (float) $clientData['ristourne'];
 
             $sheet->fromArray($row, null, 'A' . $rowNum);
             $rowNum++;
