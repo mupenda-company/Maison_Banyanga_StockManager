@@ -544,5 +544,128 @@ class Vente extends Model
             ['date_debut' => $dateDebut, 'date_fin' => $dateFin]
         );
     }
+    public function updateWithDetails($id, $data, $details, $emballagesRecus = null)
+    {
+        try {
+            $this->db->beginTransaction();
+
+            $ancienneVente = $this->getWithDetails($id);
+
+            if (!$ancienneVente) {
+                throw new Exception('Vente non trouvée');
+            }
+
+            if (($ancienneVente['statut'] ?? '') !== 'validee') {
+                throw new Exception('Seules les ventes validées peuvent être modifiées');
+            }
+
+            $stockModel = new Stock();
+            $produitModel = new Produit();
+
+            $ancien = [];
+            foreach ($ancienneVente['details'] as $d) {
+                $ancien[(int)$d['produit_id']] = [
+                    'caisses' => (int)$d['quantite_caisses'],
+                    'quantite' => (int)$d['quantite'],
+                ];
+            }
+
+            $nouveau = [];
+            foreach ($details as $d) {
+                $produit = $produitModel->find($d['produit_id']);
+                $btl = max(1, (int)($produit['bouteilles_par_caisses'] ?? 24));
+
+                $nouveau[(int)$d['produit_id']] = [
+                    'caisses' => (int)$d['quantite_caisses'],
+                    'quantite' => (int)$d['quantite_caisses'] * $btl,
+                ];
+            }
+
+            $produitsIds = array_unique(array_merge(array_keys($ancien), array_keys($nouveau)));
+
+            foreach ($produitsIds as $produitId) {
+                $ancienneQte = $ancien[$produitId]['quantite'] ?? 0;
+                $nouvelleQte = $nouveau[$produitId]['quantite'] ?? 0;
+
+                $ancienneCaisses = $ancien[$produitId]['caisses'] ?? 0;
+                $nouvelleCaisses = $nouveau[$produitId]['caisses'] ?? 0;
+
+                $diffQte = $nouvelleQte - $ancienneQte;
+                $diffCaisses = $nouvelleCaisses - $ancienneCaisses;
+
+                if ($diffQte > 0) {
+                    $stock = $this->db->fetch(
+                        "SELECT quantite_pleine FROM stocks WHERE produit_id = :p AND emplacement_id = :e",
+                        ['p' => $produitId, 'e' => $data['emplacement_id']]
+                    );
+
+                    if (!$stock || (int)$stock['quantite_pleine'] < $diffQte) {
+                        $produit = $produitModel->find($produitId);
+                        throw new Exception('Stock insuffisant pour ' . ($produit['nom'] ?? 'Produit'));
+                    }
+                }
+
+                if ($diffQte != 0 || $diffCaisses != 0) {
+                    $stockModel->updateOrCreate(
+                        $produitId,
+                        $data['emplacement_id'],
+                        [
+                            'quantite_pleine' => -$diffQte,
+                            'caisses_pleine' => -$diffCaisses
+                        ]
+                    );
+                }
+            }
+
+            $this->db->query("DELETE FROM vente_details WHERE vente_id = :id", ['id' => $id]);
+            $this->db->query("DELETE FROM vente_emballages_recus WHERE vente_id = :id", ['id' => $id]);
+
+            $this->update($id, [
+                'client_id' => $data['client_id'],
+                'emplacement_id' => $data['emplacement_id'],
+                'total_ht' => $data['total_ht'],
+                'total_tva' => $data['total_tva'],
+                'total_ttc' => $data['total_ttc'],
+                'notes' => $data['notes'] ?? ''
+            ]);
+
+            foreach ($details as $detail) {
+                $produit = $produitModel->find($detail['produit_id']);
+                $btl = max(1, (int)($produit['bouteilles_par_caisses'] ?? 24));
+
+                $this->db->insert('vente_details', [
+                    'vente_id' => $id,
+                    'produit_id' => $detail['produit_id'],
+                    'quantite_caisses' => (int)$detail['quantite_caisses'],
+                    'caisses_vides_recues' => (int)($detail['caisses_vides_recues'] ?? 0),
+                    'quantite' => (int)$detail['quantite_caisses'] * $btl,
+                    'prix_unitaire' => (float)$detail['prix_unitaire'],
+                    'prix_caisse' => (float)$detail['prix_unitaire'] * $btl,
+                    'sous_total' => (float)$detail['sous_total']
+                ]);
+            }
+
+            $emballages = $this->normaliserEmballagesRecus($emballagesRecus, $details);
+
+            foreach ($emballages as $produitId => $caissesRecues) {
+                if ((int)$caissesRecues <= 0) continue;
+
+                $this->db->insert('vente_emballages_recus', [
+                    'vente_id' => $id,
+                    'produit_id' => $produitId,
+                    'caisses_recues' => (int)$caissesRecues
+                ]);
+            }
+
+            (new Alerte())->checkStockAlerts();
+
+            $this->db->commit();
+            return ['success' => true];
+
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
 }
 

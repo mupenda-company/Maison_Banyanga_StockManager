@@ -1,5 +1,5 @@
 <?php 
-$pageTitle = 'Nouvelle vente';
+$pageTitle = 'Modifier vente';
 $autoriserInterchangeEmballages = !empty($autoriser_interchange_emballages);
 
 ob_start();
@@ -8,7 +8,7 @@ ob_start();
 <div class="max-w-4xl mx-auto">
     <div class="card">
         <div class="card-header">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Enregistrer une vente</h2>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Modifier la vente <?= htmlspecialchars($vente['numero_facture']) ?></h2>
         </div>
         <div class="card-body">
             <form 
@@ -20,24 +20,26 @@ ob_start();
                     <div>
                         <label class="label">Client *</label>
                         <input type="search" x-model="clientSearch" class="input mb-2" placeholder="Rechercher un client...">
-                        <select x-model="client_id" class="input" required>
+                        <select x-model.number="client_id" class="input" required>
                             <option value="">Sélectionner un client</option>
-                            <template x-for="c in filteredClients()" :key="c.id">
-                                <option :value="c.id" x-text="c.nom + (c.zone_nom ? ' (' + c.zone_nom + ')' : '')"></option>
-                            </template>
+                            <?php foreach ($clients as $client): ?>
+                                <option value="<?= (int)$client['id'] ?>">
+                                    <?= htmlspecialchars($client['nom'] . (!empty($client['zone_nom']) ? ' (' . $client['zone_nom'] . ')' : '')) ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
                     <div>
                         <label class="label">Point de vente *</label>
-                        <select x-model="emplacement_id" class="input" required>
+                        <select x-model.number="emplacement_id" x-init="$el.value = emplacement_id" class="input" required>
                             <?php foreach ($emplacements as $emp): ?>
-                            <option value="<?= $emp['id'] ?>"><?= htmlspecialchars($emp['nom']) ?></option>
+                            <option value="<?= (int)$emp['id'] ?>"><?= htmlspecialchars($emp['nom']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
                     <div>
                         <label class="label">N° Facture</label>
-                        <input type="text" value="<?= htmlspecialchars($numero_facture) ?>" class="input bg-gray-50" readonly>
+                        <input type="text" value="<?= htmlspecialchars($vente['numero_facture']) ?>" class="input bg-gray-50" readonly>
                     </div>
                 </div>
                 
@@ -47,7 +49,7 @@ ob_start();
                         <label class="label mb-0">Produits</label>
                         <button 
                             type="button"
-                            @click="lignes.push({ produit_id: '', caisses: 0, prix_caisse: 0 })"
+                            @click="lignes.push({ produit_id: '', caisses: 0, caisses_vides_recues: 0, prix_caisse: 0 })"
                             class="btn-secondary btn-sm"
                         >
                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -74,11 +76,13 @@ ob_start();
                                 <template x-for="(ligne, index) in lignes" :key="index">
                                     <tr>
                                         <td class="px-4 py-2">
-                                            <select x-model="ligne.produit_id" class="input w-full" @change="onProduitChange(ligne)" required>
+                                            <select x-model.number="ligne.produit_id" class="input w-full" @change="onProduitChange(ligne)" required>
                                                 <option value="">Sélectionner</option>
-                                                <template x-for="p in produits" :key="p.id">
-                                                    <option :value="p.id" x-text="p.nom"></option>
-                                                </template>
+                                                <?php foreach ($produits as $produit): ?>
+                                                    <option value="<?= (int)$produit['id'] ?>">
+                                                        <?= htmlspecialchars($produit['nom']) ?>
+                                                    </option>
+                                                <?php endforeach; ?>
                                             </select>
                                         </td>
                                         <td class="px-4 py-2 text-sm">
@@ -212,8 +216,8 @@ ob_start();
                 <div class="flex justify-end space-x-3">
                     <a href="<?= url('ventes') ?>" class="btn-secondary">Annuler</a>
                     <button type="submit" class="btn-primary" :disabled="loading">
-                        <span x-show="!loading">Enregistrer la vente</span>
-                        <span x-show="loading">Enregistrement...</span>
+                        <span x-show="!loading">Modifier la vente</span>
+                        <span x-show="loading">Modification...</span>
                     </button>
                 </div>
             </form>
@@ -224,11 +228,20 @@ ob_start();
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('venteForm', () => ({
-        client_id: '',
+        client_id: <?= (int)($vente['client_id'] ?? 0) ?>,
+        emplacement_id: <?= (int)($vente['emplacement_id'] ?? 0) ?>,
         clientSearch: '',
-        emplacement_id: '<?= $emplacements[0]['id'] ?? '' ?>',
-        notes: '',
-        lignes: [{ produit_id: '', caisses: 0, caisses_vides_recues: 0, prix_caisse: 0 }],
+        notes: <?= json_encode($vente['notes'] ?? '') ?>,
+        lignes: <?= json_encode(array_map(function ($d) {
+            $btl = max(1, (int)($d['bouteilles_par_caisses'] ?? 24));
+            return [
+                'produit_id' => (int)$d['produit_id'],
+                'caisses' => (int)($d['quantite_caisses'] ?? intdiv((int)$d['quantite'], $btl)),
+                'caisses_vides_recues' => (int)($d['caisses_vides_recues'] ?? 0),
+                'prix_caisse' => (float)($d['prix_caisse'] ?? (($d['prix_unitaire'] ?? 0) * $btl)),
+            ];
+        }, 
+        $vente['details'] ?? [])) ?>,
         clients: <?= json_encode($clients) ?>,
         produits: <?= json_encode($produits) ?>,
         tva: <?= $tva ?>,
@@ -238,11 +251,26 @@ document.addEventListener('alpine:init', () => {
         totalTtc: 0,
         coupures: { CDF: [50000, 20000, 10000, 5000, 1000, 500, 100], USD: [100, 50, 20, 10, 5, 1] },
         billetage: { CDF: {}, USD: {} },
-        emballages_recus: {},
+        emballages_recus: <?= json_encode(array_reduce($vente['emballages_recus'] ?? [], function ($carry, $item) {
+            $carry[(int)$item['produit_id']] = (int)$item['caisses_recues'];
+            return $carry;
+        }, [])) ?>,
         autoriserInterchange: <?= $autoriserInterchangeEmballages ? 'true' : 'false' ?>,
 
         init() {
+            this.client_id = Number(this.client_id);
+            this.emplacement_id = Number(this.emplacement_id);
+
+            this.lignes = this.lignes.map(l => ({
+                ...l,
+                produit_id: Number(l.produit_id),
+                caisses: Number(l.caisses || 0),
+                caisses_vides_recues: Number(l.caisses_vides_recues || 0),
+                prix_caisse: Number(l.prix_caisse || 0)
+            }));
+
             this.calculateTotals();
+
             this.$watch('lignes', () => {
                 this.calculateTotals();
             }, { deep: true });
@@ -380,7 +408,7 @@ document.addEventListener('alpine:init', () => {
                 });
                 const emballagesRecus = this.getEmballagesRecusPayload();
                 
-                await App.api('/api/ventes', 'POST', {
+                await App.api('/api/ventes/<?= (int)$vente['id'] ?>', 'PUT', {
                     client_id: parseInt(this.client_id),
                     emplacement_id: parseInt(this.emplacement_id),
                     notes: this.notes,
@@ -389,7 +417,7 @@ document.addEventListener('alpine:init', () => {
                     billetage: this.billetage
                 });
                 
-                App.notify('Vente enregistrée avec succès', 'success');
+                App.notify('Vente modifiée avec succès', 'success');
                 setTimeout(() => window.location.href = '<?= url('ventes') ?>', 1000);
             } catch (e) {
                 App.notify(e.message, 'error');
@@ -398,7 +426,9 @@ document.addEventListener('alpine:init', () => {
             }
         }
     }));
+    
 });
+
 </script>
 
 <?php 

@@ -100,6 +100,8 @@ $routes = [
     'GET::/ventes/par-vehicule/print' => ['VenteController', 'printParVehicule'],
     'GET::/ventes/par-vehicule/export' => ['VenteController', 'exportParVehicule'],
     'GET::/ventes/export' => ['VenteController', 'exportAll'],
+    'GET::/ventes/(\d+)/edit' => ['VenteController', 'edit'],
+    'PUT::/api/ventes/(\d+)' => ['VenteController', 'update'],
     
     // Clients
     'GET::/clients' => ['ClientController', 'index'],

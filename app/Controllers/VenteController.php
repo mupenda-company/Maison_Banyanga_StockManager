@@ -189,6 +189,109 @@ class VenteController extends Controller
         return $this->error($result['message'], 400);
     }
 
+    public function edit($id)
+    {
+        $this->requirePermission('ventes.creer');
+
+        $vente = $this->venteModel->getWithDetails($id);
+
+        if (!$vente) {
+            return $this->error('Vente non trouvée', 404);
+        }
+
+        if (($vente['statut'] ?? '') !== 'validee') {
+            return $this->error('Seules les ventes validées peuvent être modifiées', 422);
+        }
+
+        $this->view('ventes/edit', [
+            'vente' => $vente,
+            'clients' => $this->clientModel->getAllWithZone(),
+            'produits' => $this->produitModel->getWithStock(),
+            'emplacements' => $this->emplacementModel->getFixes(),
+            'tva' => $this->parametreModel->get('taux_tva', 16),
+            'autoriser_interchange_emballages' => $this->parametreModel->get('autoriser_interchange_emballages', '1') === '1'
+        ]);
+    }
+
+    public function update($id)
+    {
+        $this->requirePermission('ventes.creer');
+
+        $data = $this->getJsonInput();
+
+        $errors = $this->validate($data, [
+            'client_id' => 'required|numeric',
+            'emplacement_id' => 'required|numeric',
+            'details' => 'required'
+        ]);
+
+        if (!empty($errors)) {
+            return $this->error('Erreurs de validation', 422, $errors);
+        }
+
+        $tva = $this->parametreModel->get('taux_tva', 16);
+
+        $totalHt = 0;
+        $details = [];
+        $totalCaissesVendues = 0;
+
+        foreach ($data['details'] as $index => $detail) {
+            $produit = $this->produitModel->find($detail['produit_id']);
+
+            if (!$produit) {
+                return $this->error('Produit introuvable à la ligne ' . ($index + 1), 422);
+            }
+
+            $bouteillesParCaisse = max(1, (int)($produit['bouteilles_par_caisses'] ?? 24));
+            $quantiteCaisses = max(0, (int)($detail['quantite_caisses'] ?? 0));
+
+            if ($quantiteCaisses <= 0) {
+                return $this->error('La quantité doit être supérieure à 0 à la ligne ' . ($index + 1), 422);
+            }
+
+            $prixUnitaire = (float)($detail['prix_unitaire'] ?? $produit['prix_vente_unitaire']);
+            $sousTotal = $quantiteCaisses * $prixUnitaire * $bouteillesParCaisse;
+
+            $totalHt += $sousTotal;
+            $totalCaissesVendues += $quantiteCaisses;
+
+            $details[] = [
+                'produit_id' => (int)$detail['produit_id'],
+                'quantite_caisses' => $quantiteCaisses,
+                'caisses_vides_recues' => max(0, (int)($detail['caisses_vides_recues'] ?? 0)),
+                'quantite' => $quantiteCaisses * $bouteillesParCaisse,
+                'prix_unitaire' => $prixUnitaire,
+                'sous_total' => $sousTotal
+            ];
+        }
+
+        $totalTva = $totalHt * ($tva / 100);
+        $totalTtc = $totalHt + $totalTva;
+
+        $venteData = [
+            'client_id' => $data['client_id'],
+            'emplacement_id' => $data['emplacement_id'],
+            'total_ht' => $totalHt,
+            'total_tva' => $totalTva,
+            'total_ttc' => $totalTtc,
+            'notes' => $data['notes'] ?? '',
+            'updated_by' => $_SESSION['user_id'] ?? null
+        ];
+
+        $result = $this->venteModel->updateWithDetails(
+            $id,
+            $venteData,
+            $details,
+            $data['emballages_recus'] ?? null
+        );
+
+        if ($result['success']) {
+            return $this->success(['id' => $id], 'Vente modifiée avec succès');
+        }
+
+        return $this->error($result['message'], 400);
+    }   
+
     private function normaliserEmballagesRecus($emballagesRecus)
     {
         $result = [];

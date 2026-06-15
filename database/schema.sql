@@ -1317,18 +1317,18 @@ INSERT INTO `emplacements` (`code`, `nom`, `type`, `capacite`) VALUES
 ('ENT-001', 'Entrepôt Principal', 'fixe', 1000000);
 
 -- Produit par defauf pour m'evite de tous les ecrire hahha
-INSERT INTO `produits` (`id`, `code`, `nom`, `description`, `categorie`, `unite_base`, `bouteilles_par_caisses`, `prix_achat_unitaire`, `prix_achat_deposer`, `prix_achat_enlever`, `prix_vente_unitaire`, `prix_vente_caisses`, `seuil_alerte`, `actif`, `caisses_par_palette`) VALUES
-(1, 'PRD-0001', 'PRIMUS 72CL', '', 'Alcolisé', 'caisse', 12, 3023.67, 37050.00, 36284.00, 3250.00, 39000.00, 10, 1, 102),
-(2, 'PRD-0002', 'PRIMUS 50CL', '', 'Alcolisé', 'caisse', 20, 2336.70, 47500.00, 46734.00, 2500.00, 50000.00, 10, 1, 102),
-(3, 'PRD-0003', 'TURBO KING 72CL', '', 'Alcolisé', 'caisse', 12, 3182.00, 38950.00, 38184.00, 3416.67, 41000.00, 15, 1, 102),
-(4, 'PRD-0004', 'TURBO KING 50CL', '', 'Alcolisé', 'caisse', 20, 2431.70, 49400.00, 48634.00, 2600.00, 52000.00, 10, 1, 102),
-(5, 'PRD-0005', 'SUPER BOOCKB 65CL', '', 'Alcolisé', 'caisse', 12, 3182.00, 38950.00, 38184.00, 3416.67, 41000.00, 10, 1, 85),
-(6, 'PRD-0006', 'MUTZIG BL 33CL', '', 'Alcolisé', 'caisse', 24, 1868.08, 45600.00, 44834.00, 2000.00, 48000.00, 10, 1, 84),
-(7, 'PRD-0007', 'MUTZIG BL 65CL', '', 'Alcolisé', 'caisse', 12, 3182.00, 38950.00, 38184.00, 3416.67, 41000.00, 10, 1, 85),
-(8, 'PRD-0008', 'CLASS 50CL', '', 'Alcolisé', 'caisse', 20, 2336.70, 47500.00, 46734.00, 2500.00, 50000.00, 10, 1, 102),
-(9, 'PRD-0009', 'CLASS 33CL', '', 'Alcolisé', 'caisse', 24, 1947.25, 47500.00, 46734.00, 2083.33, 50000.00, 10, 1, 84),
-(10, 'PRD-0010', 'ENERGY MALT 33CL', '', 'Alcolisé', 'caisse', 24, 1551.42, 38000.00, 37234.00, 1666.67, 40000.00, 10, 1, 84),
-(11, 'PRD-0011', 'LEGEND 33CL', '', 'Alcolisé', 'caisse', 24, 2026.42, 49400.00, 48634.00, 2166.67, 52000.00, 10, 1, 84);
+INSERT INTO `produits` (`code`, `nom`, `description`, `categorie`, `unite_base`, `bouteilles_par_caisses`, `prix_achat_unitaire`, `prix_achat_deposer`, `prix_achat_enlever`, `prix_vente_unitaire`, `prix_vente_caisses`, `seuil_alerte`, `actif`, `caisses_par_palette`) VALUES
+('PRD-0001', 'PRIMUS 72CL', '', 'Alcolisé', 'caisse', 12, 3023.67, 37050.00, 36284.00, 3250.00, 39000.00, 10, 1, 102),
+('PRD-0002', 'PRIMUS 50CL', '', 'Alcolisé', 'caisse', 20, 2336.70, 47500.00, 46734.00, 2500.00, 50000.00, 10, 1, 102),
+('PRD-0003', 'TURBO KING 72CL', '', 'Alcolisé', 'caisse', 12, 3182.00, 38950.00, 38184.00, 3416.67, 41000.00, 15, 1, 102),
+('PRD-0004', 'TURBO KING 50CL', '', 'Alcolisé', 'caisse', 20, 2431.70, 49400.00, 48634.00, 2600.00, 52000.00, 10, 1, 102),
+('PRD-0005', 'SUPER BOOCKB 65CL', '', 'Alcolisé', 'caisse', 12, 3182.00, 38950.00, 38184.00, 3416.67, 41000.00, 10, 1, 85),
+('PRD-0006', 'MUTZIG BL 33CL', '', 'Alcolisé', 'caisse', 24, 1868.08, 45600.00, 44834.00, 2000.00, 48000.00, 10, 1, 84),
+('PRD-0007', 'MUTZIG BL 65CL', '', 'Alcolisé', 'caisse', 12, 3182.00, 38950.00, 38184.00, 3416.67, 41000.00, 10, 1, 85),
+('PRD-0008', 'CLASS 50CL', '', 'Alcolisé', 'caisse', 20, 2336.70, 47500.00, 46734.00, 2500.00, 50000.00, 10, 1, 102),
+('PRD-0009', 'CLASS 33CL', '', 'Alcolisé', 'caisse', 24, 1947.25, 47500.00, 46734.00, 2083.33, 50000.00, 10, 1, 84),
+('PRD-0010', 'ENERGY MALT 33CL', '', 'Alcolisé', 'caisse', 24, 1551.42, 38000.00, 37234.00, 1666.67, 40000.00, 10, 1, 84),
+('PRD-0011', 'LEGEND 33CL', '', 'Alcolisé', 'caisse', 24, 2026.42, 49400.00, 48634.00, 2166.67, 52000.00, 10, 1, 84);
 
 
 
