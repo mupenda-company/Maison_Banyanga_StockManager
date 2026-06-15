@@ -747,17 +747,14 @@ class VenteController extends Controller
             "SELECT 
                 c.id, 
                 c.nom, 
-                c.telephone, 
-                z.nom as zone_nom,
                 COALESCE(SUM(vd.quantite_caisses), 0) as total_caisses
             FROM clients c
             JOIN ventes v ON v.client_id = c.id
             JOIN vente_details vd ON vd.vente_id = v.id
-            LEFT JOIN zones z ON c.zone_id = z.id
             WHERE DATE(v.date_vente) BETWEEN :date_debut AND :date_fin
             AND v.statut = 'validee'
             " . $clientClause . $emplacementClause . "
-            GROUP BY c.id, c.nom, c.telephone, z.nom
+            GROUP BY c.id, c.nom
             HAVING total_caisses >= 1
             ORDER BY c.nom",
             $params
@@ -822,7 +819,7 @@ class VenteController extends Controller
         $sheet->setTitle('Ventes');
 
         // En-têtes en gras
-        $headers = ['Numero', 'Zone', 'Telephone', 'Nom Client'];
+        $headers = ['Nom Client'];
         foreach ($produits as $produit) {
             $headers[] = $produit['nom'];
         }
@@ -844,36 +841,77 @@ class VenteController extends Controller
 
         // Données
         $rowNum = 2;
+        $totauxProduits = [];
+        foreach ($produits as $produit) {
+            $totauxProduits[$produit['nom']] = 0;
+        }
+
+        $totalGeneralCaisses = 0;
+        $totalGeneralCA = 0;
+        $totalGeneralRistourne = 0;
         foreach ($allClients as $client) {
             $cid = $client['id'];
             $clientData = $salesByClient[$cid] ?? null;
-
             if (!$clientData) {
                 continue;
             }
 
             $row = [
-                $cid,
-                $client['zone_nom'] ?? '',
-                $client['telephone'] ?? '',
                 $client['nom']
             ];
 
             $totalCaisses = 0;
             foreach ($produits as $produit) {
                 $qty = $clientData['produits_qty'][$produit['nom']] ?? 0;
-                $row[] = (int) $qty;   // nombre entier, pas de virgule parasite
+
+                $row[] = (int)$qty;
                 $totalCaisses += $qty;
+
+                // Total par produit
+                $totauxProduits[$produit['nom']] += $qty;
             }
 
             $row[] = (int) $totalCaisses;
             $row[] = (float) $clientData['total_ttc'];
             $row[] = (float) $clientData['ristourne'];
 
+            $totalGeneralCaisses += $totalCaisses;
+            $totalGeneralCA += $clientData['total_ttc'];
+            $totalGeneralRistourne += $clientData['ristourne'];
+            
             $sheet->fromArray($row, null, 'A' . $rowNum);
             $rowNum++;
         }
+        $totalRow = [
+            'TOTAL GENERAL'
+        ];
 
+        foreach ($produits as $produit) {
+            $totalRow[] = (int)$totauxProduits[$produit['nom']];
+        }
+
+        $totalRow[] = (int)$totalGeneralCaisses;
+        $totalRow[] = (float)$totalGeneralCA;
+        $totalRow[] = (float)$totalGeneralRistourne;
+
+        $sheet->fromArray($totalRow, null, 'A' . $rowNum);
+        $sheet->getStyle(
+            'A' . $rowNum . ':' . $lastCol . $rowNum
+        )->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'size' => 12
+            ],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'FFF2CC']
+            ],
+            'borders' => [
+                'top' => [
+                    'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK
+                ]
+            ]
+        ]);
         // Largeur automatique pour toutes les colonnes
         foreach (range('A', $lastCol) as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
