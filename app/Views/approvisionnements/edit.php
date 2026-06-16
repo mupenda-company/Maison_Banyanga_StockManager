@@ -1,5 +1,5 @@
 <?php
-$pageTitle = 'Nouvel approvisionnement';
+$pageTitle = 'Modifier approvisionnement';
 ob_start();
 $produitsApiUrl = url('api/produits');
 $approvisionnementsApiUrl = url('api/approvisionnements');
@@ -27,80 +27,91 @@ $approvisionnementsUrl = url('approvisionnements');
             }
             return quantite;
         }
-    </script>
+        function approEditForm() {
+            return {
+                date: '<?= $approvisionnement['date_approvisionnement'] ?>',
+                fournisseur: <?= json_encode($approvisionnement['fournisseur'] ?? 'Bralima') ?>,
+                type_achat: <?= json_encode($approvisionnement['details'][0]['type_achat'] ?? 'deposer') ?>,
+                notes: <?= json_encode($approvisionnement['notes'] ?? '') ?>,
+                lignes: <?= json_encode(array_map(function($d) {
+                    return [
+                        'produit_id' => (int)$d['produit_id'],
+                        'quantite_achat' => (int)$d['quantite_caisses'],
+                        'unite_achat' => 'caisse'
+                    ];
+                }, $approvisionnement['details'] ?? [])) ?>,
+                produits: [],
+                loading: false,
+                total: 0,
 
-    <div class="card">
-        <div class="card-header">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Nouvel approvisionnement BdGL</h2>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Choisissez pour chaque produit un achat par caisse ou par palette. Le stock est enregistre en caisses.
-            </p>
-        </div>
-        <div class="card-body">
-            <form
-                x-data="{
-                    date: '<?= date('Y-m-d') ?>',
-                    fournisseur: 'BdGL',
-                    type_achat: 'enlever',
-                    notes: '',
-                    lignes: [{ produit_id: '', quantite_achat: 0, unite_achat: 'caisse' }],
-                    produits: [],
-                    loading: false,
-                    total: 0,
-                    recalc() {
-                        this.total = 0;
-                        this.lignes.forEach(l => {
-                            const p = this.produits.find(p => p.id == l.produit_id);
-                            if (p) {
-                                this.total += getQuantiteCaisses(l, p) * getPrixCaisse(p, this.type_achat);
-                            }
-                        });
-                    }
-                }"
-                x-init="
-                    App.api('<?= $produitsApiUrl ?>').then(r => {
-                        produits = Array.isArray(r) ? r : (r.data || []);
-                        if (produits.length === 0) {
-                            App.notify('Attention: aucun produit actif trouve.', 'warning');
+                init() {
+                    App.api('<?= url('api/produits') ?>').then(r => {
+                        this.produits = Array.isArray(r) ? r : (r.data || []);
+                        this.recalc();
+                    });
+
+                    this.$watch('lignes', () => this.recalc(), { deep: true });
+                },
+
+                recalc() {
+                    this.total = 0;
+                    this.lignes.forEach(l => {
+                        const p = this.produits.find(p => p.id == l.produit_id);
+                        if (p) {
+                            this.total += getQuantiteCaisses(l, p) * getPrixCaisse(p, this.type_achat);
                         }
-                    }).catch(() => App.notify('Erreur lors du chargement des produits', 'error'));
-                    $watch('lignes', () => recalc(), { deep: true });
-                "
-                @submit.prevent="async () => {
-                    loading = true;
+                    });
+                },
+
+                async save() {
+                    this.loading = true;
                     try {
-                        const details = lignes.filter(l => {
-                            const p = produits.find(p => p.id == l.produit_id);
-                            return p && getQuantiteCaisses(l, p) > 0;
-                        }).map(l => {
-                            const p = produits.find(p => p.id == l.produit_id);
-                            return {
-                                produit_id: parseInt(l.produit_id),
-                                quantite_caisses: getQuantiteCaisses(l, p),
-                                type_achat: type_achat
-                            };
-                        });
+                        const details = this.lignes
+                            .filter(l => {
+                                const p = this.produits.find(p => p.id == l.produit_id);
+                                return p && getQuantiteCaisses(l, p) > 0;
+                            })
+                            .map(l => {
+                                const p = this.produits.find(p => p.id == l.produit_id);
+                                return {
+                                    produit_id: parseInt(l.produit_id),
+                                    quantite_caisses: getQuantiteCaisses(l, p),
+                                    type_achat: this.type_achat
+                                };
+                            });
 
                         if (details.length === 0) {
                             throw new Error('Ajoutez au moins un produit');
                         }
 
-                        await App.api('<?= $approvisionnementsApiUrl ?>', 'POST', {
-                            date_approvisionnement: date,
-                            fournisseur: fournisseur,
-                            notes: notes,
+                        await App.api('<?= url('api/approvisionnements/' . $approvisionnement['id']) ?>', 'PUT', {
+                            date_approvisionnement: this.date,
+                            fournisseur: this.fournisseur,
+                            notes: this.notes,
                             details: details
                         });
 
-                        App.notify('Approvisionnement enregistre avec succes');
-                        window.location.href = '<?= $approvisionnementsUrl ?>';
+                        App.notify('Approvisionnement modifié avec succès');
+                        window.location.href = '<?= url('approvisionnements') ?>';
                     } catch (e) {
                         App.notify(e.message, 'error');
                     } finally {
-                        loading = false;
+                        this.loading = false;
                     }
-                }"
-            >
+                }
+            }
+        }
+    </script>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Modifier l'approvisionnement <?= htmlspecialchars($approvisionnement['numero_bon']) ?></h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Choisissez pour chaque produit un achat par caisse ou par palette. Le stock est enregistre en caisses.
+            </p>
+        </div>
+        <div class="card-body">
+            <form x-data="approEditForm()" x-init="init()" @submit.prevent="save()" >
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                     <div>
                         <label class="label">Date *</label>
@@ -157,11 +168,13 @@ $approvisionnementsUrl = url('approvisionnements');
                                 <template x-for="(ligne, index) in lignes" :key="index">
                                     <tr>
                                         <td class="px-3 py-2 min-w-64">
-                                            <select x-model="ligne.produit_id" class="input w-full" required>
+                                            <select x-model.number="ligne.produit_id" class="input w-full" required @change="recalc()">
                                                 <option value="">Selectionner</option>
-                                                <template x-for="p in produits" :key="p.id">
-                                                    <option :value="p.id" x-text="p.nom + ' (' + p.code + ')'"></option>
-                                                </template>
+                                                <?php foreach ($produits as $produit): ?>
+                                                    <option value="<?= (int)$produit['id'] ?>">
+                                                        <?= htmlspecialchars($produit['nom'] . ' (' . $produit['code'] . ')') ?>
+                                                    </option>
+                                                <?php endforeach; ?>
                                             </select>
                                         </td>
                                         <td class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
@@ -224,8 +237,8 @@ $approvisionnementsUrl = url('approvisionnements');
                 <div class="flex justify-end space-x-3">
                     <a href="<?= $approvisionnementsUrl ?>" class="btn-secondary">Annuler</a>
                     <button type="submit" class="btn-primary" :disabled="loading">
-                        <span x-show="!loading">Enregistrer</span>
-                        <span x-show="loading">Enregistrement...</span>
+                        <span x-show="!loading">Modifier</span>
+                        <span x-show="loading">Modification...</span>
                     </button>
                 </div>
             </form>

@@ -397,7 +397,106 @@ class ApprovisionnementController extends Controller
             'dettes' => $dettes
         ]);
     }
+    public function edit($id)
+    {
+        $this->requirePermission('approvisionnements.voir');
 
+        $approvisionnement = $this->approvisionnementModel->getWithDetails($id);
+
+        if (!$approvisionnement) {
+            return $this->error('Approvisionnement non trouvé', 404);
+        }
+
+        if (($approvisionnement['statut'] ?? '') !== 'valide') {
+            return $this->error('Seuls les approvisionnements validés peuvent être modifiés', 422);
+        }
+
+        $this->view('approvisionnements/edit', [
+            'approvisionnement' => $approvisionnement,
+            'produits' => $this->produitModel->getActive(),
+            'emplacementPrincipal' => $this->emplacementModel->getPrincipal(),
+            'numero_bon' => $approvisionnement['numero_bon']
+        ]);
+    }
+
+    public function update($id)
+    {
+        $this->requirePermission('approvisionnements.voir');
+
+        $data = $this->getJsonInput();
+
+        $errors = $this->validate($data, [
+            'date_approvisionnement' => 'required',
+            'details' => 'required'
+        ]);
+
+        if (!empty($errors)) {
+            return $this->error('Erreurs de validation', 422, $errors);
+        }
+
+        $details = [];
+        $totalHt = 0;
+
+        foreach ($data['details'] as $detail) {
+            $produit = $this->produitModel->find($detail['produit_id']);
+            if (!$produit) {
+                return $this->error('Produit introuvable', 422);
+            }
+
+            $typeAchat = $detail['type_achat'] ?? 'deposer';
+
+            if ($typeAchat === 'enlever' && $produit['prix_achat_enlever'] > 0) {
+                $prixCaisse = $produit['prix_achat_enlever'];
+            } elseif ($typeAchat === 'deposer' && $produit['prix_achat_deposer'] > 0) {
+                $prixCaisse = $produit['prix_achat_deposer'];
+            } else {
+                $prixCaisse = $produit['prix_achat_unitaire'] * $produit['bouteilles_par_caisses'];
+            }
+
+            $quantiteCaisses = max(0, (int)($detail['quantite_caisses'] ?? 0));
+
+            if ($quantiteCaisses <= 0) {
+                continue;
+            }
+
+            $sousTotal = $quantiteCaisses * $prixCaisse;
+            $totalHt += $sousTotal;
+
+            $details[] = [
+                'produit_id' => (int)$detail['produit_id'],
+                'quantite_caisses' => $quantiteCaisses,
+                'quantite_bouteilles' => $quantiteCaisses * (int)$produit['bouteilles_par_caisses'],
+                'prix_unitaire' => $prixCaisse / max(1, (int)$produit['bouteilles_par_caisses']),
+                'prix_caisse' => $prixCaisse,
+                'type_achat' => $typeAchat,
+                'sous_total' => $sousTotal
+            ];
+        }
+
+        if (empty($details)) {
+            return $this->error('Ajoutez au moins un produit', 422);
+        }
+
+        $emplacementPrincipal = $this->emplacementModel->getPrincipal();
+
+        $result = $this->approvisionnementModel->updateWithDetails(
+            $id,
+            [
+                'date_approvisionnement' => $data['date_approvisionnement'],
+                'fournisseur' => $data['fournisseur'] ?? 'Bralima',
+                'notes' => $data['notes'] ?? '',
+                'total_ht' => $totalHt
+            ],
+            $details,
+            $emplacementPrincipal['id']
+        );
+
+        if ($result['success']) {
+            return $this->success(['id' => $id], 'Approvisionnement modifié avec succès');
+        }
+
+        return $this->error($result['message'], 400);
+    }
     public function print($id)
     {
         $this->requirePermission('approvisionnements.voir');

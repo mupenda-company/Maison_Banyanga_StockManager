@@ -76,6 +76,8 @@ $routes = [
     'POST::/api/approvisionnements/(\d+)/annuler' => ['ApprovisionnementController', 'annuler'],
     'GET::/approvisionnements/dettes' => ['ApprovisionnementController', 'dettes'],
     'POST::/api/dettes/(\d+)/rembourser' => ['ApprovisionnementController', 'rembourserDette'],
+    'GET::/approvisionnements/(\d+)/edit' => ['ApprovisionnementController', 'edit'],
+    'PUT::/api/approvisionnements/(\d+)' => ['ApprovisionnementController', 'update'],
     
     // Retours emballages
     'GET::/retours-emballages' => ['RetourController', 'index'],
@@ -151,7 +153,7 @@ $routes = [
     'GET::/api/mobile/ventes' => ['MobileController', 'listVentes'],
     'GET::/api/mobile/ventes-par-agent' => ['MobileController', 'ventesParAgent'],
     'POST::/api/mobile/ristournes/(\d+)/payer' => ['MobileController', 'payerRistourne'],
-        'POST::/api/mobile/mission_ristournes/(\d+)/encaisser' => ['MobileController', 'encaisserMissionRistourne'],
+    'POST::/api/mobile/mission_ristournes/(\d+)/encaisser' => ['MobileController', 'encaisserMissionRistourne'],
     
     // Pertes
     'GET::/pertes' => ['PerteController', 'index'],

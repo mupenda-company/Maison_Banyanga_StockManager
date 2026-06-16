@@ -174,7 +174,91 @@ class Approvisionnement extends Model
     {
         return $this->update($id, ['statut' => 'valide']);
     }
-    
+
+    public function updateWithDetails($id, $data, $details, $emplacementPrincipalId)
+    {
+        try {
+            $this->db->beginTransaction();
+
+            $ancienAppro = $this->getWithDetails($id);
+
+            if (!$ancienAppro) {
+                throw new Exception('Approvisionnement non trouvé');
+            }
+
+            if (($ancienAppro['statut'] ?? '') !== 'valide') {
+                throw new Exception('Seuls les approvisionnements validés peuvent être modifiés');
+            }
+
+            $stockModel = new Stock();
+
+            $ancien = [];
+            foreach ($ancienAppro['details'] as $d) {
+                $ancien[(int)$d['produit_id']] = [
+                    'caisses' => (int)$d['quantite_caisses'],
+                    'bouteilles' => (int)$d['quantite_bouteilles']
+                ];
+            }
+
+            $nouveau = [];
+            foreach ($details as $d) {
+                $nouveau[(int)$d['produit_id']] = [
+                    'caisses' => (int)$d['quantite_caisses'],
+                    'bouteilles' => (int)$d['quantite_bouteilles']
+                ];
+            }
+
+            $produitsIds = array_unique(array_merge(array_keys($ancien), array_keys($nouveau)));
+
+            foreach ($produitsIds as $produitId) {
+                $ancienneCaisses = $ancien[$produitId]['caisses'] ?? 0;
+                $nouvelleCaisses = $nouveau[$produitId]['caisses'] ?? 0;
+
+                $ancienneBouteilles = $ancien[$produitId]['bouteilles'] ?? 0;
+                $nouvelleBouteilles = $nouveau[$produitId]['bouteilles'] ?? 0;
+
+                $diffCaisses = $nouvelleCaisses - $ancienneCaisses;
+                $diffBouteilles = $nouvelleBouteilles - $ancienneBouteilles;
+
+                if ($diffCaisses != 0 || $diffBouteilles != 0) {
+                    $stockModel->updateOrCreate(
+                        $produitId,
+                        $emplacementPrincipalId,
+                        [
+                            'quantite_pleine' => $diffBouteilles,
+                            'caisses_pleine' => $diffCaisses
+                        ]
+                    );
+                }
+            }
+
+            $this->update($id, [
+                'date_approvisionnement' => $data['date_approvisionnement'],
+                'fournisseur' => $data['fournisseur'] ?? 'Bralima',
+                'notes' => $data['notes'] ?? '',
+                'total_ht' => $data['total_ht']
+            ]);
+
+            $this->db->query(
+                "DELETE FROM approvisionnement_details WHERE approvisionnement_id = :id",
+                ['id' => $id]
+            );
+
+            foreach ($details as $detail) {
+                $detail['approvisionnement_id'] = $id;
+                $this->db->insert('approvisionnement_details', $detail);
+            }
+
+            (new Alerte())->checkStockAlerts();
+
+            $this->db->commit();
+            return ['success' => true];
+
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
     /**
      * Annuler un approvisionnement
      */
