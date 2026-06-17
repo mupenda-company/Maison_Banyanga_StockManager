@@ -49,6 +49,10 @@ class Emplacement extends Model
                     COALESCE(SUM(s.quantite_vide), 0) as total_stock_vide,
                     CAST(COALESCE(SUM(s.caisses_pleine), 0) AS SIGNED) as total_caisses_pleine,
                     CAST(COALESCE(SUM(s.caisses_vide), 0) AS SIGNED) as total_caisses_vide,
+                    CAST(COALESCE(SUM(COALESCE(s.caisses_pleine_physique, s.caisses_pleine, 0)), 0) AS SIGNED) as total_caisses_pleine_physique,
+                    CAST(COALESCE(SUM(COALESCE(s.caisses_vide_physique, s.caisses_vide, 0)), 0) AS SIGNED) as total_caisses_vide_physique,
+                    CAST(COALESCE(SUM(COALESCE(s.caisses_pleine_physique, s.caisses_pleine, 0) - COALESCE(s.caisses_pleine, 0)), 0) AS SIGNED) as ecart_caisses_pleine,
+                    CAST(COALESCE(SUM(COALESCE(s.caisses_vide_physique, s.caisses_vide, 0) - COALESCE(s.caisses_vide, 0)), 0) AS SIGNED) as ecart_caisses_vide,
                     MAX(v.id) as vehicule_id,
                     MAX(v.immatriculation) as vehicule_immatriculation
              FROM {$this->table} e

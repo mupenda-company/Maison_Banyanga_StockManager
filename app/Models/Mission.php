@@ -1440,6 +1440,17 @@ class Mission extends Model
                     [$bouteillesVendues, $quantiteRetournee, $caissesRetournees, $caissesVidesRetournees, $id, $produitId]
                 );
 
+                // Enregistrer le stock physique constaté sur le véhicule à la clôture.
+                // Cela ne remplace pas le stock système : cela sert à comparer système vs physique.
+                if ($emplacementVehicule > 0) {
+                    $stockModel->setPhysicalStock($produitId, $emplacementVehicule, [
+                        'caisses_pleine' => $caissesRetournees,
+                        'caisses_vide' => $caissesVidesRetournees,
+                        'quantite_pleine' => $quantiteRetournee,
+                        'quantite_vide' => $caissesVidesRetournees * $bouteillesParCaisse,
+                    ], $id);
+                }
+
                 // Les caisses pleines retournées restent dans le véhicule.
 
                 if ($caissesVidesRetournees > 0 && $emplacementPrincipalId > 0) {

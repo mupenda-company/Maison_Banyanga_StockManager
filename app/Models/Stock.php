@@ -12,6 +12,40 @@ class Stock extends Model
     {
         (new Alerte())->checkStockAlerts();
     }
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->ensurePhysicalStockColumns();
+    }
+
+    private function ensurePhysicalStockColumns(): void
+    {
+        $columns = [
+            'quantite_pleine_physique' => "ALTER TABLE stocks ADD quantite_pleine_physique INT NULL AFTER quantite_vide",
+            'quantite_vide_physique' => "ALTER TABLE stocks ADD quantite_vide_physique INT NULL AFTER quantite_pleine_physique",
+            'caisses_pleine_physique' => "ALTER TABLE stocks ADD caisses_pleine_physique INT NULL AFTER caisses_vide",
+            'caisses_vide_physique' => "ALTER TABLE stocks ADD caisses_vide_physique INT NULL AFTER caisses_pleine_physique",
+            'last_physical_count_at' => "ALTER TABLE stocks ADD last_physical_count_at DATETIME NULL AFTER caisses_vide_physique",
+            'last_physical_mission_id' => "ALTER TABLE stocks ADD last_physical_mission_id INT UNSIGNED NULL AFTER last_physical_count_at",
+        ];
+
+        foreach ($columns as $column => $sql) {
+            $exists = (bool) $this->db->fetchColumn(
+                "SELECT COUNT(*)
+                 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'stocks'
+                   AND COLUMN_NAME = :column",
+                ['column' => $column]
+            );
+
+            if (!$exists) {
+                $this->db->query($sql);
+            }
+        }
+    }
+
     
     /**
      * Récupérer le stock d'un produit dans un emplacement
@@ -115,7 +149,13 @@ class Stock extends Model
         $sql = "SELECT s.*, p.nom as produit_nom, p.code as produit_code, p.seuil_alerte,
                        e.nom as emplacement_nom, e.type as emplacement_type,
                        v.id as vehicule_id,
-                       v.immatriculation as vehicule_immatriculation
+                       v.immatriculation as vehicule_immatriculation,
+                       COALESCE(s.quantite_pleine_physique, s.quantite_pleine, 0) as quantite_pleine_physique_calc,
+                       COALESCE(s.quantite_vide_physique, s.quantite_vide, 0) as quantite_vide_physique_calc,
+                       COALESCE(s.caisses_pleine_physique, s.caisses_pleine, 0) as caisses_pleine_physique_calc,
+                       COALESCE(s.caisses_vide_physique, s.caisses_vide, 0) as caisses_vide_physique_calc,
+                       (COALESCE(s.caisses_pleine_physique, s.caisses_pleine, 0) - COALESCE(s.caisses_pleine, 0)) as ecart_caisses_pleine,
+                       (COALESCE(s.caisses_vide_physique, s.caisses_vide, 0) - COALESCE(s.caisses_vide, 0)) as ecart_caisses_vide
                 FROM {$this->table} s
                 JOIN produits p ON s.produit_id = p.id
                 JOIN emplacements e ON s.emplacement_id = e.id
@@ -279,6 +319,65 @@ class Stock extends Model
     }
     
     /**
+     * Définir le stock physique constaté sans changer le stock système.
+     * Utilisé surtout à la clôture de mission pour garder une double lecture :
+     * - caisses_pleine / caisses_vide = stock système selon les ventes saisies ;
+     * - *_physique = stock réellement compté sur terrain.
+     */
+    public function setPhysicalStock($produitId, $emplacementId, $data, $missionId = null)
+    {
+        $produit = (new Produit())->find($produitId);
+        $btlParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+        if ($btlParCaisse <= 0) {
+            $btlParCaisse = 24;
+        }
+
+        $caissesPleines = max(0, (int) ($data['caisses_pleine'] ?? 0));
+        $caissesVides = max(0, (int) ($data['caisses_vide'] ?? 0));
+        $quantitePleine = isset($data['quantite_pleine'])
+            ? max(0, (int) $data['quantite_pleine'])
+            : ($caissesPleines * $btlParCaisse);
+        $quantiteVide = isset($data['quantite_vide'])
+            ? max(0, (int) $data['quantite_vide'])
+            : ($caissesVides * $btlParCaisse);
+
+        $existing = $this->getStock($produitId, $emplacementId);
+        if (!$existing) {
+            $this->create([
+                'produit_id' => $produitId,
+                'emplacement_id' => $emplacementId,
+                'quantite_pleine' => 0,
+                'quantite_vide' => 0,
+                'caisses_pleine' => 0,
+                'caisses_vide' => 0,
+            ]);
+        }
+
+        $this->db->query(
+            "UPDATE {$this->table} SET
+                quantite_pleine_physique = :quantite_pleine_physique,
+                quantite_vide_physique = :quantite_vide_physique,
+                caisses_pleine_physique = :caisses_pleine_physique,
+                caisses_vide_physique = :caisses_vide_physique,
+                last_physical_count_at = NOW(),
+                last_physical_mission_id = :mission_id,
+                updated_at = NOW()
+             WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id",
+            [
+                'produit_id' => $produitId,
+                'emplacement_id' => $emplacementId,
+                'quantite_pleine_physique' => $quantitePleine,
+                'quantite_vide_physique' => $quantiteVide,
+                'caisses_pleine_physique' => $caissesPleines,
+                'caisses_vide_physique' => $caissesVides,
+                'mission_id' => $missionId,
+            ]
+        );
+
+        return true;
+    }
+
+    /**
      * Déduire du stock vide
      */
     public function deduireVide($produitId, $emplacementId, $quantiteCaisses)
@@ -353,7 +452,13 @@ class Stock extends Model
                     COALESCE(s.quantite_pleine, 0) as quantite_pleine,
                     COALESCE(s.quantite_vide, 0) as quantite_vide,
                     COALESCE(s.caisses_pleine, 0) as caisses_pleine,
-                    COALESCE(s.caisses_vide, 0) as caisses_vide
+                    COALESCE(s.caisses_vide, 0) as caisses_vide,
+                    COALESCE(s.quantite_pleine_physique, s.quantite_pleine, 0) as quantite_pleine_physique_calc,
+                    COALESCE(s.quantite_vide_physique, s.quantite_vide, 0) as quantite_vide_physique_calc,
+                    COALESCE(s.caisses_pleine_physique, s.caisses_pleine, 0) as caisses_pleine_physique_calc,
+                    COALESCE(s.caisses_vide_physique, s.caisses_vide, 0) as caisses_vide_physique_calc,
+                    (COALESCE(s.caisses_pleine_physique, s.caisses_pleine, 0) - COALESCE(s.caisses_pleine, 0)) as ecart_caisses_pleine,
+                    (COALESCE(s.caisses_vide_physique, s.caisses_vide, 0) - COALESCE(s.caisses_vide, 0)) as ecart_caisses_vide
                 FROM produits p
                 JOIN emplacements e ON e.actif = 1
                 LEFT JOIN {$this->table} s ON p.id = s.produit_id AND e.id = s.emplacement_id
@@ -396,6 +501,10 @@ class Stock extends Model
                     COUNT(DISTINCT p.id) as nb_produits,
                     COALESCE(SUM(s.caisses_pleine), 0) as total_caisses_pleine,
                     COALESCE(SUM(s.caisses_vide), 0) as total_caisses_vide,
+                    COALESCE(SUM(COALESCE(s.caisses_pleine_physique, s.caisses_pleine, 0)), 0) as total_caisses_pleine_physique,
+                    COALESCE(SUM(COALESCE(s.caisses_vide_physique, s.caisses_vide, 0)), 0) as total_caisses_vide_physique,
+                    COALESCE(SUM(COALESCE(s.caisses_pleine_physique, s.caisses_pleine, 0) - COALESCE(s.caisses_pleine, 0)), 0) as total_ecart_caisses_pleine,
+                    COALESCE(SUM(COALESCE(s.caisses_vide_physique, s.caisses_vide, 0) - COALESCE(s.caisses_vide, 0)), 0) as total_ecart_caisses_vide,
                     COALESCE(SUM(s.quantite_pleine), 0) as total_btl_pleine,
                     COALESCE(SUM(s.quantite_vide), 0) as total_btl_vide,
                     SUM(COALESCE(s.caisses_pleine, 0) * (COALESCE(p.prix_vente_caisses, 0))) as valeur_stock
@@ -412,6 +521,10 @@ class Stock extends Model
             'vides' => (int)$row['total_btl_vide'],
             'caisses_pleine' => (int) round($row['total_caisses_pleine']),
             'caisses_vide' => (int) round($row['total_caisses_vide']),
+            'caisses_pleine_physique' => (int) round($row['total_caisses_pleine_physique'] ?? $row['total_caisses_pleine']),
+            'caisses_vide_physique' => (int) round($row['total_caisses_vide_physique'] ?? $row['total_caisses_vide']),
+            'ecart_caisses_pleine' => (int) round($row['total_ecart_caisses_pleine'] ?? 0),
+            'ecart_caisses_vide' => (int) round($row['total_ecart_caisses_vide'] ?? 0),
             'valeur' => (float)$row['valeur_stock'],
             'nb_produits' => (int)$row['nb_produits']
         ];

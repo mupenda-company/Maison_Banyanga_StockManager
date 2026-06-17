@@ -47,7 +47,11 @@ ob_start();
     </div>
 </div>
 
-<!-- Résumé par emplacement -->
+<!-- Résumé par emplacement : stock système -->
+<div class="mb-3">
+    <h2 class="text-lg font-bold text-gray-900 dark:text-white">Stock système <span class="text-sm font-normal text-gray-500 dark:text-gray-400">(basé sur les ventes et mouvements)</span></h2>
+    <p class="text-sm text-gray-500 dark:text-gray-400">Total calculé automatiquement par le système pour chaque entrepôt ou véhicule.</p>
+</div>
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     <?php foreach ($emplacements as $emp): 
         $caisses = (int) round($emp['total_caisses_pleine'] ?? 0);
@@ -84,6 +88,50 @@ ob_start();
             </span>
         </p>
     <?= $isVehicule ? '</a>' : '</div>' ?>
+    <?php endforeach; ?>
+</div>
+
+<!-- Résumé par emplacement : stock physique -->
+<div class="mb-3">
+    <h2 class="text-lg font-bold text-gray-900 dark:text-white">Stock physique <span class="text-sm font-normal text-gray-500 dark:text-gray-400">(comptage réel)</span></h2>
+    <p class="text-sm text-gray-500 dark:text-gray-400">Total constaté physiquement. Ces cartes sont seulement informatives et ne redirigent pas vers les véhicules.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <?php foreach ($emplacements as $emp): 
+        $systeme = (int) round($emp['total_caisses_pleine'] ?? 0);
+        $physique = (int) round($emp['total_caisses_pleine_physique'] ?? $emp['total_caisses_pleine'] ?? 0);
+        $ecart = (int) round($emp['ecart_caisses_pleine'] ?? ($physique - $systeme));
+        $hasEcart = $ecart !== 0 || (int) round($emp['ecart_caisses_vide'] ?? 0) !== 0;
+    ?>
+    <div class="stat-card">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="stat-label"><?= htmlspecialchars($emp['nom']) ?></p>
+                <p class="stat-value text-2xl font-bold <?= $hasEcart ? 'text-red-600' : 'text-green-600' ?>">
+                    <?= number_format($physique, 0, '.', ' ') ?> <span class="text-sm font-normal text-gray-500">cs</span>
+                </p>
+            </div>
+            <div class="w-12 h-12 rounded-full flex items-center justify-center <?= $hasEcart ? 'bg-red-100 text-red-600 dark:bg-red-900/50' : 'bg-green-100 text-green-600 dark:bg-green-900/50' ?>">
+                <?php if ($hasEcart): ?>
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z"/>
+                </svg>
+                <?php else: ?>
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <?php endif; ?>
+            </div>
+        </div>
+        <div class="flex items-center gap-2 mt-2 flex-wrap">
+            <span class="badge-<?= $emp['type'] === 'fixe' ? 'info' : 'warning' ?>">
+                <?= $emp['type'] === 'fixe' ? 'Fixe' : 'Mobile' ?>
+            </span>
+            <span class="inline-flex px-2 py-0.5 rounded text-xs font-bold <?= $hasEcart ? 'bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/40 dark:text-red-400 dark:border-red-800' : 'bg-green-100 text-green-700 border border-green-200 dark:bg-green-900/40 dark:text-green-400 dark:border-green-800' ?>">
+                <?= $hasEcart ? 'Écart: ' . ($ecart > 0 ? '+' : '') . number_format($ecart, 0, '.', ' ') . ' cs' : 'Aligné' ?>
+            </span>
+        </div>
+    </div>
     <?php endforeach; ?>
 </div>
 
@@ -142,15 +190,18 @@ ob_start();
                         <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Produit</th>
                         <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Emplacement</th>
                         <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Type</th>
-                        <th class="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Stock Plein</th>
-                        <th class="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Stock Vide</th>
+                        <th class="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Système plein</th>
+                        <th class="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Système vide</th>
+                        <th class="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Physique plein</th>
+                        <th class="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Physique vide</th>
+                        <th class="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Écart</th>
                         <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Statut</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                     <?php if (empty($stocks)): ?>
                     <tr>
-                        <td colspan="6" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colspan="9" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                             Aucun stock enregistré
                         </td>
                     </tr>
@@ -174,16 +225,44 @@ ob_start();
                                     <?= $stock['emplacement_type'] === 'fixe' ? 'Fixe' : 'Mobile' ?>
                                 </span>
                             </td>
+                            <?php
+                                $systemePlein = (int) round($stock['caisses_pleine'] ?? 0);
+                                $systemeVide = (int) round($stock['caisses_vide'] ?? 0);
+                                $physiquePlein = (int) round($stock['caisses_pleine_physique_calc'] ?? $systemePlein);
+                                $physiqueVide = (int) round($stock['caisses_vide_physique_calc'] ?? $systemeVide);
+                                $ecartPlein = $physiquePlein - $systemePlein;
+                                $ecartVide = $physiqueVide - $systemeVide;
+                                $hasEcart = ($ecartPlein !== 0 || $ecartVide !== 0);
+                            ?>
                             <td class="px-4 py-3 text-right">
-                                <div class="font-bold text-green-600 truncate"><?= number_format((int) round($stock['caisses_pleine']), 0, '.', ' ') ?> <span class="text-[10px] font-normal">cs</span></div>
+                                <div class="font-bold text-green-600 truncate"><?= number_format($systemePlein, 0, '.', ' ') ?> <span class="text-[10px] font-normal">cs</span></div>
                             </td>
                             <td class="px-4 py-3 text-right">
-                                <div class="font-bold text-gray-600 dark:text-gray-400 truncate"><?= number_format((int) round($stock['caisses_vide']), 0, '.', ' ') ?> <span class="text-[10px] font-normal">cs</span></div>
+                                <div class="font-bold text-gray-600 dark:text-gray-400 truncate"><?= number_format($systemeVide, 0, '.', ' ') ?> <span class="text-[10px] font-normal">cs</span></div>
+                            </td>
+                            <td class="px-4 py-3 text-right">
+                                <div class="font-bold text-blue-600 truncate"><?= number_format($physiquePlein, 0, '.', ' ') ?> <span class="text-[10px] font-normal">cs</span></div>
+                            </td>
+                            <td class="px-4 py-3 text-right">
+                                <div class="font-bold text-purple-600 truncate"><?= number_format($physiqueVide, 0, '.', ' ') ?> <span class="text-[10px] font-normal">cs</span></div>
+                            </td>
+                            <td class="px-4 py-3 text-right">
+                                <div class="<?= $hasEcart ? 'font-bold text-red-600' : 'font-medium text-green-600' ?>">
+                                    P: <?= ($ecartPlein > 0 ? '+' : '') . number_format($ecartPlein, 0, '.', ' ') ?> cs<br>
+                                    V: <?= ($ecartVide > 0 ? '+' : '') . number_format($ecartVide, 0, '.', ' ') ?> cs
+                                </div>
+                                <?php if (!empty($stock['last_physical_count_at'])): ?>
+                                <div class="text-[10px] text-gray-400">
+                                    Compté le <?= date('d/m/Y H:i', strtotime($stock['last_physical_count_at'])) ?>
+                                </div>
+                                <?php endif; ?>
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex justify-center">
-                                    <?php if ($stock['caisses_pleine'] <= ($stock['seuil_alerte'] ?? 0)): ?>
-                                    <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/40 dark:text-red-400 dark:border-red-800">CRITIQUE</span>
+                                    <?php if ($hasEcart): ?>
+                                    <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/40 dark:text-red-400 dark:border-red-800">ÉCART</span>
+                                    <?php elseif ($systemePlein <= ($stock['seuil_alerte'] ?? 0)): ?>
+                                    <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-900/40 dark:text-orange-400 dark:border-orange-800">CRITIQUE</span>
                                     <?php else: ?>
                                     <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-green-100 text-green-700 border border-green-200 dark:bg-green-900/40 dark:text-green-400 dark:border-green-800">OK</span>
                                     <?php endif; ?>

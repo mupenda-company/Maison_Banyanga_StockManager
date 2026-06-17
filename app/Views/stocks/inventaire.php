@@ -104,18 +104,30 @@ ob_start();
 </div>
 
 <!-- Résumé -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 no-print">
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-6 no-print">
     <div class="stat-card">
         <p class="stat-label text-xs uppercase text-gray-500">Total produits</p>
         <p class="text-xl font-bold text-gray-900 dark:text-white"><?= $totaux['nb_produits'] ?></p>
     </div>
     <div class="stat-card border-l-4 border-green-500">
-        <p class="stat-label text-xs uppercase text-green-600">Caisses pleines</p>
-        <p class="text-xl font-bold text-green-600"><?= number_format($totaux['caisses_pleine'], 0, ',', ' ') ?></p>
+        <p class="stat-label text-xs uppercase text-green-600">Plein système</p>
+        <p class="text-xl font-bold text-green-600"><?= number_format($totaux['caisses_pleine'], 0, ',', ' ') ?> cs</p>
+    </div>
+    <div class="stat-card border-l-4 border-blue-500">
+        <p class="stat-label text-xs uppercase text-blue-600">Plein physique</p>
+        <p class="text-xl font-bold text-blue-600"><?= number_format($totaux['caisses_pleine_physique'] ?? $totaux['caisses_pleine'], 0, ',', ' ') ?> cs</p>
+    </div>
+    <div class="stat-card border-l-4 <?= ((int)($totaux['ecart_caisses_pleine'] ?? 0) === 0 && (int)($totaux['ecart_caisses_vide'] ?? 0) === 0) ? 'border-green-500' : 'border-red-500' ?>">
+        <p class="stat-label text-xs uppercase <?= ((int)($totaux['ecart_caisses_pleine'] ?? 0) === 0 && (int)($totaux['ecart_caisses_vide'] ?? 0) === 0) ? 'text-green-600' : 'text-red-600' ?>">Écart global</p>
+        <p class="text-xl font-bold <?= ((int)($totaux['ecart_caisses_pleine'] ?? 0) === 0 && (int)($totaux['ecart_caisses_vide'] ?? 0) === 0) ? 'text-green-600' : 'text-red-600' ?>">
+            P: <?= number_format($totaux['ecart_caisses_pleine'] ?? 0, 0, ',', ' ') ?> / V: <?= number_format($totaux['ecart_caisses_vide'] ?? 0, 0, ',', ' ') ?>
+        </p>
     </div>
     <div class="stat-card border-l-4 border-gray-400">
-        <p class="stat-label text-xs uppercase text-gray-600 dark:text-gray-400">Caisses vides</p>
-        <p class="text-xl font-bold text-gray-600 dark:text-gray-400"><?= number_format($totaux['caisses_vide'], 0, ',', ' ') ?></p>
+        <p class="stat-label text-xs uppercase text-gray-600 dark:text-gray-400">Vides système/physique</p>
+        <p class="text-xl font-bold text-gray-600 dark:text-gray-400">
+            <?= number_format($totaux['caisses_vide'], 0, ',', ' ') ?> / <?= number_format($totaux['caisses_vide_physique'] ?? $totaux['caisses_vide'], 0, ',', ' ') ?> cs
+        </p>
     </div>
     <div class="stat-card border-l-4 border-primary-500">
         <p class="stat-label text-xs uppercase text-primary-600">Valeur estimée</p>
@@ -133,15 +145,19 @@ ob_start();
                     <tr class="bg-gray-50 dark:bg-gray-700/50">
                         <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Produit</th>
                         <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase">Emplacement</th>
-                        <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase">Pleine (cs)</th>
-                        <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase">Vide (cs)</th>
-                        <th class="px-4 py-3 text-center text-[10px] font-bold text-gray-500 uppercase">Statut</th>
+                        <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase">Plein système</th>
+                        <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase">Plein physique</th>
+                        <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase">Écart plein</th>
+                        <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase">Vide système</th>
+                        <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase">Vide physique</th>
+                        <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase">Écart vide</th>
+                        <th class="px-4 py-3 text-center text-[10px] font-bold text-gray-500 uppercase">Alignement</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                     <?php if (empty($inventaire)): ?>
                     <tr>
-                        <td colspan="5" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colspan="9" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                             Aucun enregistrement trouvé
                         </td>
                     </tr>
@@ -161,20 +177,41 @@ ob_start();
                                     <?php endif; ?>
                                 </div>
                             </td>
+                            <?php
+                                $systemePlein = (float)($item['caisses_pleine'] ?? 0);
+                                $systemeVide = (float)($item['caisses_vide'] ?? 0);
+                                $physiquePlein = (float)($item['caisses_pleine_physique_calc'] ?? $item['caisses_pleine_physique'] ?? $systemePlein);
+                                $physiqueVide = (float)($item['caisses_vide_physique_calc'] ?? $item['caisses_vide_physique'] ?? $systemeVide);
+                                $ecartPlein = (float)($item['ecart_caisses_pleine'] ?? ($physiquePlein - $systemePlein));
+                                $ecartVide = (float)($item['ecart_caisses_vide'] ?? ($physiqueVide - $systemeVide));
+                                $hasEcart = abs($ecartPlein) > 0.0001 || abs($ecartVide) > 0.0001;
+                            ?>
                             <td class="px-4 py-3 text-right font-bold text-green-600">
-                                <?= number_format($item['caisses_pleine'], 2, '.', ' ') ?>
+                                <?= number_format($systemePlein, 2, '.', ' ') ?>
+                            </td>
+                            <td class="px-4 py-3 text-right font-bold text-blue-600">
+                                <?= number_format($physiquePlein, 2, '.', ' ') ?>
+                            </td>
+                            <td class="px-4 py-3 text-right font-bold <?= $ecartPlein == 0 ? 'text-green-600' : ($ecartPlein < 0 ? 'text-red-600' : 'text-orange-600') ?>">
+                                <?= ($ecartPlein > 0 ? '+' : '') . number_format($ecartPlein, 2, '.', ' ') ?>
                             </td>
                             <td class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-400">
-                                <?= number_format($item['caisses_vide'], 2, '.', ' ') ?>
+                                <?= number_format($systemeVide, 2, '.', ' ') ?>
+                            </td>
+                            <td class="px-4 py-3 text-right font-bold text-purple-600">
+                                <?= number_format($physiqueVide, 2, '.', ' ') ?>
+                            </td>
+                            <td class="px-4 py-3 text-right font-bold <?= $ecartVide == 0 ? 'text-green-600' : ($ecartVide < 0 ? 'text-red-600' : 'text-orange-600') ?>">
+                                <?= ($ecartVide > 0 ? '+' : '') . number_format($ecartVide, 2, '.', ' ') ?>
                             </td>
                             <td class="px-4 py-3 text-center">
-                                <?php if ($item['quantite_pleine'] <= ($item['seuil_alerte'] ?? 0)): ?>
+                                <?php if ($hasEcart): ?>
                                 <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/40 dark:text-red-400 dark:border-red-800">
-                                    CRITIQUE
+                                    ÉCART
                                 </span>
                                 <?php else: ?>
                                 <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 border border-green-200 dark:bg-green-900/40 dark:text-green-400 dark:border-green-800">
-                                    OK
+                                    ALIGNÉ
                                 </span>
                                 <?php endif; ?>
                             </td>
