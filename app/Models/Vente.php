@@ -413,28 +413,96 @@ class Vente extends Model
             $this->db->beginTransaction();
             
             $vente = $this->getWithDetails($id);
+            if (!$vente) {
+                throw new Exception('Vente introuvable.');
+            }
+
+            if (($vente['statut'] ?? '') === 'annulee') {
+                throw new Exception('Cette vente est déjà annulée.');
+            }
+
+            $emplacementRetourId = (int) ($vente['emplacement_id'] ?? 0);
+            $missionId = (int) ($vente['mission_id'] ?? 0);
+
+            /**
+             * Une vente faite depuis le téléphone est liée à une mission.
+             * Dans ce cas, l'emplacement de retour doit toujours être celui du véhicule,
+             * même si l'emplacement enregistré sur la facture a été modifié ou mal renseigné.
+             */
+            if ($missionId > 0) {
+                $missionVehicule = $this->db->fetch(
+                    "SELECT v.emplacement_id AS vehicule_emplacement_id
+                     FROM missions m
+                     JOIN vehicules v ON m.vehicule_id = v.id
+                     WHERE m.id = :mission_id
+                     LIMIT 1",
+                    ['mission_id' => $missionId]
+                );
+
+                if (!empty($missionVehicule['vehicule_emplacement_id'])) {
+                    $emplacementRetourId = (int) $missionVehicule['vehicule_emplacement_id'];
+                }
+            }
+
+            if ($emplacementRetourId <= 0) {
+                throw new Exception('Emplacement de retour introuvable pour cette vente.');
+            }
             
-            // Marquer comme annulÃ©e
+            // Marquer comme annulée
             $this->update($id, ['statut' => 'annulee']);
             
-            // Reverser le stock
+            // Reverser le stock au bon emplacement: véhicule si mission mobile, sinon entrepôt/emplacement de la facture.
             $stockModel = new Stock();
+            $mouvementModel = new MouvementStock();
             $emballagesRecus = $vente['emballages_recus'] ?? [];
+
             foreach ($vente['details'] as $detail) {
                 $btlParCaisse = (int) ($detail['bouteilles_par_caisses'] ?? 24);
                 if ($btlParCaisse <= 0) {
                     $btlParCaisse = 24;
                 }
-                $quantiteCaisses = (int) ($detail['quantite_caisses'] ?? intdiv((int) $detail['quantite'], $btlParCaisse));
 
+                $quantiteBouteilles = (int) ($detail['quantite'] ?? 0);
+                $quantiteCaisses = (int) ($detail['quantite_caisses'] ?? intdiv($quantiteBouteilles, $btlParCaisse));
+
+                if ($quantiteBouteilles <= 0 || $quantiteCaisses <= 0) {
+                    continue;
+                }
+
+                // Remettre les caisses pleines dans le véhicule ou l'entrepôt concerné.
                 $stockModel->updateOrCreate(
                     $detail['produit_id'],
-                    $vente['emplacement_id'],
+                    $emplacementRetourId,
                     [
-                        'quantite_pleine' => $detail['quantite'],
+                        'quantite_pleine' => $quantiteBouteilles,
                         'caisses_pleine' => $quantiteCaisses
                     ]
                 );
+
+                $mouvementModel->create([
+                    'produit_id' => $detail['produit_id'],
+                    'emplacement_id' => $emplacementRetourId,
+                    'type_mouvement' => 'entree',
+                    'quantite' => $quantiteBouteilles,
+                    'reference_type' => 'annulation_vente',
+                    'reference_id' => $id,
+                    'motif' => 'Annulation vente N° ' . ($vente['numero_facture'] ?? '') . ' - Retour des caisses pleines',
+                    'created_by' => $_SESSION['user_id'] ?? ($vente['created_by'] ?? null)
+                ]);
+
+                // Si la vente vient du mobile, corriger aussi le suivi du chargement de la mission.
+                if ($missionId > 0) {
+                    $this->db->query(
+                        "UPDATE mission_chargements
+                         SET quantite_vendue = GREATEST(0, IFNULL(quantite_vendue, 0) - :quantite)
+                         WHERE mission_id = :mission_id AND produit_id = :produit_id",
+                        [
+                            'quantite' => $quantiteBouteilles,
+                            'mission_id' => $missionId,
+                            'produit_id' => $detail['produit_id']
+                        ]
+                    );
+                }
             }
 
             if (empty($emballagesRecus)) {
@@ -458,14 +526,28 @@ class Vente extends Model
                     $btlParCaisse = 24;
                 }
 
+                $quantiteVides = $caissesVidesRecues * $btlParCaisse;
+
+                // L'annulation retire les emballages vides qui étaient entrés lors de la vente.
                 $stockModel->updateOrCreate(
                     $emballage['produit_id'],
-                    $vente['emplacement_id'],
+                    $emplacementRetourId,
                     [
-                        'quantite_vide' => -($caissesVidesRecues * $btlParCaisse),
+                        'quantite_vide' => -$quantiteVides,
                         'caisses_vide' => -$caissesVidesRecues
                     ]
                 );
+
+                $mouvementModel->create([
+                    'produit_id' => $emballage['produit_id'],
+                    'emplacement_id' => $emplacementRetourId,
+                    'type_mouvement' => 'sortie',
+                    'quantite' => -$quantiteVides,
+                    'reference_type' => 'annulation_vente',
+                    'reference_id' => $id,
+                    'motif' => 'Annulation vente N° ' . ($vente['numero_facture'] ?? '') . ' - Retrait des emballages vides',
+                    'created_by' => $_SESSION['user_id'] ?? ($vente['created_by'] ?? null)
+                ]);
             }
             
             $this->db->commit();
@@ -560,100 +642,250 @@ class Vente extends Model
             }
 
             $stockModel = new Stock();
+            $mouvementModel = new MouvementStock();
             $produitModel = new Produit();
 
+            $missionId = (int)($ancienneVente['mission_id'] ?? 0);
+            $emplacementId = (int)($data['emplacement_id'] ?? $ancienneVente['emplacement_id'] ?? 0);
+
+            // Sécurité : une facture mobile doit toujours impacter l'emplacement du véhicule de la mission.
+            if ($missionId > 0) {
+                $vehiculeEmplacementId = (int)$this->db->fetchColumn(
+                    "SELECT v.emplacement_id
+                     FROM missions m
+                     JOIN vehicules v ON m.vehicule_id = v.id
+                     WHERE m.id = :mission_id
+                     LIMIT 1",
+                    ['mission_id' => $missionId]
+                );
+
+                if ($vehiculeEmplacementId <= 0) {
+                    throw new Exception('Emplacement du véhicule introuvable pour cette mission.');
+                }
+
+                $emplacementId = $vehiculeEmplacementId;
+                $data['emplacement_id'] = $vehiculeEmplacementId;
+            }
+
+            if ($emplacementId <= 0) {
+                throw new Exception('Emplacement de stock introuvable.');
+            }
+
+            // Anciennes quantités vendues par produit.
             $ancien = [];
             foreach ($ancienneVente['details'] as $d) {
-                $ancien[(int)$d['produit_id']] = [
-                    'caisses' => (int)$d['quantite_caisses'],
-                    'quantite' => (int)$d['quantite'],
-                ];
+                $produitId = (int)$d['produit_id'];
+                if ($produitId <= 0) continue;
+
+                if (!isset($ancien[$produitId])) {
+                    $ancien[$produitId] = ['caisses' => 0, 'quantite' => 0];
+                }
+
+                $btl = max(1, (int)($d['bouteilles_par_caisses'] ?? 24));
+                $caisses = (int)($d['quantite_caisses'] ?? intdiv((int)($d['quantite'] ?? 0), $btl));
+                $quantite = (int)($d['quantite'] ?? ($caisses * $btl));
+
+                $ancien[$produitId]['caisses'] += $caisses;
+                $ancien[$produitId]['quantite'] += $quantite;
             }
 
+            // Nouvelles quantités vendues par produit.
             $nouveau = [];
             foreach ($details as $d) {
-                $produit = $produitModel->find($d['produit_id']);
-                $btl = max(1, (int)($produit['bouteilles_par_caisses'] ?? 24));
+                $produitId = (int)($d['produit_id'] ?? 0);
+                if ($produitId <= 0) continue;
 
-                $nouveau[(int)$d['produit_id']] = [
-                    'caisses' => (int)$d['quantite_caisses'],
-                    'quantite' => (int)$d['quantite_caisses'] * $btl,
-                ];
+                $produit = $produitModel->find($produitId);
+                if (!$produit) {
+                    throw new Exception('Produit introuvable.');
+                }
+
+                $btl = max(1, (int)($produit['bouteilles_par_caisses'] ?? 24));
+                $caisses = max(0, (int)($d['quantite_caisses'] ?? intdiv((int)($d['quantite'] ?? 0), $btl)));
+                $quantite = $caisses * $btl;
+
+                if (!isset($nouveau[$produitId])) {
+                    $nouveau[$produitId] = ['caisses' => 0, 'quantite' => 0];
+                }
+
+                $nouveau[$produitId]['caisses'] += $caisses;
+                $nouveau[$produitId]['quantite'] += $quantite;
             }
 
+            // 1) Synchroniser les caisses pleines : stock véhicule/entrepôt + stock mission si mobile.
             $produitsIds = array_unique(array_merge(array_keys($ancien), array_keys($nouveau)));
 
             foreach ($produitsIds as $produitId) {
-                $ancienneQte = $ancien[$produitId]['quantite'] ?? 0;
-                $nouvelleQte = $nouveau[$produitId]['quantite'] ?? 0;
-
-                $ancienneCaisses = $ancien[$produitId]['caisses'] ?? 0;
-                $nouvelleCaisses = $nouveau[$produitId]['caisses'] ?? 0;
+                $ancienneQte = (int)($ancien[$produitId]['quantite'] ?? 0);
+                $nouvelleQte = (int)($nouveau[$produitId]['quantite'] ?? 0);
+                $ancienneCaisses = (int)($ancien[$produitId]['caisses'] ?? 0);
+                $nouvelleCaisses = (int)($nouveau[$produitId]['caisses'] ?? 0);
 
                 $diffQte = $nouvelleQte - $ancienneQte;
                 $diffCaisses = $nouvelleCaisses - $ancienneCaisses;
 
+                if ($diffQte === 0 && $diffCaisses === 0) {
+                    continue;
+                }
+
                 if ($diffQte > 0) {
                     $stock = $this->db->fetch(
-                        "SELECT quantite_pleine FROM stocks WHERE produit_id = :p AND emplacement_id = :e",
-                        ['p' => $produitId, 'e' => $data['emplacement_id']]
+                        "SELECT quantite_pleine, caisses_pleine
+                         FROM stocks
+                         WHERE produit_id = :p AND emplacement_id = :e
+                         LIMIT 1",
+                        ['p' => $produitId, 'e' => $emplacementId]
                     );
 
                     if (!$stock || (int)$stock['quantite_pleine'] < $diffQte) {
                         $produit = $produitModel->find($produitId);
-                        throw new Exception('Stock insuffisant pour ' . ($produit['nom'] ?? 'Produit'));
+                        $dispo = $stock ? (int)$stock['caisses_pleine'] : 0;
+                        throw new Exception('Stock insuffisant pour ' . ($produit['nom'] ?? 'Produit') . '. Disponible: ' . $dispo . ' cs');
                     }
                 }
 
-                if ($diffQte != 0 || $diffCaisses != 0) {
-                    $stockModel->updateOrCreate(
-                        $produitId,
-                        $data['emplacement_id'],
-                        [
-                            'quantite_pleine' => -$diffQte,
-                            'caisses_pleine' => -$diffCaisses
-                        ]
+                // Si on augmente la facture: on sort le supplément. Si on diminue: on remet la différence.
+                $stockModel->updateOrCreate($produitId, $emplacementId, [
+                    'quantite_pleine' => -$diffQte,
+                    'caisses_pleine' => -$diffCaisses,
+                ]);
+
+                $mouvementModel->create([
+                    'produit_id' => $produitId,
+                    'emplacement_id' => $emplacementId,
+                    'type_mouvement' => $diffQte > 0 ? 'sortie' : 'entree',
+                    'quantite' => -$diffQte,
+                    'reference_type' => 'modification_vente',
+                    'reference_id' => $id,
+                    'motif' => 'Modification vente N° ' . ($ancienneVente['numero_facture'] ?? '') . ' - Ajustement caisses pleines',
+                    'created_by' => $data['updated_by'] ?? $_SESSION['user_id'] ?? ($ancienneVente['created_by'] ?? null),
+                ]);
+
+                // Pour une vente mobile, l'API mission calcule le stock avec mission_chargements.quantite_vendue.
+                if ($missionId > 0) {
+                    $chargementExiste = (int)$this->db->fetchColumn(
+                        "SELECT COUNT(*)
+                         FROM mission_chargements
+                         WHERE mission_id = :mission_id AND produit_id = :produit_id",
+                        ['mission_id' => $missionId, 'produit_id' => $produitId]
                     );
+
+                    if ($chargementExiste <= 0 && $diffQte > 0) {
+                        $produit = $produitModel->find($produitId);
+                        throw new Exception('Impossible d’ajouter ' . ($produit['nom'] ?? 'ce produit') . ' : ce produit n’est pas dans le chargement de la mission.');
+                    }
+
+                    if ($chargementExiste > 0) {
+                        $this->db->query(
+                            "UPDATE mission_chargements
+                             SET quantite_vendue = GREATEST(0, IFNULL(quantite_vendue, 0) + :diff)
+                             WHERE mission_id = :mission_id AND produit_id = :produit_id",
+                            [
+                                'diff' => $diffQte,
+                                'mission_id' => $missionId,
+                                'produit_id' => $produitId,
+                            ]
+                        );
+                    }
                 }
             }
 
+            // 2) Synchroniser les emballages vides reçus : ce qui a changé doit changer aussi dans le stock.
+            $anciensEmballages = $this->normaliserEmballagesRecus($ancienneVente['emballages_recus'] ?? null, $ancienneVente['details'] ?? []);
+            $nouveauxEmballages = $this->normaliserEmballagesRecus($emballagesRecus, $details);
+            $emballageProduitIds = array_unique(array_merge(array_keys($anciensEmballages), array_keys($nouveauxEmballages)));
+
+            foreach ($emballageProduitIds as $produitId) {
+                $anciennesCaissesVides = (int)($anciensEmballages[$produitId] ?? 0);
+                $nouvellesCaissesVides = (int)($nouveauxEmballages[$produitId] ?? 0);
+                $diffCaissesVides = $nouvellesCaissesVides - $anciennesCaissesVides;
+
+                if ($diffCaissesVides === 0) {
+                    continue;
+                }
+
+                $produit = $produitModel->find($produitId);
+                if (!$produit) {
+                    throw new Exception('Produit emballage introuvable.');
+                }
+
+                $btl = max(1, (int)($produit['bouteilles_par_caisses'] ?? 24));
+                $diffQteVides = $diffCaissesVides * $btl;
+
+                // Si on diminue les emballages reçus, on doit retirer du véhicule/entrepôt ce qui avait été ajouté avant.
+                if ($diffCaissesVides < 0) {
+                    $stockVide = $this->db->fetch(
+                        "SELECT quantite_vide, caisses_vide
+                         FROM stocks
+                         WHERE produit_id = :p AND emplacement_id = :e
+                         LIMIT 1",
+                        ['p' => $produitId, 'e' => $emplacementId]
+                    );
+
+                    if (!$stockVide || (int)$stockVide['caisses_vide'] < abs($diffCaissesVides)) {
+                        throw new Exception('Stock insuffisant en emballages vides pour ' . ($produit['nom'] ?? 'Produit') . '.');
+                    }
+                }
+
+                $stockModel->updateOrCreate($produitId, $emplacementId, [
+                    'quantite_vide' => $diffQteVides,
+                    'caisses_vide' => $diffCaissesVides,
+                ]);
+
+                $mouvementModel->create([
+                    'produit_id' => $produitId,
+                    'emplacement_id' => $emplacementId,
+                    'type_mouvement' => $diffCaissesVides > 0 ? 'entree' : 'sortie',
+                    'quantite' => $diffQteVides,
+                    'reference_type' => 'modification_vente',
+                    'reference_id' => $id,
+                    'motif' => 'Modification vente N° ' . ($ancienneVente['numero_facture'] ?? '') . ' - Ajustement emballages vides',
+                    'created_by' => $data['updated_by'] ?? $_SESSION['user_id'] ?? ($ancienneVente['created_by'] ?? null),
+                ]);
+            }
+
+            // 3) Remplacer les anciennes lignes par les nouvelles lignes de facture.
             $this->db->query("DELETE FROM vente_details WHERE vente_id = :id", ['id' => $id]);
             $this->db->query("DELETE FROM vente_emballages_recus WHERE vente_id = :id", ['id' => $id]);
 
             $this->update($id, [
                 'client_id' => $data['client_id'],
-                'emplacement_id' => $data['emplacement_id'],
+                'emplacement_id' => $emplacementId,
                 'total_ht' => $data['total_ht'],
                 'total_tva' => $data['total_tva'],
                 'total_ttc' => $data['total_ttc'],
-                'notes' => $data['notes'] ?? ''
+                'notes' => $data['notes'] ?? '',
             ]);
 
             foreach ($details as $detail) {
                 $produit = $produitModel->find($detail['produit_id']);
+                if (!$produit) {
+                    throw new Exception('Produit introuvable.');
+                }
+
                 $btl = max(1, (int)($produit['bouteilles_par_caisses'] ?? 24));
+                $quantiteCaisses = (int)($detail['quantite_caisses'] ?? 0);
+                $prixUnitaire = (float)($detail['prix_unitaire'] ?? 0);
 
                 $this->db->insert('vente_details', [
                     'vente_id' => $id,
-                    'produit_id' => $detail['produit_id'],
-                    'quantite_caisses' => (int)$detail['quantite_caisses'],
+                    'produit_id' => (int)$detail['produit_id'],
+                    'quantite_caisses' => $quantiteCaisses,
                     'caisses_vides_recues' => (int)($detail['caisses_vides_recues'] ?? 0),
-                    'quantite' => (int)$detail['quantite_caisses'] * $btl,
-                    'prix_unitaire' => (float)$detail['prix_unitaire'],
-                    'prix_caisse' => (float)$detail['prix_unitaire'] * $btl,
-                    'sous_total' => (float)$detail['sous_total']
+                    'quantite' => $quantiteCaisses * $btl,
+                    'prix_unitaire' => $prixUnitaire,
+                    'prix_caisse' => $prixUnitaire * $btl,
+                    'sous_total' => (float)($detail['sous_total'] ?? ($quantiteCaisses * $prixUnitaire * $btl)),
                 ]);
             }
 
-            $emballages = $this->normaliserEmballagesRecus($emballagesRecus, $details);
-
-            foreach ($emballages as $produitId => $caissesRecues) {
+            foreach ($nouveauxEmballages as $produitId => $caissesRecues) {
                 if ((int)$caissesRecues <= 0) continue;
 
                 $this->db->insert('vente_emballages_recus', [
                     'vente_id' => $id,
-                    'produit_id' => $produitId,
-                    'caisses_recues' => (int)$caissesRecues
+                    'produit_id' => (int)$produitId,
+                    'caisses_recues' => (int)$caissesRecues,
                 ]);
             }
 
@@ -667,5 +899,6 @@ class Vente extends Model
             return ['success' => false, 'message' => $e->getMessage()];
         }
     }
+
 }
 

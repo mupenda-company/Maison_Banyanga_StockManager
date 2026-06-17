@@ -1,6 +1,8 @@
 <?php 
 $pageTitle = 'Modifier vente';
 $autoriserInterchangeEmballages = !empty($autoriser_interchange_emballages);
+$venteEstMobile = !empty($vente['mission_id']);
+$origineVente = is_array($origine_vente) ? $origine_vente : [];
 
 ob_start();
 ?>
@@ -31,11 +33,21 @@ ob_start();
                     </div>
                     <div>
                         <label class="label">Point de vente *</label>
-                        <select x-model.number="emplacement_id" x-init="$el.value = emplacement_id" class="input" required>
+                        <select x-model.number="emplacement_id" x-init="$el.value = emplacement_id" class="input" required <?= $venteEstMobile ? 'disabled' : '' ?>>
                             <?php foreach ($emplacements as $emp): ?>
                             <option value="<?= (int)$emp['id'] ?>"><?= htmlspecialchars($emp['nom']) ?></option>
                             <?php endforeach; ?>
                         </select>
+                        <?php if ($venteEstMobile && !empty($origineVente)): ?>
+                            <p class="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                                Facture mobile issue du véhicule
+                                <strong><?= htmlspecialchars($origineVente['vehicule_immatriculation'] ?? 'N/A') ?></strong>
+                                <?php if (!empty($origineVente['numero_mission'])): ?>
+                                    / Mission <?= htmlspecialchars($origineVente['numero_mission']) ?>
+                                <?php endif; ?>.
+                                Le point de vente est verrouillé pour garder le bon suivi du stock.
+                            </p>
+                        <?php endif; ?>
                     </div>
                     <div>
                         <label class="label">N° Facture</label>
@@ -86,7 +98,10 @@ ob_start();
                                             </select>
                                         </td>
                                         <td class="px-4 py-2 text-sm">
-                                            <span x-text="ligne.produit_id ? Math.round((produits.find(p => p.id == ligne.produit_id)?.stock_plein || 0) / (produits.find(p => p.id == ligne.produit_id)?.bouteilles_par_caisses || 24)) : '0'"></span>
+                                            <span class="font-semibold" x-text="stockCaisses(ligne.produit_id)"></span>
+                                            <?php if ($venteEstMobile): ?>
+                                                <span class="block text-[10px] text-blue-600 dark:text-blue-400">Véhicule</span>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="px-4 py-2">
                                             <input type="number" x-model.number="ligne.prix_caisse" class="input w-32" step="0.01" min="0" @input="calculateTotals()">
@@ -274,6 +289,18 @@ document.addEventListener('alpine:init', () => {
             this.$watch('lignes', () => {
                 this.calculateTotals();
             }, { deep: true });
+        },
+
+        stockCaisses(produitId) {
+            const p = (this.produits || []).find(p => p.id == produitId);
+            if (!p) return 0;
+
+            if (p.caisses_pleine !== undefined && p.caisses_pleine !== null) {
+                return Math.round(parseFloat(p.caisses_pleine) || 0);
+            }
+
+            const btl = parseInt(p.bouteilles_par_caisses) || 24;
+            return Math.round((parseFloat(p.stock_plein) || 0) / btl);
         },
 
         allEmballagesRecusZero() {

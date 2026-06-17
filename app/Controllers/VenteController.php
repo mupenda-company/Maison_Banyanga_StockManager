@@ -203,11 +203,67 @@ class VenteController extends Controller
             return $this->error('Seules les ventes validées peuvent être modifiées', 422);
         }
 
+        // Par défaut, les ventes créées depuis le back-office utilisent les points fixes.
+        // Pour une facture mobile, le point de vente doit rester le véhicule de la mission.
+        $emplacements = $this->emplacementModel->getFixes();
+        $origineVente = null;
+
+        if (!empty($vente['mission_id'])) {
+            $origineVente = $this->db->fetch(
+                "SELECT m.id as mission_id, m.numero_mission,
+                        v.id as vehicule_id, v.immatriculation as vehicule_immatriculation,
+                        v.emplacement_id as vehicule_emplacement_id,
+                        e.nom as vehicule_emplacement_nom, e.type as vehicule_emplacement_type
+                 FROM missions m
+                 LEFT JOIN vehicules v ON m.vehicule_id = v.id
+                 LEFT JOIN emplacements e ON v.emplacement_id = e.id
+                 WHERE m.id = :mission_id
+                 LIMIT 1",
+                ['mission_id' => (int) $vente['mission_id']]
+            );
+
+            $vehiculeEmplacementId = (int) ($origineVente['vehicule_emplacement_id'] ?? 0);
+            if ($vehiculeEmplacementId > 0) {
+                // On force l'emplacement affiché et envoyé à l'API vers le véhicule réel.
+                $vente['emplacement_id'] = $vehiculeEmplacementId;
+                $vente['emplacement_nom'] = $origineVente['vehicule_emplacement_nom'] ?? $vente['emplacement_nom'] ?? '';
+
+                $dejaDansListe = false;
+                foreach ($emplacements as $emp) {
+                    if ((int) ($emp['id'] ?? 0) === $vehiculeEmplacementId) {
+                        $dejaDansListe = true;
+                        break;
+                    }
+                }
+
+                // getFixes() ne retourne généralement que les entrepôts; on ajoute donc le véhicule d'origine.
+                if (!$dejaDansListe) {
+                    $libelleVehicule = trim(
+                        'Véhicule ' . ($origineVente['vehicule_immatriculation'] ?? '') .
+                        (!empty($origineVente['vehicule_emplacement_nom']) ? ' - ' . $origineVente['vehicule_emplacement_nom'] : '')
+                    );
+
+                    $emplacements[] = [
+                        'id' => $vehiculeEmplacementId,
+                        'nom' => $libelleVehicule ?: 'Véhicule de la mission',
+                        'type' => $origineVente['vehicule_emplacement_type'] ?? 'vehicule'
+                    ];
+                }
+            }
+        }
+
+        $stockEmplacementId = (int) ($vente['emplacement_id'] ?? 0);
+        $produits = $stockEmplacementId > 0
+            ? $this->getProduitsAvecStockEmplacement($stockEmplacementId)
+            : $this->produitModel->getWithStock();
+
         $this->view('ventes/edit', [
             'vente' => $vente,
             'clients' => $this->clientModel->getAllWithZone(),
-            'produits' => $this->produitModel->getWithStock(),
-            'emplacements' => $this->emplacementModel->getFixes(),
+            'produits' => $produits,
+            'emplacements' => $emplacements,
+            'origine_vente' => $origineVente,
+            'stock_emplacement_id' => $stockEmplacementId,
             'tva' => $this->parametreModel->get('taux_tva', 16),
             'autoriser_interchange_emballages' => $this->parametreModel->get('autoriser_interchange_emballages', '1') === '1'
         ]);
@@ -227,6 +283,27 @@ class VenteController extends Controller
 
         if (!empty($errors)) {
             return $this->error('Erreurs de validation', 422, $errors);
+        }
+
+        $ancienneVente = $this->venteModel->getWithDetails($id);
+        if (!$ancienneVente) {
+            return $this->error('Vente non trouvée', 404);
+        }
+
+        if (!empty($ancienneVente['mission_id'])) {
+            $vehiculeEmplacementId = (int) $this->db->fetchColumn(
+                "SELECT v.emplacement_id
+                 FROM missions m
+                 JOIN vehicules v ON m.vehicule_id = v.id
+                 WHERE m.id = :mission_id
+                 LIMIT 1",
+                ['mission_id' => (int) $ancienneVente['mission_id']]
+            );
+
+            if ($vehiculeEmplacementId > 0) {
+                // Sécurité serveur: une facture mobile reste toujours liée au stock du véhicule.
+                $data['emplacement_id'] = $vehiculeEmplacementId;
+            }
         }
 
         $tva = $this->parametreModel->get('taux_tva', 16);
@@ -291,6 +368,31 @@ class VenteController extends Controller
 
         return $this->error($result['message'], 400);
     }   
+
+
+    /**
+     * Récupérer les produits avec le stock d'un emplacement précis.
+     * Important pour la modification d'une facture mobile: le stock affiché doit être celui du véhicule,
+     * pas le stock global ou celui de l'entrepôt.
+     */
+    private function getProduitsAvecStockEmplacement($emplacementId)
+    {
+        $emplacementId = (int) $emplacementId;
+
+        return $this->db->fetchAll(
+            "SELECT p.*,
+                    COALESCE(s.quantite_pleine, 0) as stock_plein,
+                    COALESCE(s.quantite_vide, 0) as stock_vide,
+                    COALESCE(s.caisses_pleine, 0) as caisses_pleine,
+                    COALESCE(s.caisses_vide, 0) as caisses_vide,
+                    COALESCE(s.quantite_pleine, 0) as quantite_pleine,
+                    COALESCE(s.quantite_vide, 0) as quantite_vide
+             FROM produits p
+             LEFT JOIN stocks s ON s.produit_id = p.id AND s.emplacement_id = :emplacement_id
+             ORDER BY p.nom ASC",
+            ['emplacement_id' => $emplacementId]
+        );
+    }
 
     private function normaliserEmballagesRecus($emballagesRecus)
     {
