@@ -214,14 +214,20 @@ class ClientController extends Controller
     {
         $this->requirePermission('clients.supprimer');
         
-        // Vérifier si le client a des ventes
-        $hasVentes = $this->db->fetchColumn("SELECT COUNT(*) FROM ventes WHERE client_id = :id", ['id' => $id]);
+        // Bloquer uniquement si le client possède au moins une vente encore validée.
+        // Les factures annulées ne doivent pas empêcher la suppression, car elles n'ont plus d'impact commercial.
+        $hasVentesValidees = (int) $this->db->fetchColumn(
+            "SELECT COUNT(*) FROM ventes WHERE client_id = :id AND statut = 'validee'",
+            ['id' => $id]
+        );
         
-        if ($hasVentes > 0) {
-            return $this->error("Impossible de supprimer ce client car il possède un historique de ventes.");
+        if ($hasVentesValidees > 0) {
+            return $this->error("Impossible de supprimer ce client car il possède encore des ventes validées.");
         }
-        
-        $this->clientModel->delete($id);
+
+        // S'il n'a que des ventes annulées, on le considère comme un client sans activité valide.
+        // On désactive le client pour éviter les erreurs de clé étrangère avec les anciennes factures annulées.
+        $this->clientModel->update($id, ['actif' => 0]);
         return $this->success(null, "Client supprimé avec succès.");
     }
 }

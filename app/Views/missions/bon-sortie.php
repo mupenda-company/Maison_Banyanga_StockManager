@@ -138,8 +138,17 @@
         <!-- Chargement -->
         <div class="mb-5">
             <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2"><?= $isRistourne ? 'Produits livrés' : 'Produits chargés' ?></h3>
-            <?php if (empty($mission['chargements'])): ?>
-            <div class="p-4 text-center text-gray-500 border rounded-lg">Aucun chargement</div>
+            <?php
+                // Ne garder sur le bon de sortie que les produits dont le stock final réel est supérieur à 0.
+                // Exemple : si un produit existe dans mission_chargements mais son total final est 0 cs,
+                // il ne doit pas apparaître sur la liste imprimée.
+                $chargementsAffiches = array_values(array_filter($mission['chargements'] ?? [], function ($chargement) {
+                    $totalReelCaisses = (float) ($chargement['caisses_total'] ?? max(0, (float) ($chargement['quantite_caisses'] ?? 0)));
+                    return $totalReelCaisses > 0;
+                }));
+            ?>
+            <?php if (empty($chargementsAffiches)): ?>
+            <div class="p-4 text-center text-gray-500 border rounded-lg">Aucun chargement avec stock final supérieur à 0</div>
             <?php else: ?>
             <table class="w-full text-xs">
                 <thead>
@@ -152,7 +161,7 @@
                 </thead>
                 <tbody class="divide-y divide-gray-200">
                     <?php $totalCaisses = 0; $totalStockDepart = 0; $totalAjoutMission = 0; ?>
-                    <?php foreach ($mission['chargements'] as $chargement): ?>
+                    <?php foreach ($chargementsAffiches as $chargement): ?>
                     <?php
                         $btlParCaisse = (int)($chargement['bouteilles_par_caisses'] ?? 24);
                         if ($btlParCaisse <= 0) {
@@ -161,6 +170,9 @@
 
                         $stockDepartCaisses = (int) ($chargement['caisses_deja_dans_vehicule'] ?? 0);
                         $totalReelCaisses = (int) ($chargement['caisses_total'] ?? max(0, (int) ($chargement['quantite_caisses'] ?? 0)));
+                        if ($totalReelCaisses <= 0) {
+                            continue;
+                        }
                         $ajoutMissionCaisses = $totalReelCaisses - $stockDepartCaisses;
                         $totalStockDepart += $stockDepartCaisses;
                         $totalAjoutMission += $ajoutMissionCaisses;
