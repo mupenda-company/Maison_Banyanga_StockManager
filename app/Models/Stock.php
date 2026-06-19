@@ -422,6 +422,11 @@ class Stock extends Model
         $where = "p.actif = 1 AND e.actif = 1 AND (e.type != 'mobile' OR v.emplacement_id IS NOT NULL)";
         $params = [];
         
+        if (!empty($filters['produit_id'])) {
+            $where .= " AND p.id = :produit_id";
+            $params['produit_id'] = $filters['produit_id'];
+        }
+
         if (!empty($filters['emplacement_id'])) {
             $where .= " AND e.id = :emplacement_id";
             $params['emplacement_id'] = $filters['emplacement_id'];
@@ -486,6 +491,11 @@ class Stock extends Model
     {
         $where = "p.actif = 1 AND e.actif = 1 AND (e.type != 'mobile' OR v.emplacement_id IS NOT NULL)";
         $params = [];
+        
+        if (!empty($filters['produit_id'])) {
+            $where .= " AND p.id = :produit_id";
+            $params['produit_id'] = $filters['produit_id'];
+        }
         
         if (!empty($filters['emplacement_id'])) {
             $where .= " AND e.id = :emplacement_id";

@@ -38,8 +38,8 @@ ob_start();
 <!-- Filtres -->
 <div class="card mb-6 no-print">
     <div class="card-body">
-        <form method="GET" class="flex flex-wrap gap-4 items-end">
-            <div class="flex-1 min-w-[150px]">
+        <form method="GET" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4 items-end">
+            <div>
                 <label class="label">Produit</label>
                 <select name="produit_id" class="input">
                     <option value="">Tous les produits</option>
@@ -50,7 +50,7 @@ ob_start();
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="flex-1 min-w-[150px]">
+            <div>
                 <label class="label">Emplacement</label>
                 <select name="emplacement_id" class="input">
                     <option value="">Tous les emplacements</option>
@@ -61,7 +61,7 @@ ob_start();
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="w-32">
+            <div>
                 <label class="label">Type</label>
                 <select name="type" class="input">
                     <option value="">Tous</option>
@@ -70,11 +70,11 @@ ob_start();
                     <option value="transfert" <?= ($filters['type'] ?? '') == 'transfert' ? 'selected' : '' ?>>Transferts</option>
                 </select>
             </div>
-            <div class="w-40"><label class="label">Date debut</label><input type="date" name="date_debut" class="input" value="<?= $filters['date_debut'] ?? '' ?>"></div>
-            <div class="w-40"><label class="label">Date fin</label><input type="date" name="date_fin" class="input" value="<?= $filters['date_fin'] ?? '' ?>"></div>
-            <div class="flex gap-2">
-                <button type="submit" class="btn btn-primary mr-2">Filtrer</button>
-                <a href="<?= url('stocks/mouvements') ?>" class="btn btn-secondary">Reset</a>
+            <div><label class="label">Date début</label><input type="date" name="date_debut" class="input w-full" value="<?= $filters['date_debut'] ?? '' ?>"></div>
+            <div><label class="label">Date fin</label><input type="date" name="date_fin" class="input w-full" value="<?= $filters['date_fin'] ?? '' ?>"></div>
+            <div class="flex flex-col sm:flex-row gap-2 xl:justify-end">
+                <button type="submit" class="btn btn-primary w-full sm:w-auto">Filtrer</button>
+                <a href="<?= url('stocks/mouvements') ?>" class="btn btn-secondary w-full sm:w-auto">Réinitialiser</a>
             </div>
         </form>
     </div>
@@ -241,10 +241,10 @@ ob_start();
             </p>
             <div class="flex gap-2">
                 <?php if ($pagination['current_page'] > 1): ?>
-                <a href="?page=<?= $pagination['current_page'] - 1 ?>" class="btn btn-sm btn-secondary">Précédent</a>
+                <a href="?<?= http_build_query(array_merge($baseQuery, ['page' => $pagination['current_page'] - 1])) ?>" class="btn btn-sm btn-secondary">Précédent</a>
                 <?php endif; ?>
                 <?php if ($pagination['current_page'] < $pagination['last_page']): ?>
-                <a href="?page=<?= $pagination['current_page'] + 1 ?>" class="btn btn-sm btn-primary">Suivant</a>
+                <a href="?<?= http_build_query(array_merge($baseQuery, ['page' => $pagination['current_page'] + 1])) ?>" class="btn btn-sm btn-primary">Suivant</a>
                 <?php endif; ?>
             </div>
         </div>

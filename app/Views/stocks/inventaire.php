@@ -15,6 +15,9 @@ $customStyle = $printMode ? "@media print {
     th, td { padding: 4px 6px !important; font-size: 10pt !important; }
 }" : null;
 $baseQuery = [];
+if (!empty($filters['produit_id'])) {
+    $baseQuery['produit_id'] = $filters['produit_id'];
+}
 if (!empty($filters['emplacement_id'])) {
     $baseQuery['emplacement_id'] = $filters['emplacement_id'];
 }
@@ -68,36 +71,54 @@ ob_start();
 
 <!-- Filtres -->
 <div class="card mb-6 no-print">
-    <div class="card-body py-3">
-        <form method="GET" class="flex flex-wrap items-center gap-4">
-            <div class="flex items-center gap-2">
-                <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">Emplacement</label>
-                <select name="emplacement_id" class="input py-1.5 w-64">
+    <div class="card-body">
+        <form method="GET" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 items-end">
+            <div>
+                <label class="label">Produit</label>
+                <select name="produit_id" class="input w-full">
+                    <option value="">Tous les produits</option>
+                    <?php foreach ($produits as $produit): ?>
+                    <option value="<?= (int) $produit['id'] ?>" <?= ($filters['produit_id'] ?? '') == $produit['id'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($produit['nom']) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div>
+                <label class="label">Emplacement</label>
+                <select name="emplacement_id" class="input w-full">
                     <option value="">Tous les emplacements</option>
                     <?php foreach ($emplacements as $emp): ?>
-                    <option value="<?= $emp['id'] ?>" <?= ($filters['emplacement_id'] ?? '') == $emp['id'] ? 'selected' : '' ?>>
+                    <option value="<?= (int) $emp['id'] ?>" <?= ($filters['emplacement_id'] ?? '') == $emp['id'] ? 'selected' : '' ?>>
                         <?= htmlspecialchars($emp['nom']) ?> (<?= ucfirst($emp['type']) ?>)
                     </option>
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="flex items-center gap-2">
-                <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">Catégorie</label>
-                <select name="categorie" class="input py-1.5 w-64">
+
+            <div>
+                <label class="label">Catégorie</label>
+                <select name="categorie" class="input w-full">
                     <option value="">Toutes les catégories</option>
                     <?php foreach ($categories as $cat): 
                         $catName = is_array($cat) ? $cat['categorie'] : $cat;
                     ?>
-                    <option value="<?= $catName ?>" <?= ($filters['categorie'] ?? '') == $catName ? 'selected' : '' ?>>
+                    <option value="<?= htmlspecialchars($catName, ENT_QUOTES, 'UTF-8') ?>" <?= ($filters['categorie'] ?? '') == $catName ? 'selected' : '' ?>>
                         <?= htmlspecialchars($catName) ?>
                     </option>
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div><label class="text-sm font-medium">Stock a la date</label><input type="date" name="date_stock" max="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($filters['date_stock'] ?? '') ?>" class="input py-1.5 w-44"></div>
-            <div class="flex gap-2 ml-auto">
-                <button type="submit" class="btn-primary py-1.5 px-4 mr-2">Filtrer</button>
-                <a href="<?= url('stocks/inventaire') ?>" class="btn-secondary py-1.5 px-4">Réinitialiser</a>
+
+            <div>
+                <label class="label">Stock à la date</label>
+                <input type="date" name="date_stock" max="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($filters['date_stock'] ?? '') ?>" class="input w-full">
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-2 xl:justify-end">
+                <button type="submit" class="btn btn-primary w-full sm:w-auto">Filtrer</button>
+                <a href="<?= url('stocks/inventaire') ?>" class="btn btn-secondary w-full sm:w-auto">Réinitialiser</a>
             </div>
         </form>
     </div>
@@ -230,7 +251,7 @@ ob_start();
             </p>
             <div class="flex space-x-1">
                 <?php if ($pagination['current_page'] > 1): ?>
-                <a href="?<?= http_build_query(array_merge($_GET, ['page' => $pagination['current_page'] - 1])) ?>" class="btn-secondary btn-sm">Précédent</a>
+                <a href="?<?= http_build_query(array_merge($baseQuery, ['page' => $pagination['current_page'] - 1])) ?>" class="btn-secondary btn-sm">Précédent</a>
                 <?php endif; ?>
 
                 <?php 
@@ -239,14 +260,14 @@ ob_start();
                 if ($end - $start < 4) $start = max(1, $end - 4);
                 
                 for ($i = $start; $i <= $end; $i++): ?>
-                <a href="?<?= http_build_query(array_merge($_GET, ['page' => $i])) ?>" 
+                <a href="?<?= http_build_query(array_merge($baseQuery, ['page' => $i])) ?>" 
                    class="btn-sm px-3 <?= $i == $pagination['current_page'] ? 'btn-primary font-bold' : 'btn-secondary font-normal' ?>">
                     <?= $i ?>
                 </a>
                 <?php endfor; ?>
 
                 <?php if ($pagination['current_page'] < $pagination['last_page']): ?>
-                <a href="?<?= http_build_query(array_merge($_GET, ['page' => $pagination['current_page'] + 1])) ?>" class="btn-secondary btn-sm">Suivant</a>
+                <a href="?<?= http_build_query(array_merge($baseQuery, ['page' => $pagination['current_page'] + 1])) ?>" class="btn-secondary btn-sm">Suivant</a>
                 <?php endif; ?>
             </div>
         </div>

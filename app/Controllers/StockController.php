@@ -326,6 +326,7 @@ class StockController extends Controller
         $this->requirePermission('stock.voir');
         
         $filters = [
+            'produit_id' => $_GET['produit_id'] ?? null,
             'emplacement_id' => $_GET['emplacement_id'] ?? null,
             'categorie' => $_GET['categorie'] ?? null,
             'date_stock' => $_GET['date_stock'] ?? null
