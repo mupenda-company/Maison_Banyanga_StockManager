@@ -1,6 +1,13 @@
 <?php 
-$pageTitle = 'Ajouter une dépense';
+$pageTitle = 'Modifier une dépense';
 ob_start();
+
+$montantSaisi = (float)($depense['montant_original'] ?? 0);
+$deviseSaisie = $depense['devise'] ?? get_base_devise();
+if ($montantSaisi <= 0) {
+    $montantSaisi = (float)($depense['montant'] ?? 0);
+    $deviseSaisie = get_base_devise();
+}
 ?>
 
 <div class="mb-6">
@@ -15,11 +22,11 @@ ob_start();
 <div class="max-w-2xl mx-auto">
     <div class="card">
         <div class="card-header">
-            <h2 class="text-lg font-semibold">Ajouter une dépense</h2>
+            <h2 class="text-lg font-semibold">Modifier la dépense</h2>
         </div>
         <div class="card-body">
-            <form x-data="depenseForm" @submit.prevent="save">
-                <div class="grid grid-cols-2 gap-4">
+            <form x-data="depenseEditForm" @submit.prevent="save">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="label">Catégorie *</label>
                         <select x-model="form.categorie" class="input" required>
@@ -46,7 +53,7 @@ ob_start();
                         <label class="label">Date *</label>
                         <input type="date" x-model="form.date_depense" class="input" required>
                     </div>
-                    <div>
+                    <div class="md:col-span-2">
                         <label class="label">Description *</label>
                         <input type="text" x-model="form.description" class="input" required placeholder="Description de la dépense">
                     </div>
@@ -55,8 +62,8 @@ ob_start();
                 <div class="mt-6 flex justify-end gap-3">
                     <a href="<?= url('depenses') ?>" class="btn btn-secondary">Annuler</a>
                     <button type="submit" class="btn btn-primary" :disabled="loading">
-                        <span x-show="!loading">Enregistrer</span>
-                        <span x-show="loading">Enregistrement...</span>
+                        <span x-show="!loading">Enregistrer les modifications</span>
+                        <span x-show="loading">Modification...</span>
                     </button>
                 </div>
             </form>
@@ -66,21 +73,21 @@ ob_start();
 
 <script>
 document.addEventListener('alpine:init', () => {
-    Alpine.data('depenseForm', () => ({
+    Alpine.data('depenseEditForm', () => ({
         form: {
-            categorie: 'Transport',
-            description: '',
-            montant: '',
-            devise: window.BASE_DEVISE || 'CDF',
-            date_depense: new Date().toISOString().split('T')[0]
+            categorie: <?= json_encode($depense['categorie'] ?? 'Transport') ?>,
+            description: <?= json_encode($depense['description'] ?? '') ?>,
+            montant: <?= json_encode($montantSaisi) ?>,
+            devise: <?= json_encode($deviseSaisie) ?>,
+            date_depense: <?= json_encode($depense['date_depense'] ?? date('Y-m-d')) ?>
         },
         loading: false,
 
         async save() {
             this.loading = true;
             try {
-                const res = await fetch(BASE_URL + '/api/depenses', {
-                    method: 'POST',
+                const res = await fetch(BASE_URL + '/api/depenses/<?= (int)$depense['id'] ?>', {
+                    method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(this.form)
                 });
@@ -88,7 +95,7 @@ document.addEventListener('alpine:init', () => {
                 if (data.success) {
                     window.location.href = BASE_URL + '/depenses';
                 } else {
-                    alert(data.message || 'Erreur lors de l\'enregistrement');
+                    alert(data.message || 'Erreur lors de la modification');
                 }
             } catch (e) {
                 alert('Erreur réseau');

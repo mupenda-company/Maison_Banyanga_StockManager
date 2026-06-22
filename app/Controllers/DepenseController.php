@@ -86,6 +86,71 @@ class DepenseController extends Controller
         return $this->success(['id' => $id], 'Dépense enregistrée avec succès');
     }
     
+
+    /**
+     * Formulaire de modification
+     */
+    public function edit($id)
+    {
+        $this->requirePermission('depenses.creer');
+
+        $depense = $this->depenseModel->find((int) $id);
+        if (!$depense) {
+            throw new Exception('Dépense non trouvée');
+        }
+
+        $this->view('depenses/edit', [
+            'depense' => $depense,
+            'pageTitle' => 'Modifier la dépense #' . $id
+        ]);
+    }
+
+    /**
+     * Mettre à jour une dépense
+     */
+    public function update($id)
+    {
+        $this->requirePermission('depenses.creer');
+
+        $depense = $this->depenseModel->find((int) $id);
+        if (!$depense) {
+            return $this->error('Dépense non trouvée', 404);
+        }
+
+        $data = $this->getJsonInput();
+
+        $errors = $this->validate($data, [
+            'categorie' => 'required',
+            'description' => 'required',
+            'montant' => 'required|numeric',
+            'date_depense' => 'required'
+        ]);
+
+        if (!empty($errors)) {
+            return $this->error('Données invalides', 422, $errors);
+        }
+
+        $devise = strtoupper($data['devise'] ?? get_base_devise());
+        if (!in_array($devise, ['CDF', 'USD'], true)) {
+            $devise = get_base_devise();
+        }
+
+        $montantOriginal = (float) $data['montant'];
+        $payload = [
+            'categorie' => trim($data['categorie']),
+            'description' => trim($data['description']),
+            'devise' => $devise,
+            'montant_original' => $montantOriginal,
+            'taux_change' => get_taux_change(),
+            'montant' => convert_money($montantOriginal, $devise, get_base_devise()),
+            'date_depense' => $data['date_depense']
+        ];
+
+        $this->depenseModel->update((int) $id, $payload);
+
+        return $this->success(['id' => (int) $id], 'Dépense modifiée avec succès');
+    }
+
     /**
      * Supprimer une dépense
      */

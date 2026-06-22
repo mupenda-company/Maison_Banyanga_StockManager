@@ -180,6 +180,8 @@ $routes = [
     'GET::/depenses/(\d+)/print' => ['DepenseController', 'print'],
     'POST::/api/depenses' => ['DepenseController', 'store'],
     'DELETE::/api/depenses/(\d+)' => ['DepenseController', 'delete'],
+    'GET::/depenses/(\d+)/edit' => ['DepenseController', 'edit'],
+    'PUT::/api/depenses/(\d+)' => ['DepenseController', 'update'],
     
     // Zones
     'GET::/zones' => ['ZoneController', 'index'],

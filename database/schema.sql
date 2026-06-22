@@ -123,7 +123,7 @@ CREATE TABLE `clients` (
 
 CREATE TABLE `depenses` (
   `id` int UNSIGNED NOT NULL,
-  `categorie` enum('Transport','Carburant','Maintenance','Restauration','Autres') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `categorie` enum('Transport','Carburant','Maintenance','Restauration','Promotion','Autres') COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `montant` decimal(12,2) NOT NULL,
   `devise` enum('CDF','USD') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'CDF',
