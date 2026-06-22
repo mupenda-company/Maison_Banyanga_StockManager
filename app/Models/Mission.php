@@ -55,7 +55,9 @@ class Mission extends Model
             'manquants_agents' => [
                 'mission_id' => "ALTER TABLE manquants_agents ADD mission_id INT UNSIGNED NULL AFTER agent_id",
                 'type_manquant' => "ALTER TABLE manquants_agents ADD type_manquant VARCHAR(30) NOT NULL DEFAULT 'manuel' AFTER mission_id",
-                'quantite_emballages' => "ALTER TABLE manquants_agents ADD quantite_emballages DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER quantite_caisses",
+                'quantite_caisses_reglee' => "ALTER TABLE manquants_agents ADD quantite_caisses_reglee DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER quantite_caisses",
+                'quantite_emballages' => "ALTER TABLE manquants_agents ADD quantite_emballages DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER quantite_caisses_reglee",
+                'quantite_emballages_reglee' => "ALTER TABLE manquants_agents ADD quantite_emballages_reglee DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER quantite_emballages",
             ],
         ];
 
@@ -639,7 +641,9 @@ class Mission extends Model
                     'type_manquant' => 'mission',
                     'produit_id' => null,
                     'quantite_caisses' => $totalManquantCaisses,
+                    'quantite_caisses_reglee' => 0,
                     'quantite_emballages' => $totalManquantCaisses,
+                    'quantite_emballages_reglee' => 0,
                     'montant' => round($totalManquantMontant, 2),
                     'montant_paye' => 0,
                     'date_manquant' => date('Y-m-d', strtotime($data['date_depart'] ?? 'now')),
@@ -1373,6 +1377,7 @@ class Mission extends Model
             $totalCaissesRetournees = 0;
             $totalCaissesRetourAttendues = 0;
             $totalVidesAttendues = 0;
+            $totalVidesAttenduesPhysiques = 0;
             $totalMontantPhysique = 0.0;
             $totalValeurRetoursPleins = 0.0;
             $totalValeurChargement = 0.0;
@@ -1429,6 +1434,7 @@ class Mission extends Model
                 $totalVidesRetournes += $caissesVidesRetournees;
                 $totalCaissesRetourAttendues += $caissesRetourAttendues;
                 $totalVidesAttendues += $caissesVidesAttendues;
+                $totalVidesAttenduesPhysiques += $caissesVenduesPhysiques;
                 $totalMontantPhysique += $montantPhysiqueProduit;
                 $totalValeurRetoursPleins += $caissesRetournees * $prixCaisse;
                 $totalValeurChargement += $caissesChargees * $prixCaisse;
@@ -1439,17 +1445,6 @@ class Mission extends Model
                      WHERE mission_id = ? AND produit_id = ?",
                     [$bouteillesVendues, $quantiteRetournee, $caissesRetournees, $caissesVidesRetournees, $id, $produitId]
                 );
-
-                // Enregistrer le stock physique constaté sur le véhicule à la clôture.
-                // Cela ne remplace pas le stock système : cela sert à comparer système vs physique.
-                if ($emplacementVehicule > 0) {
-                    $stockModel->setPhysicalStock($produitId, $emplacementVehicule, [
-                        'caisses_pleine' => $caissesRetournees,
-                        'caisses_vide' => $caissesVidesRetournees,
-                        'quantite_pleine' => $quantiteRetournee,
-                        'quantite_vide' => $caissesVidesRetournees * $bouteillesParCaisse,
-                    ], $id);
-                }
 
                 // Les caisses pleines retournées restent dans le véhicule.
 
@@ -1534,18 +1529,60 @@ class Mission extends Model
             }
 
             if ($manquantId > 0) {
-                $statutManquant = ($couvertureManquant + 0.01 >= $totalValeurChargement && $ecartCaissesVides >= 0) ? 'paye' : ($couvertureManquant > 0 ? 'partiel' : 'ouvert');
+                // Emballages attendus selon le comptage physique :
+                // si le vendeur n'a pas saisi toutes les ventes dans l'application,
+                // les caisses vendues physiquement sont recalculées par : chargées - pleines retournées.
+                $manquantMission = $this->db->fetch(
+                    "SELECT * FROM manquants_agents WHERE id = :id LIMIT 1",
+                    ['id' => $manquantId]
+                );
+
+                $totalCaissesManquant = (float) ($manquantMission['quantite_caisses'] ?? $totalManquantCaisses ?? $totalCaissesChargees ?? 0);
+                if ($totalCaissesManquant <= 0) {
+                    $totalCaissesManquant = (float) ($totalCaissesRetournees + $totalVidesAttenduesPhysiques);
+                }
+
+                // Une caisse pleine revenue règle la dette physique.
+                // Une caisse vendue physiquement est réglée par la valeur monétaire.
+                $caissesRegleesParMission = min($totalCaissesManquant, $totalCaissesRetournees + $totalVidesAttenduesPhysiques);
+
+                $totalEmballagesManquant = (float) ($manquantMission['quantite_emballages'] ?? $totalManquantCaisses ?? $totalVidesAttenduesPhysiques);
+                if ($totalEmballagesManquant <= 0) {
+                    $totalEmballagesManquant = $totalVidesAttenduesPhysiques;
+                }
+                $emballagesReglesParMission = min($totalEmballagesManquant, $totalVidesRetournes);
+
+                $resteMontantManquant = max(0, $totalValeurChargement - $couvertureManquant);
+                $resteCaissesManquant = max(0, $totalCaissesManquant - $caissesRegleesParMission);
+                $resteEmballagesManquant = max(0, $totalEmballagesManquant - $emballagesReglesParMission);
+
+                $statutManquant = ($resteMontantManquant <= 0.01 && $resteCaissesManquant <= 0.0001 && $resteEmballagesManquant <= 0.0001)
+                    ? 'paye'
+                    : (($couvertureManquant > 0 || $caissesRegleesParMission > 0 || $emballagesReglesParMission > 0) ? 'partiel' : 'ouvert');
+
                 $this->db->query(
                     "UPDATE manquants_agents
                      SET montant_paye = :montant_paye,
+                         quantite_caisses_reglee = :quantite_caisses_reglee,
+                         quantite_emballages_reglee = :quantite_emballages_reglee,
                          date_reglement = :date_reglement,
                          notes_reglement = :notes_reglement,
                          statut = :statut
                      WHERE id = :id",
                     [
                         'montant_paye' => round($couvertureManquant, 2),
+                        'quantite_caisses_reglee' => $caissesRegleesParMission,
+                        'quantite_emballages_reglee' => $emballagesReglesParMission,
                         'date_reglement' => $statutManquant === 'paye' ? date('Y-m-d') : null,
-                        'notes_reglement' => 'Cloture mission ' . ($mission['numero_mission'] ?? $id) . ' - retour plein: ' . $totalCaissesRetournees . ' cs, retour vide: ' . $totalVidesRetournes . ' cs, montant encaisse: ' . round((float) $montant_encaisse, 2) . ', montant du physique: ' . round($totalMontantPhysique, 2) . '.',
+                        'notes_reglement' => 'Cloture mission ' . ($mission['numero_mission'] ?? $id)
+                            . ' - vendu systeme: ' . $totalCaissesVendues . ' cs'
+                            . ', vendu physique: ' . $totalVidesAttenduesPhysiques . ' cs'
+                            . ', retour plein: ' . $totalCaissesRetournees . ' cs'
+                            . ', retour vide: ' . $totalVidesRetournes . ' cs'
+                            . ', reste caisses: ' . $resteCaissesManquant . ' cs'
+                            . ', reste emballages: ' . $resteEmballagesManquant . ' cs'
+                            . ', montant encaisse: ' . round((float) $montant_encaisse, 2)
+                            . ', montant du physique: ' . round($totalMontantPhysique, 2) . '.',
                         'statut' => $statutManquant,
                         'id' => $manquantId,
                     ]
