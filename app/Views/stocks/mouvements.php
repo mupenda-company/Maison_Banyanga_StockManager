@@ -68,6 +68,7 @@ ob_start();
                     <option value="entree" <?= ($filters['type'] ?? '') == 'entree' ? 'selected' : '' ?>>Entrées</option>
                     <option value="sortie" <?= ($filters['type'] ?? '') == 'sortie' ? 'selected' : '' ?>>Sorties</option>
                     <option value="transfert" <?= ($filters['type'] ?? '') == 'transfert' ? 'selected' : '' ?>>Transferts</option>
+                    <option value="inventaire" <?= ($filters['type'] ?? '') == 'inventaire' ? 'selected' : '' ?>>Ajustements / inventaire</option>
                 </select>
             </div>
             <div><label class="label">Date début</label><input type="date" name="date_debut" class="input w-full" value="<?= $filters['date_debut'] ?? '' ?>"></div>
@@ -170,6 +171,9 @@ ob_start();
                                 } elseif ($mvt['type_mouvement'] === 'sortie') {
                                     $typeLabel = 'Sortie';
                                     $typeClass = 'badge-danger';
+                                } elseif ($mvt['type_mouvement'] === 'inventaire') {
+                                    $typeLabel = (($mvt['reference_type'] ?? '') === 'ajustement_stock') ? 'Correction écart' : 'Inventaire';
+                                    $typeClass = 'badge-warning';
                                 } else {
                                     $typeLabel = 'Transfert';
                                     $typeClass = 'badge-info';

@@ -788,4 +788,85 @@ class StockController extends Controller
             return $this->error($e->getMessage(), 400);
         }
     }
+
+    /**
+     * Page de correction des écarts système/physique.
+     */
+    public function correction()
+    {
+        $this->requirePermission('stock.gerer');
+
+        $filters = [
+            'produit_id' => $_GET['produit_id'] ?? null,
+            'emplacement_id' => $_GET['emplacement_id'] ?? null,
+        ];
+
+        $ecarts = $this->stockModel->getEcarts($filters);
+
+        $this->view('stocks/correction', [
+            'ecarts' => $ecarts,
+            'filters' => $filters,
+            'produits' => $this->produitModel->getActive(),
+            'emplacements' => $this->emplacementModel->getWithStock(),
+        ]);
+    }
+
+    /**
+     * API : valider une correction d'écart.
+     */
+    public function saveCorrection()
+    {
+        $this->requirePermission('stock.gerer');
+
+        $data = $this->getJsonInput();
+        $errors = $this->validate($data, [
+            'produit_id' => 'required|numeric',
+            'emplacement_id' => 'required|numeric',
+            'motif' => 'required',
+        ]);
+
+        if (!empty($errors)) {
+            return $this->error('Données invalides', 422, $errors);
+        }
+
+        $result = $this->stockModel->corrigerEcart(
+            (int) $data['produit_id'],
+            (int) $data['emplacement_id'],
+            [
+                'corriger_plein' => !empty($data['corriger_plein']),
+                'corriger_vide' => !empty($data['corriger_vide']),
+                'motif' => trim((string) ($data['motif'] ?? '')),
+                'created_by' => $_SESSION['user_id'] ?? null,
+            ]
+        );
+
+        if (!empty($result['success'])) {
+            return $this->success($result, $result['message'] ?? 'Écart corrigé avec succès');
+        }
+
+        return $this->error($result['message'] ?? 'Correction impossible', 400);
+    }
+
+    /**
+     * Historique des corrections d'écarts.
+     */
+    public function historiqueCorrections()
+    {
+        $this->requirePermission('stock.voir');
+
+        $filters = [
+            'produit_id' => $_GET['produit_id'] ?? null,
+            'emplacement_id' => $_GET['emplacement_id'] ?? null,
+        ];
+
+        $ajustements = $this->stockModel->getHistoriqueAjustements($filters);
+
+        $this->view('stocks/historique-ajustements', [
+            'ajustements' => $ajustements,
+            'filters' => $filters,
+            'produits' => $this->produitModel->getActive(),
+            'emplacements' => $this->emplacementModel->getWithStock(),
+        ]);
+    }
+
 }

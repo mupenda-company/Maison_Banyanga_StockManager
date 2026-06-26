@@ -173,12 +173,13 @@ ob_start();
                         <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase">Vide physique</th>
                         <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase">Écart vide</th>
                         <th class="px-4 py-3 text-center text-[10px] font-bold text-gray-500 uppercase">Alignement</th>
+                        <th class="px-4 py-3 text-center text-[10px] font-bold text-gray-500 uppercase no-print">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                     <?php if (empty($inventaire)): ?>
                     <tr>
-                        <td colspan="9" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colspan="10" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                             Aucun enregistrement trouvé
                         </td>
                     </tr>
@@ -234,6 +235,13 @@ ob_start();
                                 <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 border border-green-200 dark:bg-green-900/40 dark:text-green-400 dark:border-green-800">
                                     ALIGNÉ
                                 </span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="px-4 py-3 text-center no-print">
+                                <?php if ($hasEcart && can('stock.gerer')): ?>
+                                <a href="<?= url('stocks/correction') ?>?produit_id=<?= (int)$item['produit_id'] ?>&emplacement_id=<?= (int)$item['emplacement_id'] ?>" class="btn btn-sm btn-primary">Corriger</a>
+                                <?php else: ?>
+                                <span class="text-xs text-gray-400">—</span>
                                 <?php endif; ?>
                             </td>
                         </tr>

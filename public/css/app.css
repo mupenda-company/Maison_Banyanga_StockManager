@@ -3472,6 +3472,10 @@ video {
   background-color: rgb(113 63 18 / 0.5);
 }
 
+.dark\:bg-primary-900\/40:is(.dark *) {
+  background-color: rgb(var(--color-primary-900) / 0.4);
+}
+
 .dark\:text-amber-400:is(.dark *) {
   --tw-text-opacity: 1;
   color: rgb(251 191 36 / var(--tw-text-opacity, 1));

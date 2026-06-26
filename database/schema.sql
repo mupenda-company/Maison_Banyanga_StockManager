@@ -326,6 +326,29 @@ CREATE TABLE `mouvements_stock` (
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
+CREATE TABLE IF NOT EXISTS ajustements_stock (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    produit_id INT UNSIGNED NOT NULL,
+    emplacement_id INT UNSIGNED NOT NULL,
+    type_ajustement VARCHAR(30) NOT NULL DEFAULT 'inventaire',
+    ancien_systeme_plein DECIMAL(12,2) NOT NULL DEFAULT 0,
+    physique_plein DECIMAL(12,2) NOT NULL DEFAULT 0,
+    nouveau_systeme_plein DECIMAL(12,2) NOT NULL DEFAULT 0,
+    ecart_plein DECIMAL(12,2) NOT NULL DEFAULT 0,
+    ancien_systeme_vide DECIMAL(12,2) NOT NULL DEFAULT 0,
+    physique_vide DECIMAL(12,2) NOT NULL DEFAULT 0,
+    nouveau_systeme_vide DECIMAL(12,2) NOT NULL DEFAULT 0,
+    ecart_vide DECIMAL(12,2) NOT NULL DEFAULT 0,
+    motif TEXT NULL,
+    created_by INT UNSIGNED NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_ajustements_stock_produit (produit_id),
+    INDEX idx_ajustements_stock_emplacement (emplacement_id),
+    INDEX idx_ajustements_stock_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
 --
 -- Table structure for table `objectifs_produits`
 --

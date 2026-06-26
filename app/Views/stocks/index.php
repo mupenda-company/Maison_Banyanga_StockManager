@@ -130,6 +130,11 @@ ob_start();
             <span class="inline-flex px-2 py-0.5 rounded text-xs font-bold <?= $hasEcart ? 'bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/40 dark:text-red-400 dark:border-red-800' : 'bg-green-100 text-green-700 border border-green-200 dark:bg-green-900/40 dark:text-green-400 dark:border-green-800' ?>">
                 <?= $hasEcart ? 'Écart: ' . ($ecart > 0 ? '+' : '') . number_format($ecart, 0, '.', ' ') . ' cs' : 'Aligné' ?>
             </span>
+            <?php if ($hasEcart && can('stock.gerer')): ?>
+            <a href="<?= url('stocks/correction') ?>?emplacement_id=<?= (int)$emp['id'] ?>" class="inline-flex px-2 py-0.5 rounded text-xs font-bold bg-primary-100 text-primary-700 border border-primary-200 dark:bg-primary-900/40 dark:text-primary-300 dark:border-primary-800">
+                Corriger
+            </a>
+            <?php endif; ?>
         </div>
     </div>
     <?php endforeach; ?>
@@ -138,6 +143,12 @@ ob_start();
 <!-- Actions -->
 <div class="flex flex-wrap gap-3 mb-6">
     <?php if (can('stock.gerer')): ?>
+    <a href="<?= url('stocks/correction') ?>" class="btn-primary">
+        Corriger les écarts
+    </a>
+    <a href="<?= url('stocks/ajustements') ?>" class="btn-secondary">
+        Historique corrections
+    </a>
     <a href="<?= url('stocks/inventaire') ?>" class="btn-secondary">
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2-2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>

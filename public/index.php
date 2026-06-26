@@ -65,6 +65,9 @@ $routes = [
     'POST::/api/stocks/transfert' => ['StockController', 'transfert'],
     'POST::/api/stocks/ajustement' => ['StockController', 'ajustement'],
     'POST::/api/stocks/inventaire-initial' => ['StockController', 'enregistrerInventaireInitial'],
+    'GET::/stocks/correction' => ['StockController', 'correction'],
+    'POST::/api/stocks/correction' => ['StockController', 'saveCorrection'],
+    'GET::/stocks/ajustements' => ['StockController', 'historiqueCorrections'],
     
     // Approvisionnements
     'GET::/approvisionnements' => ['ApprovisionnementController', 'index'],

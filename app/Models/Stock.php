@@ -17,6 +17,7 @@ class Stock extends Model
     {
         parent::__construct();
         $this->ensurePhysicalStockColumns();
+        $this->ensureAjustementsStockTable();
     }
 
     private function ensurePhysicalStockColumns(): void
@@ -46,7 +47,42 @@ class Stock extends Model
         }
     }
 
-    
+
+    private function ensureAjustementsStockTable(): void
+    {
+        $exists = (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*)
+             FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'ajustements_stock'"
+        );
+
+        if (!$exists) {
+            $this->db->query(
+                "CREATE TABLE ajustements_stock (
+                    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                    produit_id INT UNSIGNED NOT NULL,
+                    emplacement_id INT UNSIGNED NOT NULL,
+                    type_ajustement VARCHAR(30) NOT NULL DEFAULT 'inventaire',
+                    ancien_systeme_plein DECIMAL(12,2) NOT NULL DEFAULT 0,
+                    physique_plein DECIMAL(12,2) NOT NULL DEFAULT 0,
+                    nouveau_systeme_plein DECIMAL(12,2) NOT NULL DEFAULT 0,
+                    ecart_plein DECIMAL(12,2) NOT NULL DEFAULT 0,
+                    ancien_systeme_vide DECIMAL(12,2) NOT NULL DEFAULT 0,
+                    physique_vide DECIMAL(12,2) NOT NULL DEFAULT 0,
+                    nouveau_systeme_vide DECIMAL(12,2) NOT NULL DEFAULT 0,
+                    ecart_vide DECIMAL(12,2) NOT NULL DEFAULT 0,
+                    motif TEXT NULL,
+                    created_by INT UNSIGNED NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_ajustements_stock_produit (produit_id),
+                    INDEX idx_ajustements_stock_emplacement (emplacement_id),
+                    INDEX idx_ajustements_stock_created_at (created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+        }
+    }
+
     /**
      * Récupérer le stock d'un produit dans un emplacement
      */
@@ -539,4 +575,225 @@ class Stock extends Model
             'nb_produits' => (int)$row['nb_produits']
         ];
     }
+
+    /**
+     * Récupérer uniquement les lignes qui ont un écart système/physique.
+     */
+    public function getEcarts($filters = [])
+    {
+        $where = "p.actif = 1 AND e.actif = 1 AND (e.type != 'mobile' OR v.emplacement_id IS NOT NULL)";
+        $params = [];
+
+        if (!empty($filters['produit_id'])) {
+            $where .= " AND p.id = :produit_id";
+            $params['produit_id'] = $filters['produit_id'];
+        }
+
+        if (!empty($filters['emplacement_id'])) {
+            $where .= " AND e.id = :emplacement_id";
+            $params['emplacement_id'] = $filters['emplacement_id'];
+        }
+
+        $sql = "SELECT s.*, p.nom as produit_nom, p.code as produit_code, p.bouteilles_par_caisses,
+                       e.nom as emplacement_nom, e.type as emplacement_type,
+                       v.id as vehicule_id, v.immatriculation as vehicule_immatriculation,
+                       COALESCE(s.caisses_pleine, 0) as caisses_pleine_systeme,
+                       COALESCE(s.caisses_vide, 0) as caisses_vide_systeme,
+                       COALESCE(s.caisses_pleine_physique, s.caisses_pleine, 0) as caisses_pleine_physique_calc,
+                       COALESCE(s.caisses_vide_physique, s.caisses_vide, 0) as caisses_vide_physique_calc,
+                       (COALESCE(s.caisses_pleine_physique, s.caisses_pleine, 0) - COALESCE(s.caisses_pleine, 0)) as ecart_caisses_pleine,
+                       (COALESCE(s.caisses_vide_physique, s.caisses_vide, 0) - COALESCE(s.caisses_vide, 0)) as ecart_caisses_vide
+                FROM {$this->table} s
+                JOIN produits p ON p.id = s.produit_id
+                JOIN emplacements e ON e.id = s.emplacement_id
+                LEFT JOIN vehicules v ON v.emplacement_id = e.id AND v.actif = 1
+                WHERE {$where}
+                  AND (
+                    COALESCE(s.caisses_pleine_physique, s.caisses_pleine, 0) <> COALESCE(s.caisses_pleine, 0)
+                    OR COALESCE(s.caisses_vide_physique, s.caisses_vide, 0) <> COALESCE(s.caisses_vide, 0)
+                  )
+                ORDER BY e.type, e.nom, p.nom";
+
+        return $this->db->fetchAll($sql, $params);
+    }
+
+    /**
+     * Corriger l'écart en alignant le stock système sur le stock physique.
+     * Règle métier : les emballages/vides ne se corrigent jamais dans un véhicule.
+     */
+    public function corrigerEcart($produitId, $emplacementId, $options = [])
+    {
+        $corrigerPlein = !empty($options['corriger_plein']);
+        $corrigerVide = !empty($options['corriger_vide']);
+        $motif = trim((string) ($options['motif'] ?? ''));
+        $createdBy = $options['created_by'] ?? ($_SESSION['user_id'] ?? null);
+
+        if (!$corrigerPlein && !$corrigerVide) {
+            return ['success' => false, 'message' => 'Sélectionnez au moins un type d’écart à corriger.'];
+        }
+
+        if ($motif === '') {
+            return ['success' => false, 'message' => 'Le motif est obligatoire pour corriger un écart.'];
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            $stock = $this->db->fetch(
+                "SELECT s.*, p.bouteilles_par_caisses, p.nom as produit_nom, e.type as emplacement_type, e.nom as emplacement_nom
+                 FROM {$this->table} s
+                 JOIN produits p ON p.id = s.produit_id
+                 JOIN emplacements e ON e.id = s.emplacement_id
+                 WHERE s.produit_id = :produit_id AND s.emplacement_id = :emplacement_id
+                 FOR UPDATE",
+                ['produit_id' => $produitId, 'emplacement_id' => $emplacementId]
+            );
+
+            if (!$stock) {
+                throw new Exception('Stock introuvable pour ce produit et cet emplacement.');
+            }
+
+            $isMobile = ($stock['emplacement_type'] ?? '') === 'mobile';
+            if ($isMobile && $corrigerVide) {
+                throw new Exception('Les écarts d’emballages/vides doivent être corrigés uniquement dans l’entrepôt, pas dans le véhicule.');
+            }
+
+            $btlParCaisse = (int) ($stock['bouteilles_par_caisses'] ?? 24);
+            if ($btlParCaisse <= 0) {
+                $btlParCaisse = 24;
+            }
+
+            $ancienPlein = (float) ($stock['caisses_pleine'] ?? 0);
+            $physiquePlein = (float) ($stock['caisses_pleine_physique'] ?? $stock['caisses_pleine'] ?? 0);
+            $ecartPlein = $physiquePlein - $ancienPlein;
+
+            $ancienVide = (float) ($stock['caisses_vide'] ?? 0);
+            $physiqueVide = (float) ($stock['caisses_vide_physique'] ?? $stock['caisses_vide'] ?? 0);
+            $ecartVide = $physiqueVide - $ancienVide;
+
+            $nouveauPlein = $ancienPlein;
+            $nouveauVide = $ancienVide;
+            $mouvements = [];
+
+            if ($corrigerPlein && abs($ecartPlein) > 0.0001) {
+                $nouveauPlein = $physiquePlein;
+                $mouvements[] = [
+                    'type' => 'plein',
+                    'ecart' => $ecartPlein,
+                    'quantite' => $ecartPlein * $btlParCaisse,
+                    'motif' => 'Correction écart inventaire plein: ' . ($ecartPlein > 0 ? '+' : '') . $ecartPlein . ' cs - ' . $motif,
+                ];
+            }
+
+            if ($corrigerVide && abs($ecartVide) > 0.0001) {
+                $nouveauVide = $physiqueVide;
+                $mouvements[] = [
+                    'type' => 'vide',
+                    'ecart' => $ecartVide,
+                    'quantite' => $ecartVide * $btlParCaisse,
+                    'motif' => 'Correction écart inventaire vides: ' . ($ecartVide > 0 ? '+' : '') . $ecartVide . ' cs - ' . $motif,
+                ];
+            }
+
+            if (empty($mouvements)) {
+                $this->db->commit();
+                return ['success' => true, 'message' => 'Aucun écart à corriger.'];
+            }
+
+            $this->db->insert('ajustements_stock', [
+                'produit_id' => $produitId,
+                'emplacement_id' => $emplacementId,
+                'type_ajustement' => 'inventaire',
+                'ancien_systeme_plein' => $ancienPlein,
+                'physique_plein' => $physiquePlein,
+                'nouveau_systeme_plein' => $nouveauPlein,
+                'ecart_plein' => $corrigerPlein ? $ecartPlein : 0,
+                'ancien_systeme_vide' => $ancienVide,
+                'physique_vide' => $physiqueVide,
+                'nouveau_systeme_vide' => $nouveauVide,
+                'ecart_vide' => $corrigerVide ? $ecartVide : 0,
+                'motif' => $motif,
+                'created_by' => $createdBy,
+            ]);
+
+            $this->db->query(
+                "UPDATE {$this->table} SET
+                    caisses_pleine = :caisses_pleine,
+                    quantite_pleine = :quantite_pleine,
+                    caisses_vide = :caisses_vide,
+                    quantite_vide = :quantite_vide,
+                    caisses_pleine_physique = :caisses_pleine_physique,
+                    quantite_pleine_physique = :quantite_pleine_physique,
+                    caisses_vide_physique = :caisses_vide_physique,
+                    quantite_vide_physique = :quantite_vide_physique,
+                    updated_at = NOW()
+                 WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id",
+                [
+                    'produit_id' => $produitId,
+                    'emplacement_id' => $emplacementId,
+                    'caisses_pleine' => $nouveauPlein,
+                    'quantite_pleine' => (int) round($nouveauPlein * $btlParCaisse),
+                    'caisses_vide' => $nouveauVide,
+                    'quantite_vide' => (int) round($nouveauVide * $btlParCaisse),
+                    'caisses_pleine_physique' => $nouveauPlein,
+                    'quantite_pleine_physique' => (int) round($nouveauPlein * $btlParCaisse),
+                    'caisses_vide_physique' => $nouveauVide,
+                    'quantite_vide_physique' => (int) round($nouveauVide * $btlParCaisse),
+                ]
+            );
+
+            $mouvementModel = new MouvementStock();
+            foreach ($mouvements as $mvt) {
+                $mouvementModel->create([
+                    'produit_id' => $produitId,
+                    'emplacement_id' => $emplacementId,
+                    'type_mouvement' => 'inventaire',
+                    'quantite' => $mvt['quantite'],
+                    'reference_type' => 'ajustement_stock',
+                    'reference_id' => 0,
+                    'motif' => $mvt['motif'],
+                    'created_by' => $createdBy,
+                ]);
+            }
+
+            $this->refreshStockAlerts();
+            $this->db->commit();
+
+            return ['success' => true, 'message' => 'Écart corrigé et stock aligné avec le comptage physique.'];
+        } catch (Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    public function getHistoriqueAjustements($filters = [])
+    {
+        $where = '1=1';
+        $params = [];
+
+        if (!empty($filters['produit_id'])) {
+            $where .= ' AND a.produit_id = :produit_id';
+            $params['produit_id'] = $filters['produit_id'];
+        }
+        if (!empty($filters['emplacement_id'])) {
+            $where .= ' AND a.emplacement_id = :emplacement_id';
+            $params['emplacement_id'] = $filters['emplacement_id'];
+        }
+
+        return $this->db->fetchAll(
+            "SELECT a.*, p.nom as produit_nom, p.code as produit_code, e.nom as emplacement_nom, e.type as emplacement_type,
+                    CONCAT(u.prenom, ' ', u.nom) as user_nom
+             FROM ajustements_stock a
+             JOIN produits p ON p.id = a.produit_id
+             JOIN emplacements e ON e.id = a.emplacement_id
+             LEFT JOIN users u ON u.id = a.created_by
+             WHERE {$where}
+             ORDER BY a.created_at DESC, a.id DESC
+             LIMIT 300",
+            $params
+        );
+    }
+
 }
