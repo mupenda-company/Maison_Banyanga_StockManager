@@ -20,18 +20,20 @@ $customStyle = "
     .report-sheet { box-shadow: none !important; padding: 0 !important; }
     .print-table th, .print-table td { border: 1px solid #d1d5db !important; padding: 6px !important; font-size: 10px !important; }
 }
-.report-sheet { background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(15,23,42,.08); }
+.report-sheet { background: #ffffff; border-radius: 12px; box-shadow: 0 10px 30px rgba(15,23,42,.08); }
+.dark .report-sheet { background: #111827; color: #f9fafb; box-shadow: none; }
 .print-table { width: 100%; border-collapse: collapse; }
 .print-table th { background: #111827; color: white; text-align: left; font-size: 11px; text-transform: uppercase; }
 .print-table td { border-bottom: 1px solid #e5e7eb; padding: 8px; }
+.dark .print-table td { border-bottom-color: #374151; }
 ";
 ob_start();
 ?>
-<div x-data="manquantsPage()" class="report-sheet p-4 md:p-6">
+<div x-data="manquantsPage()" class="report-sheet p-4 md:p-6 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
     <div class="flex flex-wrap items-center justify-between gap-4 mb-6 no-print">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Manquants agents</h1>
-            <p class="text-sm text-gray-500">Rapport détaillé, emballages dus, paiements et restes à payer par agent.</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Rapport détaillé, emballages dus, paiements et restes à payer par agent.</p>
         </div>
         <div class="flex gap-2">
             <?php if (can('pertes.creer')): ?><a href="<?= url('manquants/create') ?>" class="btn btn-primary">Enregistrer un manquant</a><?php endif; ?>
@@ -56,7 +58,7 @@ ob_start();
 
     <div class="card mb-6 no-print">
         <div class="card-body">
-            <form method="GET" class="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
+            <form method="GET" class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
                 <div>
                     <label class="label">Agent</label>
                     <select name="agent_id" class="input">
@@ -100,23 +102,41 @@ ob_start();
         </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
-        <div class="stat-card"><p class="stat-label">Manquants</p><p class="stat-value"><?= count($manquants) ?></p></div>
-        <div class="stat-card"><p class="stat-label">Reste caisses</p><p class="stat-value text-blue-600"><?= number_format($totalResteCaisses, 2, ',', ' ') ?> cs</p></div>
-        <div class="stat-card"><p class="stat-label">Reste emballages</p><p class="stat-value text-purple-600"><?= number_format($totalResteEmballages, 2, ',', ' ') ?> cs</p></div>
-        <div class="stat-card"><p class="stat-label">Montant total</p><p class="stat-value text-red-600"><?= format_money_converted($totalMontant) ?></p></div>
-        <div class="stat-card"><p class="stat-label">Déjà payé</p><p class="stat-value text-green-600"><?= format_money_converted($totalPaye) ?></p></div>
-        <div class="stat-card"><p class="stat-label">Reste à payer</p><p class="stat-value text-orange-600"><?= format_money_converted($totalReste) ?></p></div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
+        <div class="stat-card dark:bg-gray-800 dark:border-gray-700">
+            <p class="stat-label dark:text-gray-400">Manquants</p>
+            <p class="stat-value text-gray-900 dark:text-white"><?= count($manquants) ?></p>
+        </div>
+        <div class="stat-card border-l-4 border-blue-500 dark:bg-gray-800 dark:border-gray-700">
+            <p class="stat-label dark:text-gray-400">Reste caisses</p>
+            <p class="stat-value text-blue-600 dark:text-blue-400"><?= number_format($totalResteCaisses, 2, ',', ' ') ?> cs</p>
+        </div>
+        <div class="stat-card border-l-4 border-purple-500 dark:bg-gray-800 dark:border-gray-700">
+            <p class="stat-label dark:text-gray-400">Reste emballages</p>
+            <p class="stat-value text-purple-600 dark:text-purple-400"><?= number_format($totalResteEmballages, 2, ',', ' ') ?> cs</p>
+        </div>
+        <div class="stat-card border-l-4 border-red-500 dark:bg-gray-800 dark:border-gray-700">
+            <p class="stat-label dark:text-gray-400">Montant total</p>
+            <p class="stat-value text-red-600 dark:text-red-400"><?= format_money_converted($totalMontant) ?></p>
+        </div>
+        <div class="stat-card border-l-4 border-green-500 dark:bg-gray-800 dark:border-gray-700">
+            <p class="stat-label dark:text-gray-400">Déjà payé</p>
+            <p class="stat-value text-green-600 dark:text-green-400"><?= format_money_converted($totalPaye) ?></p>
+        </div>
+        <div class="stat-card border-l-4 border-orange-500 dark:bg-gray-800 dark:border-gray-700">
+            <p class="stat-label dark:text-gray-400">Reste à payer</p>
+            <p class="stat-value text-orange-600 dark:text-orange-400"><?= format_money_converted($totalReste) ?></p>
+        </div>
     </div>
 
     <?php if (!empty($resume)): ?>
         <div class="mb-6">
-            <h2 class="text-sm font-bold uppercase text-gray-500 mb-2">Résumé par agent</h2>
+            <h2 class="text-sm font-bold uppercase text-gray-500 dark:text-gray-400 mb-2">Résumé par agent</h2>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <?php foreach ($resume as $r): ?>
-                    <div class="rounded-lg border border-gray-200 p-3">
+                    <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
                         <p class="font-bold"><?= htmlspecialchars($r['agent_nom']) ?></p>
-                        <p class="text-sm text-gray-500"><?= (int) $r['nombre'] ?> cas · Reste caisses: <?= number_format((float) ($r['total_reste_caisses'] ?? 0), 2, ',', ' ') ?> · Reste emb.: <?= number_format((float) ($r['total_reste_emballages'] ?? 0), 2, ',', ' ') ?></p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400"><?= (int) $r['nombre'] ?> cas · Reste caisses: <?= number_format((float) ($r['total_reste_caisses'] ?? 0), 2, ',', ' ') ?> · Reste emb.: <?= number_format((float) ($r['total_reste_emballages'] ?? 0), 2, ',', ' ') ?></p>
                         <p class="text-sm">Payé: <strong class="text-green-600"><?= format_money_converted($r['total_paye']) ?></strong></p>
                         <p class="text-sm">Reste: <strong class="text-orange-600"><?= format_money_converted($r['total_reste']) ?></strong></p>
                     </div>
@@ -125,8 +145,8 @@ ob_start();
         </div>
     <?php endif; ?>
 
-    <div class="table-container">
-        <table class="table">
+    <div class="table-container rounded-lg border border-gray-200 dark:border-gray-700">
+        <table class="table text-gray-800 dark:text-gray-100">
             <thead>
                 <tr>
                     <th>Date</th>
@@ -200,9 +220,9 @@ ob_start();
 
     <div x-show="payment.open" class="fixed inset-0 z-50 flex items-center justify-center p-4 no-print" style="display:none">
         <div class="absolute inset-0 bg-black/50" @click="payment.open=false"></div>
-        <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md p-6">
-            <h3 class="text-lg font-bold mb-1">Régler un manquant</h3>
-            <p class="text-sm text-gray-500 mb-4" x-text="payment.agent + ' · argent: ' + App.formatMoneyConverted(payment.reste, (window.BASE_DEVISE || 'CDF'), window.DEVISE) + ' · caisses: ' + payment.reste_caisses + ' · emballages: ' + payment.reste_emballages"></p>
+        <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6">
+            <h3 class="text-lg font-bold mb-1 text-gray-900 dark:text-white">Régler un manquant</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4" x-text="payment.agent + ' · argent: ' + App.formatMoneyConverted(payment.reste, (window.BASE_DEVISE || 'CDF'), window.DEVISE) + ' · caisses: ' + payment.reste_caisses + ' · emballages: ' + payment.reste_emballages"></p>
             <div class="space-y-3 mb-4">
                 <div><label class="label">Paiement CDF</label><input type="number" min="0" step="0.01" x-model.number="payment.montant_paye_cdf" class="input"></div>
                 <div><label class="label">Paiement USD</label><input type="number" min="0" step="0.01" x-model.number="payment.montant_paye_usd" class="input"></div>
