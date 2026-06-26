@@ -37,7 +37,7 @@ ob_start();
 </div>
 
 <!-- Cartes résumé -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
     <!-- Chiffre d'affaires -->
     <div class="stat-card">
         <div class="flex items-center justify-between">
@@ -143,7 +143,7 @@ ob_start();
     </div>
 
     <!-- Récolté ce mois (local) -->
-    <!-- <div class="stat-card">
+    <div class="stat-card">
         <div class="flex items-center justify-between">
             <div class="min-w-0 flex-1 mr-2">
                 <p class="stat-label">Récolte locale</p>
@@ -158,7 +158,7 @@ ob_start();
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
             Deduction locale ristournes
         </p>
-    </div> -->
+    </div>
 </div>
 
 <!-- Deuxième rangée : Dettes + Panier -->
