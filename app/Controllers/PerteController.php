@@ -205,6 +205,69 @@ class PerteController extends Controller
         return $this->error($result['message'], 400);
     }
     
+
+    /**
+     * Formulaire de modification
+     */
+    public function edit($id)
+    {
+        $this->requirePermission('pertes.creer');
+
+        $perte = $this->perteModel->getWithDetails((int) $id);
+        if (!$perte) {
+            return $this->error('Perte introuvable', 404);
+        }
+
+        $this->view('pertes/edit', [
+            'perte' => $perte,
+            'produits' => $this->produitModel->getWithStock(),
+            'emplacements' => $this->emplacementModel->all('type, nom'),
+            'agents' => $this->userModel->getActive()
+        ]);
+    }
+
+    /**
+     * Mettre à jour une perte et synchroniser le stock
+     */
+    public function update($id)
+    {
+        $this->requirePermission('pertes.creer');
+
+        $data = $this->getJsonInput();
+
+        $errors = $this->validate($data, [
+            'produit_id' => 'required|numeric',
+            'emplacement_id' => 'required|numeric',
+            'quantite' => 'required|numeric',
+            'type_perte' => 'required',
+            'date_perte' => 'required'
+        ]);
+
+        if (!empty($errors)) {
+            return $this->error('Erreurs de validation', 422, $errors);
+        }
+
+        $result = $this->perteModel->updateWithStockUpdate((int) $id, [
+            'produit_id' => (int) $data['produit_id'],
+            'emplacement_id' => (int) $data['emplacement_id'],
+            'quantite' => (float) $data['quantite'],
+            'unite_perte' => $data['unite_perte'] ?? 'caisse',
+            'type_perte' => $data['type_perte'],
+            'type_stock' => $data['type_stock'] ?? 'plein',
+            'motif' => $data['motif'] ?? '',
+            'date_perte' => $data['date_perte'],
+            'valeur_perte' => $data['valeur_perte'] ?? 0,
+            'agent_id' => !empty($data['agent_id']) ? (int) $data['agent_id'] : null,
+            'updated_by' => $_SESSION['user_id'] ?? null
+        ]);
+
+        if ($result['success']) {
+            return $this->success(['id' => (int) $id], 'Perte modifiée avec succès');
+        }
+
+        return $this->error($result['message'], 400);
+    }
+
     /**
      * Supprimer une perte (API)
      */

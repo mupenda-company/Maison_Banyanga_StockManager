@@ -161,7 +161,8 @@ $routes = [
     'POST::/api/pertes' => ['PerteController', 'store'],
     'DELETE::/api/pertes/(\d+)' => ['PerteController', 'delete'],
     'GET::/pertes/stats' => ['PerteController', 'stats'],
-    
+    'GET::/pertes/(\d+)/edit' => ['PerteController', 'edit'],
+    'PUT::/api/pertes/(\d+)' => ['PerteController', 'update'],
     
     // Manquants agents
     'GET::/manquants' => ['ManquantController', 'index'],

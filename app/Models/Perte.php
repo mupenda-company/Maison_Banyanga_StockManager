@@ -222,6 +222,134 @@ class Perte extends Model
         );
     }
 
+
+    /**
+     * Modifier une perte en restaurant l'ancien impact stock puis en appliquant le nouveau.
+     */
+    public function updateWithStockUpdate($id, $data)
+    {
+        try {
+            $this->db->beginTransaction();
+
+            $anciennePerte = $this->getWithDetails((int) $id);
+            if (!$anciennePerte) {
+                throw new Exception('Perte non trouvée');
+            }
+
+            $stockModel = new Stock();
+            $mouvementModel = new MouvementStock();
+
+            // 1) Restaurer l'ancien stock touché par la perte initiale
+            $ancienBtlParCaisse = (int) ($anciennePerte['bouteilles_par_caisses'] ?? 24);
+            if ($ancienBtlParCaisse <= 0) {
+                $ancienBtlParCaisse = 24;
+            }
+            $ancienneQuantiteCaisses = (float) ($anciennePerte['quantite'] ?? 0);
+            $ancienneQuantiteBouteilles = $ancienneQuantiteCaisses * $ancienBtlParCaisse;
+            $ancienTypeStock = $anciennePerte['type_stock'] ?? 'plein';
+
+            $stockModel->updateOrCreate(
+                (int) $anciennePerte['produit_id'],
+                (int) $anciennePerte['emplacement_id'],
+                $ancienTypeStock === 'vide'
+                    ? [
+                        'quantite_vide' => $ancienneQuantiteBouteilles,
+                        'caisses_vide' => $ancienneQuantiteCaisses,
+                    ]
+                    : [
+                        'quantite_pleine' => $ancienneQuantiteBouteilles,
+                        'caisses_pleine' => $ancienneQuantiteCaisses,
+                    ]
+            );
+
+            $mouvementModel->create([
+                'produit_id' => (int) $anciennePerte['produit_id'],
+                'emplacement_id' => (int) $anciennePerte['emplacement_id'],
+                'type_mouvement' => 'entree',
+                'quantite' => $ancienneQuantiteBouteilles,
+                'reference_type' => 'perte_modification',
+                'reference_id' => (int) $id,
+                'motif' => 'Restauration ancien impact perte ID: ' . (int) $id,
+                'created_by' => $data['updated_by'] ?? ($_SESSION['user_id'] ?? null)
+            ]);
+
+            // 2) Recalculer la nouvelle quantité selon l'unité saisie
+            $produit = (new Produit())->find((int) $data['produit_id']);
+            if (!$produit) {
+                throw new Exception('Produit introuvable');
+            }
+
+            $btlParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+            if ($btlParCaisse <= 0) {
+                $btlParCaisse = 24;
+            }
+
+            $unitePerte = $data['unite_perte'] ?? 'caisse';
+            $quantiteSaisie = max(0, (float) ($data['quantite'] ?? 0));
+            $nouvelleQuantiteBouteilles = $unitePerte === 'bouteille'
+                ? $quantiteSaisie
+                : ($quantiteSaisie * $btlParCaisse);
+            $nouvelleQuantiteCaisses = $nouvelleQuantiteBouteilles / max(1, $btlParCaisse);
+
+            if (abs($nouvelleQuantiteCaisses - round($nouvelleQuantiteCaisses)) < 0.0001) {
+                $nouvelleQuantiteCaisses = (float) round($nouvelleQuantiteCaisses);
+            }
+
+            if ($nouvelleQuantiteCaisses <= 0) {
+                throw new Exception('La quantité de perte doit être supérieure à 0');
+            }
+
+            $nouveauTypeStock = $data['type_stock'] ?? 'plein';
+
+            // 3) Déduire le nouveau stock
+            $stockModel->updateOrCreate(
+                (int) $data['produit_id'],
+                (int) $data['emplacement_id'],
+                $nouveauTypeStock === 'vide'
+                    ? [
+                        'quantite_vide' => -$nouvelleQuantiteBouteilles,
+                        'caisses_vide' => -$nouvelleQuantiteCaisses,
+                    ]
+                    : [
+                        'quantite_pleine' => -$nouvelleQuantiteBouteilles,
+                        'caisses_pleine' => -$nouvelleQuantiteCaisses,
+                    ]
+            );
+
+            $mouvementModel->create([
+                'produit_id' => (int) $data['produit_id'],
+                'emplacement_id' => (int) $data['emplacement_id'],
+                'type_mouvement' => 'sortie',
+                'quantite' => -$nouvelleQuantiteBouteilles,
+                'reference_type' => 'perte',
+                'reference_id' => (int) $id,
+                'motif' => 'Modification perte (' . $nouveauTypeStock . ') - ' . ($data['type_perte'] ?? ''),
+                'created_by' => $data['updated_by'] ?? ($_SESSION['user_id'] ?? null)
+            ]);
+
+            // 4) Mettre à jour l'enregistrement de la perte
+            $this->update((int) $id, [
+                'produit_id' => (int) $data['produit_id'],
+                'emplacement_id' => (int) $data['emplacement_id'],
+                'quantite' => $nouvelleQuantiteCaisses,
+                'type_perte' => $data['type_perte'],
+                'type_stock' => $nouveauTypeStock,
+                'motif' => $data['motif'] ?? '',
+                'date_perte' => $data['date_perte'],
+                'valeur_perte' => max(0, (float) ($data['valeur_perte'] ?? 0)),
+                'agent_id' => !empty($data['agent_id']) ? (int) $data['agent_id'] : null,
+            ]);
+
+            $this->db->commit();
+            return ['success' => true, 'id' => (int) $id];
+        } catch (Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
     /**
      * Supprimer une perte et restaurer le stock
      */
