@@ -51,7 +51,7 @@ ob_start();
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-8">
     <div class="card xl:col-span-2">
         <div class="card-header flex items-center justify-between">
-            <h3 class="font-bold">Stock emballages par produit</h3>
+            <h3 class="font-bold dark:text-white">Stock emballages par produit</h3>
             <span class="text-xs text-gray-400">Caisses vides</span>
         </div>
         <div class="card-body p-0">
@@ -89,7 +89,7 @@ ob_start();
 
     <div class="card">
         <div class="card-header">
-            <h3 class="font-bold">Emprunts / prets en cours</h3>
+            <h3 class="font-bold dark:text-white">Emprunts / prets en cours</h3>
         </div>
         <div class="card-body space-y-4">
             <div class="flex items-center justify-between border-b pb-3 dark:border-gray-700">
@@ -115,7 +115,7 @@ ob_start();
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
     <div class="card">
         <div class="card-header flex items-center justify-between">
-            <h3 class="font-bold">Stock emballages par emplacement</h3>
+            <h3 class="font-bold dark:text-white">Stock emballages par emplacement</h3>
             <span class="text-xs text-gray-400">Fixe et mobile</span>
         </div>
         <div class="card-body p-0">
@@ -144,7 +144,7 @@ ob_start();
 
     <div class="card">
         <div class="card-header flex items-center justify-between">
-            <h3 class="font-bold">Dettes d'emballages clients</h3>
+            <h3 class="font-bold dark:text-white">Dettes d'emballages clients</h3>
             <span class="text-xs text-gray-400">Periode filtree</span>
         </div>
         <div class="card-body p-0">
@@ -190,7 +190,7 @@ ob_start();
 
 <div class="card">
     <div class="card-header flex items-center justify-between">
-        <h3 class="font-bold">Retours recents</h3>
+        <h3 class="font-bold dark:text-white">Retours recents</h3>
         <a href="<?= url('emballages/suivi') ?>" class="text-sm text-primary-600 hover:text-primary-700">Voir tout</a>
     </div>
     <div class="card-body p-0">
