@@ -1,14 +1,16 @@
 <?php 
-$pageTitle = 'Inventaire initial';
+$emballageMode = !empty($emballageMode);
+$pageTitle = $emballageMode ? 'Stock initial emballages' : 'Inventaire initial';
+$returnUrl = $emballageMode ? url('emballages') : url('stocks');
 ob_start();
 ?>
 
 <div class="max-w-6xl mx-auto">
     <div class="card">
         <div class="card-header">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Inventaire initial du dépôt principal</h2>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white"><?= $emballageMode ? 'Stock initial emballages du dépôt principal' : 'Inventaire initial du dépôt principal' ?></h2>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Enregistrez ici la base de départ des produits et des caisses vides avant les approvisionnements et les ventes.
+                <?= $emballageMode ? 'Enregistrez ici la base de départ des emballages vides avant les approvisionnements et les ventes.' : 'Enregistrez ici la base de départ des produits pleins. Les emballages vides se saisissent dans le tableau de bord Emballages.' ?>
             </p>
         </div>
         <div class="card-body">
@@ -36,12 +38,12 @@ ob_start();
                             <tr>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Produit</th>
                                 <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Btl/Caisse</th>
-                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Ancien plein</th>
-                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Nouveau plein</th>
-                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Ecart plein</th>
-                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Ancien vide</th>
-                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Nouveau vide</th>
-                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Ecart vide</th>
+                                <?php if (!$emballageMode): ?><th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Ancien plein</th><?php endif; ?>
+                                <?php if (!$emballageMode): ?><th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Nouveau plein</th><?php endif; ?>
+                                <?php if (!$emballageMode): ?><th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Ecart plein</th><?php endif; ?>
+                                <?php if ($emballageMode): ?><th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Ancien emballages</th><?php endif; ?>
+                                <?php if ($emballageMode): ?><th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Nouveau emballages</th><?php endif; ?>
+                                <?php if ($emballageMode): ?><th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Ecart emballages</th><?php endif; ?>
                             </tr>
                         </thead>
                         <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -52,16 +54,12 @@ ob_start();
                                         <div class="text-xs text-gray-500" x-text="ligne.produit_code"></div>
                                     </td>
                                     <td class="px-4 py-3 text-right text-sm text-gray-600 dark:text-gray-300" x-text="ligne.bouteilles_par_caisses"></td>
-                                    <td class="px-4 py-3 text-right text-sm text-gray-500 dark:text-gray-400" x-text="ligne.ancien_caisses_pleine"></td>
-                                    <td class="px-4 py-3 text-right">
-                                        <input type="number" class="input w-24 text-right" min="0" step="1" x-model.number="ligne.caisses_pleine" @input="sanitizeLine(ligne)">
-                                    </td>
-                                    <td class="px-4 py-3 text-right font-semibold" x-bind:class="lineEcartPleine(ligne) > 0 ? 'text-green-600' : (lineEcartPleine(ligne) < 0 ? 'text-red-600' : 'text-gray-400')" x-text="lineEcartPleine(ligne) > 0 ? '+' + lineEcartPleine(ligne) : lineEcartPleine(ligne)"></td>
-                                    <td class="px-4 py-3 text-right text-sm text-gray-500 dark:text-gray-400" x-text="ligne.ancien_caisses_vide"></td>
-                                    <td class="px-4 py-3 text-right">
-                                        <input type="number" class="input w-24 text-right" min="0" step="1" x-model.number="ligne.caisses_vide" @input="sanitizeLine(ligne)">
-                                    </td>
-                                    <td class="px-4 py-3 text-right font-semibold" x-bind:class="lineEcartVide(ligne) > 0 ? 'text-green-600' : (lineEcartVide(ligne) < 0 ? 'text-red-600' : 'text-gray-400')" x-text="lineEcartVide(ligne) > 0 ? '+' + lineEcartVide(ligne) : lineEcartVide(ligne)"></td>
+                                    <?php if (!$emballageMode): ?><td class="px-4 py-3 text-right text-sm text-gray-500 dark:text-gray-400" x-text="ligne.ancien_caisses_pleine"></td><?php endif; ?>
+                                    <?php if (!$emballageMode): ?><td class="px-4 py-3 text-right"><input type="number" class="input w-24 text-right" min="0" step="1" x-model.number="ligne.caisses_pleine" @input="sanitizeLine(ligne)"></td><?php endif; ?>
+                                    <?php if (!$emballageMode): ?><td class="px-4 py-3 text-right font-semibold" x-bind:class="lineEcartPleine(ligne) > 0 ? 'text-green-600' : (lineEcartPleine(ligne) < 0 ? 'text-red-600' : 'text-gray-400')" x-text="lineEcartPleine(ligne) > 0 ? '+' + lineEcartPleine(ligne) : lineEcartPleine(ligne)"></td><?php endif; ?>
+                                    <?php if ($emballageMode): ?><td class="px-4 py-3 text-right text-sm text-gray-500 dark:text-gray-400" x-text="ligne.ancien_caisses_vide"></td><?php endif; ?>
+                                    <?php if ($emballageMode): ?><td class="px-4 py-3 text-right"><input type="number" class="input w-24 text-right" min="0" step="1" x-model.number="ligne.caisses_vide" @input="sanitizeLine(ligne)"></td><?php endif; ?>
+                                    <?php if ($emballageMode): ?><td class="px-4 py-3 text-right font-semibold" x-bind:class="lineEcartVide(ligne) > 0 ? 'text-green-600' : (lineEcartVide(ligne) < 0 ? 'text-red-600' : 'text-gray-400')" x-text="lineEcartVide(ligne) > 0 ? '+' + lineEcartVide(ligne) : lineEcartVide(ligne)"></td><?php endif; ?>
                                 </tr>
                             </template>
                         </tbody>
@@ -85,7 +83,7 @@ ob_start();
                         <span x-show="hasAnyEcart()" class="ml-2 text-yellow-600 font-medium" x-text="'(' + ecartCount() + ' ecart(s))'"></span>
                     </div>
                     <div class="flex gap-3">
-                        <a href="<?= url('stocks') ?>" class="btn-secondary">Annuler</a>
+                        <a href="<?= $returnUrl ?>" class="btn-secondary">Annuler</a>
                         <button type="submit" class="btn-primary" :disabled="loading">
                             <span x-show="!loading">Enregistrer l'inventaire</span>
                             <span x-show="loading">Enregistrement...</span>
@@ -173,17 +171,18 @@ document.addEventListener('alpine:init', () => {
                     .filter((ligne) => ligne.produit_id && (ligne.has_existing_stock || ligne.caisses_pleine > 0 || ligne.caisses_vide > 0));
 
                 if (lignes.length === 0) {
-                    throw new Error('Saisissez au moins un produit avec une quantite');
+                    throw new Error('Saisissez au moins une quantite');
                 }
 
                 const result = await App.api('/api/stocks/inventaire-initial', 'POST', {
                     emplacement_id: parseInt(this.emplacement_id),
                     lignes: lignes,
-                    motif_ecart: this.motif_ecart.trim()
+                    motif_ecart: this.motif_ecart.trim(),
+                    mode: '<?= $emballageMode ? 'emballage' : 'stock' ?>'
                 });
 
                 App.notify(result.message || 'Inventaire initial enregistré avec succès', 'success');
-                setTimeout(() => window.location.href = '<?= url('stocks') ?>', 900);
+                setTimeout(() => window.location.href = '<?= $returnUrl ?>', 900);
             } catch (e) {
                 App.notify(e.message || 'Erreur lors de l\'enregistrement', 'error');
             } finally {

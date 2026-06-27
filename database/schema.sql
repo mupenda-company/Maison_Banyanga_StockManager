@@ -177,6 +177,8 @@ CREATE TABLE `emplacements` (
 
 CREATE TABLE `emprunts_emballages` (
   `id` int UNSIGNED NOT NULL,
+  `direction` enum('recu','donne') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'recu',
+  `type_stock` enum('vide','plein') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'vide',
   `source_type` enum('client','externe') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'client',
   `client_id` int UNSIGNED DEFAULT NULL,
   `source_nom` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,

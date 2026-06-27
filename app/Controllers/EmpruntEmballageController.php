@@ -23,6 +23,8 @@ class EmpruntEmballageController extends Controller
         $filters = [
             'statut' => $_GET['statut'] ?? null,
             'source_type' => $_GET['source_type'] ?? null,
+            'direction' => $_GET['direction'] ?? null,
+            'type_stock' => $_GET['type_stock'] ?? null,
         ];
 
         $this->view('emballages/emprunts', [
@@ -51,6 +53,16 @@ class EmpruntEmballageController extends Controller
             return $this->error('Erreurs de validation', 422, $errors);
         }
 
+        $direction = $data['direction'] ?? 'recu';
+        if (!in_array($direction, ['recu', 'donne'], true)) {
+            return $this->error('Type d\'emprunt invalide', 422);
+        }
+
+        $typeStock = $data['type_stock'] ?? 'vide';
+        if (!in_array($typeStock, ['vide', 'plein'], true)) {
+            return $this->error('Type de stock invalide', 422);
+        }
+
         if (!in_array($data['source_type'], ['client', 'externe'], true)) {
             return $this->error('Type de source invalide', 422);
         }
@@ -64,6 +76,8 @@ class EmpruntEmballageController extends Controller
         }
 
         $result = $this->empruntModel->createWithStock([
+            'direction' => $direction,
+            'type_stock' => $typeStock,
             'source_type' => $data['source_type'],
             'client_id' => $data['source_type'] === 'client' ? $data['client_id'] : null,
             'source_nom' => $data['source_type'] === 'externe' ? trim($data['source_nom']) : null,
@@ -77,7 +91,7 @@ class EmpruntEmballageController extends Controller
         ]);
 
         if ($result['success']) {
-            return $this->success(['id' => $result['id']], 'Emprunt enregistre avec succes');
+            return $this->success(['id' => $result['id']], $direction === 'donne' ? 'Pret enregistre avec succes' : 'Emprunt enregistre avec succes');
         }
 
         return $this->error($result['message'], 400);

@@ -88,6 +88,7 @@ $routes = [
 
     // Emballages
     'GET::/emballages' => ['EmballageController', 'index'],
+    'GET::/emballages/inventaire-initial' => ['StockController', 'inventaireInitial'],
     'GET::/emballages/suivi' => ['EmballageController', 'suivi'],
     'GET::/emballages/emprunts' => ['EmpruntEmballageController', 'index'],
     'POST::/api/emballages/emprunts' => ['EmpruntEmballageController', 'store'],
@@ -128,6 +129,7 @@ $routes = [
     'PUT::/api/vehicules/(\d+)' => ['VehiculeController', 'update'],
     'DELETE::/api/vehicules/(\d+)' => ['VehiculeController', 'delete'],
     'POST::/api/vehicules/transfert' => ['VehiculeController', 'transfertVehicule'],
+    'POST::/api/vehicules/(\d+)/retour-emballages' => ['VehiculeController', 'retourEmballages'],
     
     // Missions
     'GET::/missions' => ['MissionController', 'index'],

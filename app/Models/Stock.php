@@ -264,6 +264,27 @@ class Stock extends Model
             $data['caisses_pleine'] = intval($data['quantite_pleine'] / $btlParCaisse);
         }
 
+        $delta = [
+            'quantite_pleine' => (int) ($data['quantite_pleine'] ?? 0),
+            'quantite_vide' => (int) ($data['quantite_vide'] ?? 0),
+            'caisses_pleine' => (int) ($data['caisses_pleine'] ?? 0),
+            'caisses_vide' => (int) ($data['caisses_vide'] ?? 0),
+        ];
+
+        $actuel = [
+            'quantite_pleine' => (int) ($existing['quantite_pleine'] ?? 0),
+            'quantite_vide' => (int) ($existing['quantite_vide'] ?? 0),
+            'caisses_pleine' => (int) ($existing['caisses_pleine'] ?? 0),
+            'caisses_vide' => (int) ($existing['caisses_vide'] ?? 0),
+        ];
+
+        foreach ($delta as $champ => $variation) {
+            if ($actuel[$champ] + $variation < 0) {
+                $libelle = str_replace('_', ' ', $champ);
+                throw new Exception('Stock insuffisant pour ' . $libelle . ' : disponible ' . $actuel[$champ] . ', demande ' . abs($variation));
+            }
+        }
+
         if ($existing) {
             $this->db->query(
                 "UPDATE {$this->table} SET 
@@ -276,10 +297,10 @@ class Stock extends Model
                 [
                     'produit_id' => $produitId,
                     'emplacement_id' => $emplacementId,
-                    'quantite_pleine' => $data['quantite_pleine'] ?? 0,
-                    'quantite_vide' => $data['quantite_vide'] ?? 0,
-                    'caisses_pleine' => $data['caisses_pleine'] ?? 0,
-                    'caisses_vide' => $data['caisses_vide'] ?? 0
+                    'quantite_pleine' => $delta['quantite_pleine'],
+                    'quantite_vide' => $delta['quantite_vide'],
+                    'caisses_pleine' => $delta['caisses_pleine'],
+                    'caisses_vide' => $delta['caisses_vide']
                 ]
             );
             $this->refreshStockAlerts();
@@ -288,10 +309,10 @@ class Stock extends Model
             $id = $this->create([
                 'produit_id' => $produitId,
                 'emplacement_id' => $emplacementId,
-                'quantite_pleine' => $data['quantite_pleine'] ?? 0,
-                'quantite_vide' => $data['quantite_vide'] ?? 0,
-                'caisses_pleine' => $data['caisses_pleine'] ?? 0,
-                'caisses_vide' => $data['caisses_vide'] ?? 0
+                'quantite_pleine' => $delta['quantite_pleine'],
+                'quantite_vide' => $delta['quantite_vide'],
+                'caisses_pleine' => $delta['caisses_pleine'],
+                'caisses_vide' => $delta['caisses_vide']
             ]);
             $this->refreshStockAlerts();
             return $id;

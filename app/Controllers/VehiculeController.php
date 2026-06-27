@@ -551,6 +551,85 @@ class VehiculeController extends Controller
     /**
      * Supprimer un véhicule (désactiver)
      */
+    public function retourEmballages($id)
+    {
+        $this->requirePermission('vehicules.gerer');
+
+        try {
+            $this->db->beginTransaction();
+
+            $vehicule = $this->vehiculeModel->getWithStock($id);
+            if (!$vehicule || empty($vehicule['emplacement_id'])) {
+                throw new Exception('Véhicule non trouvé ou sans emplacement');
+            }
+
+            $entrepot = (new Emplacement())->getPrincipal();
+            if (!$entrepot) {
+                throw new Exception('Entrepôt principal non trouvé');
+            }
+
+            $stockModel = new Stock();
+            $mouvementModel = new MouvementStock();
+            $totalCaisses = 0;
+
+            foreach (($vehicule['stock'] ?? []) as $ligne) {
+                $caissesVides = (int) ($ligne['caisses_vide'] ?? 0);
+                if ($caissesVides <= 0) {
+                    continue;
+                }
+
+                $produit = (new Produit())->find($ligne['produit_id']);
+                $btlParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+                if ($btlParCaisse <= 0) {
+                    $btlParCaisse = 24;
+                }
+
+                $quantiteBouteilles = $caissesVides * $btlParCaisse;
+                $stockModel->updateOrCreate($ligne['produit_id'], $vehicule['emplacement_id'], [
+                    'quantite_vide' => -$quantiteBouteilles,
+                    'caisses_vide' => -$caissesVides,
+                ]);
+                $stockModel->updateOrCreate($ligne['produit_id'], $entrepot['id'], [
+                    'quantite_vide' => $quantiteBouteilles,
+                    'caisses_vide' => $caissesVides,
+                ]);
+
+                $mouvementModel->create([
+                    'produit_id' => $ligne['produit_id'],
+                    'emplacement_id' => $vehicule['emplacement_id'],
+                    'type_mouvement' => 'transfert',
+                    'quantite' => -$quantiteBouteilles,
+                    'reference_type' => 'retour_emballages_vehicule',
+                    'reference_id' => (int) $id,
+                    'motif' => 'Retour emballages véhicule vers entrepôt',
+                    'created_by' => $_SESSION['user_id'] ?? null,
+                ]);
+                $mouvementModel->create([
+                    'produit_id' => $ligne['produit_id'],
+                    'emplacement_id' => $entrepot['id'],
+                    'type_mouvement' => 'transfert',
+                    'quantite' => $quantiteBouteilles,
+                    'reference_type' => 'retour_emballages_vehicule',
+                    'reference_id' => (int) $id,
+                    'motif' => 'Retour emballages véhicule vers entrepôt',
+                    'created_by' => $_SESSION['user_id'] ?? null,
+                ]);
+
+                $totalCaisses += $caissesVides;
+            }
+
+            if ($totalCaisses <= 0) {
+                $this->db->commit();
+                return $this->success(['total_caisses' => 0], 'Aucun emballage vide à rentrer pour ce véhicule');
+            }
+
+            $this->db->commit();
+            return $this->success(['total_caisses' => $totalCaisses], $totalCaisses . ' cs d\'emballages rentrées à l\'entrepôt');
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            return $this->error($e->getMessage(), 400);
+        }
+    }
     public function delete($id)
     {
         $this->requirePermission('admin.voir');

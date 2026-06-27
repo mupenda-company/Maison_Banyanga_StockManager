@@ -92,6 +92,26 @@ class Approvisionnement extends Model
             $stockModel = new Stock();
             $mouvementModel = new MouvementStock();
             $detteModel = new DetteEmballage();
+
+            $besoinsEmballages = [];
+            foreach ($details as $detail) {
+                $produitId = (int) ($detail['produit_id'] ?? 0);
+                $besoinsEmballages[$produitId] = ($besoinsEmballages[$produitId] ?? 0) + (int) ($detail['quantite_caisses'] ?? 0);
+            }
+
+            foreach ($besoinsEmballages as $produitId => $caissesNecessaires) {
+                if ($caissesNecessaires <= 0) {
+                    continue;
+                }
+
+                $stockVide = $stockModel->getStock($produitId, $emplacementPrincipalId);
+                $disponible = (int) ($stockVide['caisses_vide'] ?? 0);
+                if ($disponible < $caissesNecessaires) {
+                    $produit = (new Produit())->find($produitId);
+                    $nomProduit = $produit['nom'] ?? ('Produit #' . $produitId);
+                    throw new Exception('Emballages insuffisants pour ' . $nomProduit . ' : disponible ' . $disponible . ' cs, demandé ' . $caissesNecessaires . ' cs. Enregistrez un emprunt d\'emballages avant de valider cet approvisionnement.');
+                }
+            }
             
             foreach ($details as $detail) {
                 $detail['approvisionnement_id'] = $approvisionnementId;

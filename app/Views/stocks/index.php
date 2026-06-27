@@ -1,5 +1,10 @@
 <?php 
-$pageTitle = 'Gestion des stocks';
+$emballageMode = !empty($emballageMode);
+$pageTitle = $emballageMode ? 'Stock emballages' : 'Gestion des stocks';
+$stockBaseUrl = $emballageMode ? url('emballages/stock') : url('stocks');
+$inventaireUrl = $emballageMode ? url('emballages/inventaire') : url('stocks/inventaire');
+$inventaireInitialUrl = $emballageMode ? url('emballages/inventaire-initial') : url('stocks/inventaire-initial');
+$mouvementsUrl = $emballageMode ? url('emballages/mouvements') : url('stocks/mouvements');
 $printUrl = '?' . http_build_query(array_merge($_GET, ['print' => 1]));
 ob_start();
 ?>
@@ -41,7 +46,7 @@ ob_start();
             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Stock a la date</label><input type="date" name="date_stock" max="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($filters['date_stock'] ?? '') ?>" class="input py-1.5 w-44">
             <div class="flex gap-2 ml-auto">
                 <button type="submit" class="btn-primary py-1.5 px-4 mr-2">Filtrer</button>
-                <a href="<?= url('stocks') ?>" class="btn-secondary py-1.5 px-4">Réinitialiser</a>
+                <a href="<?= $stockBaseUrl ?>" class="btn-secondary py-1.5 px-4">Réinitialiser</a>
             </div>
         </form>
     </div>
@@ -49,7 +54,7 @@ ob_start();
 
 <!-- Résumé par emplacement : stock système -->
 <div class="mb-3">
-    <h2 class="text-lg font-bold text-gray-900 dark:text-white">Stock système <span class="text-sm font-normal text-gray-500 dark:text-gray-400">(basé sur les ventes et mouvements)</span></h2>
+    <h2 class="text-lg font-bold text-gray-900 dark:text-white"><?= $emballageMode ? 'Stock emballages système' : 'Stock système' ?> <span class="text-sm font-normal text-gray-500 dark:text-gray-400">(basé sur les ventes et mouvements)</span></h2>
     <p class="text-sm text-gray-500 dark:text-gray-400">Total calculé automatiquement par le système pour chaque entrepôt ou véhicule.</p>
 </div>
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -93,7 +98,7 @@ ob_start();
 
 <!-- Résumé par emplacement : stock physique -->
 <div class="mb-3">
-    <h2 class="text-lg font-bold text-gray-900 dark:text-white">Stock physique <span class="text-sm font-normal text-gray-500 dark:text-gray-400">(comptage réel)</span></h2>
+    <h2 class="text-lg font-bold text-gray-900 dark:text-white"><?= $emballageMode ? 'Emballages physiques' : 'Stock physique' ?> <span class="text-sm font-normal text-gray-500 dark:text-gray-400">(comptage réel)</span></h2>
     <p class="text-sm text-gray-500 dark:text-gray-400">Total constaté physiquement. Ces cartes sont seulement informatives et ne redirigent pas vers les véhicules.</p>
 </div>
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -149,24 +154,24 @@ ob_start();
     <a href="<?= url('stocks/ajustements') ?>" class="btn-secondary">
         Historique corrections
     </a>
-    <a href="<?= url('stocks/inventaire') ?>" class="btn-secondary">
+    <a href="<?= $inventaireUrl ?>" class="btn-secondary">
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2-2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
         </svg>
-        Inventaire complet
+        <?= $emballageMode ? 'Inventaire emballages' : 'Inventaire complet' ?>
     </a>
-    <a href="<?= url('stocks/inventaire-initial') ?>" class="btn-secondary">
+    <a href="<?= $inventaireInitialUrl ?>" class="btn-secondary">
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6"/>
         </svg>
-        Inventaire initial
+        <?= $emballageMode ? 'Stock initial emballages' : 'Inventaire initial' ?>
     </a>
     <?php endif; ?>
-    <a href="<?= url('stocks/mouvements') ?>" class="btn-secondary">
+    <a href="<?= $mouvementsUrl ?>" class="btn-secondary">
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
         </svg>
-        Historique mouvements
+        <?= $emballageMode ? 'Mouvements emballages' : 'Historique mouvements' ?>
     </a>
     <button type="button" onclick="window.open('<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>','_blank')" class="btn-secondary">Imprimer</button>
     <?php if (!empty($filters['date_stock'])): ?><span class="badge-info">Etat au <?= date('d/m/Y', strtotime($filters['date_stock'])) ?></span><?php endif; ?>

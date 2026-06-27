@@ -1,5 +1,8 @@
 <?php 
-$pageTitle = 'Mouvements de stock';
+$emballageMode = !empty($emballageMode);
+$pageTitle = $emballageMode ? 'Mouvements emballages' : 'Mouvements de stock';
+$stockBaseUrl = $emballageMode ? url('emballages/stock') : url('stocks');
+$mouvementsBaseUrl = $emballageMode ? url('emballages/mouvements') : url('stocks/mouvements');
 $printMode = isset($print_mode) ? (bool) $print_mode : false;
 $baseQuery = [];
 if (!empty($filters['produit_id'])) {
@@ -27,11 +30,11 @@ ob_start();
 ?>
 
 <div class="mb-6 no-print">
-    <a href="<?= url('stocks') ?>" class="text-primary-600 hover:text-primary-700 flex items-center gap-2">
+    <a href="<?= $stockBaseUrl ?>" class="text-primary-600 hover:text-primary-700 flex items-center gap-2">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
         </svg>
-        Retour aux stocks
+        <?= $emballageMode ? 'Retour aux emballages' : 'Retour aux stocks' ?>
     </a>
 </div>
 
@@ -75,7 +78,7 @@ ob_start();
             <div><label class="label">Date fin</label><input type="date" name="date_fin" class="input w-full" value="<?= $filters['date_fin'] ?? '' ?>"></div>
             <div class="flex flex-col sm:flex-row gap-2 xl:justify-end">
                 <button type="submit" class="btn btn-primary w-full sm:w-auto">Filtrer</button>
-                <a href="<?= url('stocks/mouvements') ?>" class="btn btn-secondary w-full sm:w-auto">Réinitialiser</a>
+                <a href="<?= $mouvementsBaseUrl ?>" class="btn btn-secondary w-full sm:w-auto">Réinitialiser</a>
             </div>
         </form>
     </div>

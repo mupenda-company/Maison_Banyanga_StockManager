@@ -178,7 +178,7 @@
         }
     </style>
 </head>
-    <body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-200" x-data="{ sidebarOpen: false, alertsOpen: false, userMenuOpen: false }">
+    <body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-200" x-data="{ sidebarOpen: false, alertsOpen: false, userMenuOpen: false, emballagesOpen: <?= strpos($_SERVER['REQUEST_URI'], '/emballages') !== false ? 'true' : 'false' ?> }">
         <!-- Notifications Container -->
         <div class="notifications-container fixed top-20 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
             <template x-for="item in ($store.notifications?.items || [])" :key="item.id">
@@ -293,19 +293,22 @@
 
                 <!-- Emballages -->
                 <?php if (can('emballages.voir')): ?>
-                <a href="<?= url('emballages') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/emballages') !== false ? 'active' : '' ?>">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V7a2 2 0 00-1-1.732l-6-3.464a2 2 0 00-2 0l-6 3.464A2 2 0 004 7v6a2 2 0 001 1.732l6 3.464a2 2 0 002 0l6-3.464A2 2 0 0020 13z"/>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 12l8-5M12 12L4 7m8 5v9"/>
-                    </svg>
-                    Emballages
-                </a>
-                <a href="<?= url('emballages/emprunts') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/emballages/emprunts') !== false ? 'active' : '' ?>">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4"/>
-                    </svg>
-                    Emprunts emballages
-                </a>
+                <div>
+                    <button type="button" @click="emballagesOpen = !emballagesOpen" class="sidebar-link w-full <?= strpos($_SERVER['REQUEST_URI'], '/emballages') !== false ? 'active' : '' ?>">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V7a2 2 0 00-1-1.732l-6-3.464a2 2 0 00-2 0l-6 3.464A2 2 0 004 7v6a2 2 0 001 1.732l6 3.464a2 2 0 002 0l6-3.464A2 2 0 0020 13z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 12l8-5M12 12L4 7m8 5v9"/>
+                        </svg>
+                        <span class="flex-1 text-left">Emballages</span>
+                        <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': emballagesOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <div x-show="emballagesOpen" x-transition class="ml-8 mt-1 space-y-1">
+                        <a href="<?= url('emballages') ?>" class="sidebar-link text-sm <?= ($_SERVER['REQUEST_URI'] ?? '') === url('emballages') ? 'active' : '' ?>">Tableau de bord</a>
+                        <a href="<?= url('emballages/emprunts') ?>" class="sidebar-link text-sm <?= strpos($_SERVER['REQUEST_URI'], '/emballages/emprunts') !== false ? 'active' : '' ?>">Emprunts / prêts</a>
+                    </div>
+                </div>
                 <?php endif; ?>
                 
                 <!-- Stocks -->

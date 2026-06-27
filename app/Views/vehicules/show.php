@@ -31,6 +31,11 @@ ob_start();
                     <a href="<?= url('vehicules/' . $vehicule['id'] . '/print') ?>" class="btn-secondary btn-sm no-print">
                         Imprimer
                     </a>
+                    <?php if (can('vehicules.gerer') && array_sum(array_map(fn($s) => (int) ($s['caisses_vide'] ?? 0), $vehicule['stock'] ?? [])) > 0): ?>
+                    <button type="button" class="btn-primary btn-sm no-print" onclick="retourEmballagesVehicule()">
+                        Rentrer emballages
+                    </button>
+                    <?php endif; ?>
                 </div>
             </div>
             <div class="card-body">
@@ -201,7 +206,22 @@ ob_start();
     </div>
 </div>
 
-<?php 
+
+<script>
+async function retourEmballagesVehicule() {
+    if (!confirm('Rentrer tous les emballages vides de ce vehicule vers l\'entrepot ?')) {
+        return;
+    }
+
+    try {
+        const result = await App.api('<?= url('api/vehicules/' . $vehicule['id'] . '/retour-emballages') ?>', 'POST', {});
+        App.notify(result.message || 'Emballages rentres', 'success');
+        setTimeout(() => location.reload(), 800);
+    } catch (e) {
+        App.notify(e.message || 'Erreur lors du retour des emballages', 'error');
+    }
+}
+</script><?php 
 $content = ob_get_clean();
 require_once ROOT_PATH . '/app/Views/layouts/app.php';
 ?>

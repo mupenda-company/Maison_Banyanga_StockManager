@@ -1,19 +1,20 @@
-<?php 
+<?php
 $pageTitle = 'Tableau de bord emballages';
+$stockEmballages = $stockEmballages ?? ['total_caisses' => 0, 'fixe_caisses' => 0, 'mobile_caisses' => 0, 'par_produit' => [], 'par_emplacement' => []];
+$resumeEmprunts = $resumeEmprunts ?? ['nb_en_cours' => 0, 'recu_vide' => 0, 'donne_vide' => 0, 'recu_plein' => 0, 'donne_plein' => 0];
 ob_start();
 ?>
 
 <div class="flex items-center justify-between mb-6">
     <div>
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Tableau de bord emballages</h1>
-        <p class="text-gray-500 dark:text-gray-400">Vue synthétique des retours de vides et des dettes d'emballages</p>
+        <p class="text-gray-500 dark:text-gray-400">Inventaire reel des emballages vides, dettes clients et emprunts / prets en cours</p>
     </div>
-
     <div class="flex items-center gap-3">
-        <a href="<?= url('emballages/suivi') ?>" class="btn btn-secondary">Suivi détaillé</a>
-        <!-- <?php if (can('emballages.gerer')): ?>
-        <a href="<?= url('retours-emballages') ?>" class="btn btn-primary">Nouveau retour</a>
-        <?php endif; ?> -->
+        <?php if (can('emballages.gerer')): ?>
+        <a href="<?= url('emballages/inventaire-initial') ?>" class="btn btn-secondary">Inventaire initial</a>
+        <?php endif; ?>
+        <a href="<?= url('emballages/emprunts') ?>" class="btn btn-primary">Emprunts / prets</a>
     </div>
 </div>
 
@@ -26,115 +27,115 @@ ob_start();
 
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     <div class="stat-card">
-        <p class="stat-label">Retours enregistrés</p>
-        <p class="stat-value text-primary-600"><?= (int) ($statsRetours['resume']['nb_retours'] ?? 0) ?></p>
-        <p class="text-xs text-gray-400 mt-1"><?= (int) ($statsRetours['resume']['nb_clients'] ?? 0) ?> client(s)</p>
+        <p class="stat-label">Emballages disponibles</p>
+        <p class="stat-value text-primary-600"><?= number_format((int) $stockEmballages['total_caisses'], 0, ',', ' ') ?> cs</p>
+        <p class="text-xs text-gray-400 mt-1">Total caisses vides en stock</p>
     </div>
     <div class="stat-card">
-        <p class="stat-label">Caisses retournées</p>
-        <p class="stat-value text-blue-600"><?= number_format((float) ($statsRetours['resume']['total_caisses'] ?? 0), 0, ',', ' ') ?> cs</p>
-        <p class="text-xs text-gray-400 mt-1"><?= number_format((float) ($statsRetours['resume']['total_bouteilles'] ?? 0), 0, ',', ' ') ?> bouteilles</p>
+        <p class="stat-label">En entrepot</p>
+        <p class="stat-value text-green-600"><?= number_format((int) $stockEmballages['fixe_caisses'], 0, ',', ' ') ?> cs</p>
+        <p class="text-xs text-gray-400 mt-1">Emplacements fixes</p>
     </div>
     <div class="stat-card">
-        <p class="stat-label">Dette calculée</p>
-        <p class="stat-value text-orange-600"><?= number_format((float) ($clientsEmballage['total_dette'] ?? 0), 0, ',', ' ') ?> cs</p>
-        <p class="text-xs text-gray-400 mt-1">Depuis les ventes et retours</p>
+        <p class="stat-label">Dans vehicules</p>
+        <p class="stat-value text-blue-600"><?= number_format((int) $stockEmballages['mobile_caisses'], 0, ',', ' ') ?> cs</p>
+        <p class="text-xs text-gray-400 mt-1">Emplacements mobiles</p>
     </div>
     <div class="stat-card">
-        <p class="stat-label">Dettes manuelles</p>
-        <p class="stat-value text-green-600"><?= (int) ($statsDettes['nb_dettes'] ?? 0) ?></p>
-        <p class="text-xs text-gray-400 mt-1"><?= number_format((float) ($statsDettes['caisses_restantes'] ?? 0), 0, ',', ' ') ?> caisses restantes</p>
+        <p class="stat-label">Operations ouvertes</p>
+        <p class="stat-value text-orange-600"><?= (int) $resumeEmprunts['nb_en_cours'] ?></p>
+        <p class="text-xs text-gray-400 mt-1">Emprunts / prets non soldes</p>
     </div>
 </div>
 
-<div class="card mb-8">
-    <div class="card-header flex items-center justify-between">
-        <h3 class="font-bold">Détail des dettes d'emballages par client et produit</h3>
-        <span class="text-xs text-gray-400">Période filtrée</span>
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-8">
+    <div class="card xl:col-span-2">
+        <div class="card-header flex items-center justify-between">
+            <h3 class="font-bold">Stock emballages par produit</h3>
+            <span class="text-xs text-gray-400">Caisses vides</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Produit</th>
+                            <th class="text-right">Total</th>
+                            <th class="text-right">Entrepot</th>
+                            <th class="text-right">Vehicules</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($stockEmballages['par_produit'])): ?>
+                            <tr><td colspan="4" class="text-center p-4 text-gray-500">Aucun produit actif</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($stockEmballages['par_produit'] as $ligne): ?>
+                                <tr>
+                                    <td>
+                                        <div class="font-medium"><?= htmlspecialchars($ligne['produit_nom']) ?></div>
+                                        <div class="text-[10px] text-gray-400 font-mono"><?= htmlspecialchars($ligne['produit_code'] ?? '') ?></div>
+                                    </td>
+                                    <td class="text-right font-bold <?= (int) $ligne['total_caisses'] < 0 ? 'text-red-600' : 'text-gray-900 dark:text-white' ?>"><?= number_format((int) $ligne['total_caisses'], 0, ',', ' ') ?> cs</td>
+                                    <td class="text-right"><?= number_format((int) $ligne['fixe_caisses'], 0, ',', ' ') ?> cs</td>
+                                    <td class="text-right"><?= number_format((int) $ligne['mobile_caisses'], 0, ',', ' ') ?> cs</td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
-    <div class="card-body p-0">
-        <div class="table-container">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Client</th>
-                        <th>Produit</th>
-                        <th class="text-right">Vendu</th>
-                        <th class="text-right">Reçu</th>
-                        <th class="text-right">Retourné</th>
-                        <th class="text-right">Dette</th>
-                        <th class="text-right">Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($clientsEmballage['lignes'] ?? [])): ?>
-                        <tr><td colspan="7" class="text-center p-4 text-gray-500">Aucune dette d'emballage sur la période</td></tr>
-                    <?php else: ?>
-                        <?php foreach (array_slice($clientsEmballage['lignes'], 0, 10) as $ligne): ?>
-                            <tr>
-                                <td>
-                                    <div class="font-medium"><?= htmlspecialchars($ligne['client_nom']) ?></div>
-                                    <div class="text-[10px] text-gray-400"><?= htmlspecialchars($ligne['zone_nom'] ?? 'N/A') ?></div>
-                                </td>
-                                <td>
-                                    <div class="font-medium"><?= htmlspecialchars($ligne['produit_nom']) ?></div>
-                                    <div class="text-[10px] text-gray-400 font-mono"><?= htmlspecialchars($ligne['produit_code'] ?? '') ?></div>
-                                </td>
-                                <td class="text-right"><?= number_format((int) $ligne['caisses_vendues'], 0, ',', ' ') ?> cs</td>
-                                <td class="text-right"><?= number_format((int) $ligne['caisses_vides_recues'], 0, ',', ' ') ?> cs</td>
-                                <td class="text-right"><?= number_format((int) $ligne['caisses_retournees'], 0, ',', ' ') ?> cs</td>
-                                <td class="text-right font-bold text-red-600"><?= number_format((int) $ligne['dette_caisses'], 0, ',', ' ') ?> cs</td>
-                                <td class="text-right">
-                                    <?php if (can('emballages.gerer')): ?>
-                                    <button type="button"
-                                            class="btn btn-sm btn-primary"
-                                            onclick="openQuickRetour(<?= (int) $ligne['client_id'] ?>, <?= (int) $ligne['produit_id'] ?>, <?= (int) $ligne['bouteilles_par_caisses'] ?>, <?= (int) $ligne['dette_caisses'] ?>)">
-                                        Completer
-                                    </button>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="font-bold">Emprunts / prets en cours</h3>
+        </div>
+        <div class="card-body space-y-4">
+            <div class="flex items-center justify-between border-b pb-3 dark:border-gray-700">
+                <span class="text-sm text-gray-500">Emballages empruntes</span>
+                <span class="font-bold text-green-600"><?= number_format((int) $resumeEmprunts['recu_vide'], 0, ',', ' ') ?> cs</span>
+            </div>
+            <div class="flex items-center justify-between border-b pb-3 dark:border-gray-700">
+                <span class="text-sm text-gray-500">Emballages pretes</span>
+                <span class="font-bold text-red-600"><?= number_format((int) $resumeEmprunts['donne_vide'], 0, ',', ' ') ?> cs</span>
+            </div>
+            <div class="flex items-center justify-between border-b pb-3 dark:border-gray-700">
+                <span class="text-sm text-gray-500">Produits pleins empruntes</span>
+                <span class="font-bold text-green-600"><?= number_format((int) $resumeEmprunts['recu_plein'], 0, ',', ' ') ?> cs</span>
+            </div>
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-500">Produits pleins pretes</span>
+                <span class="font-bold text-red-600"><?= number_format((int) $resumeEmprunts['donne_plein'], 0, ',', ' ') ?> cs</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+    <div class="card">
+        <div class="card-header flex items-center justify-between">
+            <h3 class="font-bold">Stock emballages par emplacement</h3>
+            <span class="text-xs text-gray-400">Fixe et mobile</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Emplacement</th>
+                            <th>Type</th>
+                            <th class="text-right">Caisses vides</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($stockEmballages['par_emplacement'] as $ligne): ?>
+                        <tr>
+                            <td class="font-medium"><?= htmlspecialchars($ligne['emplacement_nom']) ?></td>
+                            <td><?= ($ligne['emplacement_type'] ?? '') === 'mobile' ? '<span class="badge-info">Vehicule</span>' : '<span class="badge-success">Entrepot</span>' ?></td>
+                            <td class="text-right font-bold <?= (int) $ligne['total_caisses'] < 0 ? 'text-red-600' : '' ?>"><?= number_format((int) $ligne['total_caisses'], 0, ',', ' ') ?> cs</td>
+                        </tr>
                         <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-    <div class="card">
-        <div class="card-header flex items-center justify-between">
-            <h3 class="font-bold">Top produits retournés</h3>
-            <span class="text-xs text-gray-400">Période filtrée</span>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-container">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Produit</th>
-                            <th class="text-center">Retours</th>
-                            <th class="text-right">Caisses</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (empty($statsRetours['top_produits'] ?? [])): ?>
-                            <tr><td colspan="3" class="text-center p-4 text-gray-500">Aucune donnée</td></tr>
-                        <?php else: ?>
-                            <?php foreach ($statsRetours['top_produits'] as $p): ?>
-                                <tr>
-                                    <td>
-                                        <div class="font-medium"><?= htmlspecialchars($p['nom']) ?></div>
-                                        <div class="text-[10px] text-gray-400 font-mono"><?= htmlspecialchars($p['code']) ?></div>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-bold"><?= (int) $p['nb_retours'] ?></span>
-                                    </td>
-                                    <td class="text-right font-bold text-blue-700"><?= number_format((float) $p['total_caisses'], 0, ',', ' ') ?> cs</td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>
@@ -143,35 +144,40 @@ ob_start();
 
     <div class="card">
         <div class="card-header flex items-center justify-between">
-            <h3 class="font-bold">Dettes d'emballages en cours</h3>
-            <span class="text-xs text-gray-400">Remboursements</span>
+            <h3 class="font-bold">Dettes d'emballages clients</h3>
+            <span class="text-xs text-gray-400">Periode filtree</span>
         </div>
         <div class="card-body p-0">
             <div class="table-container">
                 <table class="table">
                     <thead>
                         <tr>
+                            <th>Client</th>
                             <th>Produit</th>
-                            <th>Approvisionnement</th>
-                            <th class="text-right">Reste</th>
+                            <th class="text-right">Dette</th>
+                            <th class="text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (empty($dettesEnCours)): ?>
-                            <tr><td colspan="3" class="text-center p-4 text-gray-500">Aucune dette en cours</td></tr>
+                        <?php if (empty($clientsEmballage['lignes'] ?? [])): ?>
+                            <tr><td colspan="4" class="text-center p-4 text-gray-500">Aucune dette d'emballage sur la periode</td></tr>
                         <?php else: ?>
-                            <?php foreach ($dettesEnCours as $dette): ?>
-                                <?php $reste = (int) (($dette['quantite_dette_caisses'] ?? 0) - ($dette['quantite_remboursee'] ?? 0)); ?>
+                            <?php foreach (array_slice($clientsEmballage['lignes'], 0, 8) as $ligne): ?>
                                 <tr>
                                     <td>
-                                        <div class="font-medium"><?= htmlspecialchars($dette['produit_nom'] ?? 'N/A') ?></div>
-                                        <div class="text-[10px] text-gray-400"><?= htmlspecialchars($dette['produit_code'] ?? '') ?></div>
+                                        <div class="font-medium"><?= htmlspecialchars($ligne['client_nom']) ?></div>
+                                        <div class="text-[10px] text-gray-400"><?= htmlspecialchars($ligne['zone_nom'] ?? 'N/A') ?></div>
                                     </td>
                                     <td>
-                                        <div class="font-medium"><?= htmlspecialchars($dette['numero_bon'] ?? 'N/A') ?></div>
-                                        <div class="text-[10px] text-gray-400"><?= htmlspecialchars($dette['fournisseur'] ?? '') ?></div>
+                                        <div class="font-medium"><?= htmlspecialchars($ligne['produit_nom']) ?></div>
+                                        <div class="text-[10px] text-gray-400 font-mono"><?= htmlspecialchars($ligne['produit_code'] ?? '') ?></div>
                                     </td>
-                                    <td class="text-right font-bold text-red-600"><?= number_format($reste, 0, ',', ' ') ?> cs</td>
+                                    <td class="text-right font-bold text-red-600"><?= number_format((int) $ligne['dette_caisses'], 0, ',', ' ') ?> cs</td>
+                                    <td class="text-right">
+                                        <?php if (can('emballages.gerer')): ?>
+                                        <button type="button" class="btn btn-sm btn-primary" onclick="openQuickRetour(<?= (int) $ligne['client_id'] ?>, <?= (int) $ligne['produit_id'] ?>, <?= (int) $ligne['bouteilles_par_caisses'] ?>, <?= (int) $ligne['dette_caisses'] ?>)">Completer</button>
+                                        <?php endif; ?>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -182,9 +188,9 @@ ob_start();
     </div>
 </div>
 
-<div class="card mt-8">
+<div class="card">
     <div class="card-header flex items-center justify-between">
-        <h3 class="font-bold">Retours récents</h3>
+        <h3 class="font-bold">Retours recents</h3>
         <a href="<?= url('emballages/suivi') ?>" class="text-sm text-primary-600 hover:text-primary-700">Voir tout</a>
     </div>
     <div class="card-body p-0">
@@ -196,19 +202,17 @@ ob_start();
                         <th>Client</th>
                         <th>Produit</th>
                         <th class="text-right">Caisses</th>
-                        <th>Réceptionné à</th>
+                        <th>Receptionne a</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($retoursRecents)): ?>
-                        <tr><td colspan="5" class="text-center p-4 text-gray-500">Aucun retour récent</td></tr>
+                        <tr><td colspan="5" class="text-center p-4 text-gray-500">Aucun retour recent</td></tr>
                     <?php else: ?>
                         <?php foreach ($retoursRecents as $r): ?>
                             <?php
                                 $btlParCaisse = (int) ($r['bouteilles_par_caisses'] ?? 24);
-                                if ($btlParCaisse <= 0) {
-                                    $btlParCaisse = 24;
-                                }
+                                if ($btlParCaisse <= 0) { $btlParCaisse = 24; }
                                 $caisses = $r['quantite'] / $btlParCaisse;
                             ?>
                             <tr>
@@ -264,21 +268,11 @@ document.addEventListener('alpine:init', () => {
         loading: false,
         bouteillesParCaisse: 24,
         maxCaisses: 0,
-        form: {
-            client_id: '',
-            produit_id: '',
-            caisses: 1,
-            emplacement_id: '<?= $emplacements[0]['id'] ?? '' ?>'
-        },
+        form: { client_id: '', produit_id: '', caisses: 1, emplacement_id: '<?= $emplacements[0]['id'] ?? '' ?>' },
         open(clientId, produitId, bouteillesParCaisse, detteCaisses) {
             this.bouteillesParCaisse = parseInt(bouteillesParCaisse || 24, 10) || 24;
             this.maxCaisses = parseInt(detteCaisses || 0, 10) || 0;
-            this.form = {
-                client_id: clientId,
-                produit_id: produitId,
-                caisses: this.maxCaisses,
-                emplacement_id: '<?= $emplacements[0]['id'] ?? '' ?>'
-            };
+            this.form = { client_id: clientId, produit_id: produitId, caisses: this.maxCaisses, emplacement_id: '<?= $emplacements[0]['id'] ?? '' ?>' };
             this.isOpen = true;
         },
         close() { this.isOpen = false; },
@@ -309,7 +303,7 @@ function openQuickRetour(clientId, produitId, bouteillesParCaisse, detteCaisses)
 </script>
 <?php endif; ?>
 
-<?php 
+<?php
 $content = ob_get_clean();
 require_once ROOT_PATH . '/app/Views/layouts/app.php';
 ?>

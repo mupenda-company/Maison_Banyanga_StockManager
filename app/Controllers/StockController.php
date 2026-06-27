@@ -18,13 +18,24 @@ class StockController extends Controller
         $this->emplacementModel = new Emplacement();
         $this->mouvementModel = new MouvementStock();
     }
+    private function isEmballageRoute(): bool
+    {
+        $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
+        return strpos($path, '/emballages') !== false;
+    }
+
+    private function requireStockOrEmballagePermission(string $action = 'voir'): void
+    {
+        $permission = $this->isEmballageRoute() ? 'emballages.' . $action : 'stock.' . $action;
+        $this->requirePermission($permission);
+    }
     
     /**
      * Vue globale du stock
      */
     public function index()
     {
-        $this->requirePermission('stock.voir');
+        $this->requireStockOrEmballagePermission('voir');
         
         $filters = [
             'produit_id' => $_GET['produit_id'] ?? null,
@@ -114,7 +125,7 @@ class StockController extends Controller
      */
     public function inventaireInitial()
     {
-        $this->requirePermission('stock.gerer');
+        $this->requireStockOrEmballagePermission('gerer');
 
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
         $produits = $this->produitModel->getActive();
@@ -127,7 +138,8 @@ class StockController extends Controller
         $this->view('stocks/inventaire_initial', [
             'produits' => $produits,
             'emplacement' => $emplacementPrincipal,
-            'stocks' => $stocks
+            'stocks' => $stocks,
+            'emballageMode' => $this->isEmballageRoute()
         ]);
     }
 
@@ -136,9 +148,10 @@ class StockController extends Controller
      */
     public function enregistrerInventaireInitial()
     {
-        $this->requirePermission('stock.gerer');
-
         $data = $this->getJsonInput();
+        $mode = ($data['mode'] ?? 'stock') === 'emballage' ? 'emballage' : 'stock';
+        $this->requirePermission($mode === 'emballage' ? 'emballages.gerer' : 'stock.gerer');
+
 
         $errors = $this->validate($data, [
             'emplacement_id' => 'required|numeric',
@@ -160,8 +173,8 @@ class StockController extends Controller
             if ($produitId <= 0) continue;
             $ancienPleine = (int) ($ligne['ancien_caisses_pleine'] ?? 0);
             $ancienVide = (int) ($ligne['ancien_caisses_vide'] ?? 0);
-            $nouveauPleine = (int) ($ligne['caisses_pleine'] ?? 0);
-            $nouveauVide = (int) ($ligne['caisses_vide'] ?? 0);
+            $nouveauPleine = $mode === 'emballage' ? $ancienPleine : (int) ($ligne['caisses_pleine'] ?? 0);
+            $nouveauVide = $mode === 'emballage' ? (int) ($ligne['caisses_vide'] ?? 0) : $ancienVide;
             if ($nouveauPleine !== $ancienPleine || $nouveauVide !== $ancienVide) {
                 $hasEcart = true;
                 break;
@@ -179,10 +192,10 @@ class StockController extends Controller
             $totalEcarts = 0;
             foreach ($data['lignes'] as $ligne) {
                 $produitId = (int) ($ligne['produit_id'] ?? 0);
-                $caissesPleines = (int) ($ligne['caisses_pleine'] ?? 0);
-                $caissesVides = (int) ($ligne['caisses_vide'] ?? 0);
                 $ancienPleine = (int) ($ligne['ancien_caisses_pleine'] ?? 0);
                 $ancienVide = (int) ($ligne['ancien_caisses_vide'] ?? 0);
+                $caissesPleines = $mode === 'emballage' ? $ancienPleine : (int) ($ligne['caisses_pleine'] ?? 0);
+                $caissesVides = $mode === 'emballage' ? (int) ($ligne['caisses_vide'] ?? 0) : $ancienVide;
                 $stockExistant = $this->stockModel->getStock($produitId, $emplacementId);
 
                 if ($produitId <= 0) {
@@ -323,7 +336,7 @@ class StockController extends Controller
      */
     public function inventaire()
     {
-        $this->requirePermission('stock.voir');
+        $this->requireStockOrEmballagePermission('voir');
         
         $filters = [
             'produit_id' => $_GET['produit_id'] ?? null,
@@ -456,7 +469,7 @@ class StockController extends Controller
      */
     public function byEmplacement($emplacementId)
     {
-        $this->requirePermission('stock.voir');
+        $this->requireStockOrEmballagePermission('voir');
         
         $emplacement = $this->emplacementModel->find($emplacementId);
         
@@ -484,7 +497,7 @@ class StockController extends Controller
      */
     public function mouvements()
     {
-        $this->requirePermission('stock.voir');
+        $this->requireStockOrEmballagePermission('voir');
 
         $printMode = isset($_GET['print']) && (string)$_GET['print'] === '1';
 
@@ -647,9 +660,10 @@ class StockController extends Controller
      */
     public function transfert()
     {
-        $this->requirePermission('stock.gerer');
-        
         $data = $this->getJsonInput();
+        $mode = ($data['mode'] ?? 'stock') === 'emballage' ? 'emballage' : 'stock';
+        $this->requirePermission($mode === 'emballage' ? 'emballages.gerer' : 'stock.gerer');
+        
         
         $errors = $this->validate($data, [
             'produit_id' => 'required|numeric',
@@ -719,9 +733,10 @@ class StockController extends Controller
      */
     public function ajustement()
     {
-        $this->requirePermission('stock.gerer');
-        
         $data = $this->getJsonInput();
+        $mode = ($data['mode'] ?? 'stock') === 'emballage' ? 'emballage' : 'stock';
+        $this->requirePermission($mode === 'emballage' ? 'emballages.gerer' : 'stock.gerer');
+        
         
         $errors = $this->validate($data, [
             'produit_id' => 'required|numeric',
@@ -816,9 +831,10 @@ class StockController extends Controller
      */
     public function saveCorrection()
     {
-        $this->requirePermission('stock.gerer');
-
         $data = $this->getJsonInput();
+        $mode = ($data['mode'] ?? 'stock') === 'emballage' ? 'emballage' : 'stock';
+        $this->requirePermission($mode === 'emballage' ? 'emballages.gerer' : 'stock.gerer');
+
         $errors = $this->validate($data, [
             'produit_id' => 'required|numeric',
             'emplacement_id' => 'required|numeric',
@@ -852,7 +868,7 @@ class StockController extends Controller
      */
     public function historiqueCorrections()
     {
-        $this->requirePermission('stock.voir');
+        $this->requireStockOrEmballagePermission('voir');
 
         $filters = [
             'produit_id' => $_GET['produit_id'] ?? null,
