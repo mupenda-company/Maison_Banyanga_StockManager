@@ -117,6 +117,7 @@ ob_start();
                         <th>Agent</th>
                         <th>Emplacement</th>
                         <th>Motif</th>
+                        <th>Manquant</th>
                         <th class="text-right no-print">Actions</th>
                     </tr>
                 </thead>
@@ -138,6 +139,14 @@ ob_start();
                             $quantiteTop = '';
                             $quantiteBottom = $totalBouteilles . ' btl';
                         }
+
+                        $resteManquantMontant = (float) ($perte['manquant_reste_montant'] ?? 0);
+                        $resteManquantCaisses = (float) ($perte['manquant_reste_caisses'] ?? 0);
+                        $resteManquantEmballages = (float) ($perte['manquant_reste_emballages'] ?? 0);
+                        $manquantRegle = $resteManquantMontant <= 0.01 && $resteManquantCaisses <= 0.0001 && $resteManquantEmballages <= 0.0001;
+                        $manquantStatut = !empty($perte['manquant_id'])
+                            ? ($manquantRegle ? 'paye' : (($perte['manquant_statut'] ?? '') === 'partiel' ? 'partiel' : 'ouvert'))
+                            : null;
                     ?>
                     <tr>
                         <td><?= date('d/m/Y', strtotime($perte['date_perte'])) ?></td>
@@ -181,6 +190,20 @@ ob_start();
                         <td><?= htmlspecialchars(trim(($perte['agent_prenom'] ?? '') . ' ' . ($perte['agent_nom'] ?? '')) ?: '-') ?></td>
                         <td><?= htmlspecialchars($perte['emplacement_nom'] ?? '-') ?></td>
                         <td class="max-w-xs truncate text-sm"><?= htmlspecialchars($perte['motif'] ?? '-') ?></td>
+                        <td>
+                            <?php if (!empty($perte['manquant_id'])): ?>
+                                <?php if ($manquantStatut === 'paye'): ?>
+                                    <span class="badge-success">Payé</span>
+                                <?php elseif ($manquantStatut === 'partiel'): ?>
+                                    <span class="badge-warning">Partiel</span>
+                                <?php else: ?>
+                                    <span class="badge-danger">Ouvert</span>
+                                <?php endif; ?>
+                                <a href="<?= url('manquants?agent_id=' . (int)($perte['agent_id'] ?? 0)) ?>" class="block text-[11px] text-primary-600 hover:text-primary-800 mt-1">Régler</a>
+                            <?php else: ?>
+                                <span class="text-xs text-gray-400">Non lié</span>
+                            <?php endif; ?>
+                        </td>
                         <td class="text-center whitespace-nowrap">
                             <div class="flex items-center justify-center gap-2">
                                 <?php if (can('pertes.creer')): ?>
@@ -249,7 +272,6 @@ window.addEventListener('afterprint', function () { if (window.opener) window.cl
 $content = ob_get_clean();
 require_once ROOT_PATH . '/app/Views/layouts/app.php';
 ?>
-
 
 
 

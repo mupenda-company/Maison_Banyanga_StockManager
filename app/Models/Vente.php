@@ -1,6 +1,6 @@
 <?php
 /**
- * ModÃ¨le Vente
+ * Modèle Vente
  */
 
 class Vente extends Model
@@ -9,7 +9,7 @@ class Vente extends Model
     protected $fillable = ['numero_facture', 'client_id', 'date_vente', 'mission_id', 'emplacement_id', 'total_ht', 'total_tva', 'total_ttc', 'statut', 'notes', 'created_by'];
     
     /**
-     * GÃ©nÃ©rer un numÃ©ro de facture unique
+     * Générer un numéro de facture unique
      */
     public function generateNumeroFacture($prefix = 'FAC-')
     {
@@ -35,7 +35,7 @@ class Vente extends Model
     }
     
     /**
-     * RÃ©cupÃ©rer avec les dÃ©tails
+     * Récupérer avec les détails
      */
     public function getWithDetails($id)
     {
@@ -82,7 +82,7 @@ class Vente extends Model
     }
     
     /**
-     * RÃ©cupÃ©rer les ventes avec client
+     * Récupérer les ventes avec client
      */
     public function getAllWithClient($page = 1, $perPage = 20, $filters = [])
     {
@@ -137,17 +137,17 @@ class Vente extends Model
     }
     
     /**
-     * CrÃ©er une vente avec dÃ©tails
+     * Créer une vente avec détails
      */
     public function createWithDetails($data, $details, $emballagesRecus = null)
     {
         try {
             $this->db->beginTransaction();
             
-            // CrÃ©er la vente
+            // Créer la vente
             $venteId = $this->create($data);
             
-            // CrÃ©er les dÃ©tails et mettre Ã  jour le stock
+            // Créer les détails et mettre à jour le stock
             $stockModel = new Stock();
             $mouvementModel = new MouvementStock();
             $produitModel = new Produit();
@@ -171,11 +171,11 @@ class Vente extends Model
                 $detail['vente_id'] = $venteId;
 
                 if (!array_key_exists('caisses_vides_recues', $detail) || $detail['caisses_vides_recues'] === '' || $detail['caisses_vides_recues'] === null) {
-                    throw new Exception('Les emballages reÃ§us doivent Ãªtre renseignÃ©s pour chaque ligne de vente.');
+                    throw new Exception('Les emballages reçus doivent être renseignés pour chaque ligne de vente.');
                 }
 
                 if (!is_numeric($detail['caisses_vides_recues'])) {
-                    throw new Exception('Les emballages reÃ§us doivent Ãªtre un nombre valide.');
+                    throw new Exception('Les emballages reçus doivent être un nombre valide.');
                 }
                 
                 $produit = $produitModel->find($detail['produit_id']);
@@ -201,7 +201,7 @@ class Vente extends Model
                     $prixCaisse = (float) (($produit['prix_vente_unitaire'] ?? 0) * $btlParCaisse);
                 }
                 
-                // VÃ‰RIFICATION DU STOCK DISPONIBLE
+                // VÉRIFICATION DU STOCK DISPONIBLE
                 $currentStock = $this->db->fetch(
                     "SELECT quantite_pleine FROM stocks WHERE produit_id = :p AND emplacement_id = :e",
                     ['p' => $detail['produit_id'], 'e' => $data['emplacement_id']]
@@ -223,7 +223,7 @@ class Vente extends Model
                     'sous_total' => $quantiteCaisses * $prixCaisse
                 ]);
                 
-                // DÃ©duire du stock (PLEIN)
+                // Déduire du stock (PLEIN)
                 $stockModel->updateOrCreate(
                     $detail['produit_id'],
                     $data['emplacement_id'],
@@ -241,7 +241,7 @@ class Vente extends Model
                     'quantite' => -$quantiteBouteilles,
                     'reference_type' => 'vente',
                     'reference_id' => $venteId,
-                    'motif' => 'Vente NÂ° ' . $data['numero_facture'] . ' - Sortie des caisses pleines',
+                    'motif' => 'Vente N° ' . $data['numero_facture'] . ' - Sortie des caisses pleines',
                     'created_by' => $data['created_by']
                 ]);
 
@@ -286,7 +286,7 @@ class Vente extends Model
                     'created_by' => $data['created_by']
                 ]);
             }
-            // DÃ‰CLENCHER LES ALERTES IMMÃ‰DIATEMENT
+            // DÉCLENCHER LES ALERTES IMMÉDIATEMENT
             (new Alerte())->checkStockAlerts();
             
             $this->db->commit();
@@ -347,7 +347,7 @@ class Vente extends Model
     }
 
     /**
-     * Ventes groupÃ©es par zone
+     * Ventes groupées par zone
      */
     public function getVentesParZone($dateDebut, $dateFin)
     {
@@ -364,7 +364,7 @@ class Vente extends Model
     }
 
     /**
-     * Ventes validÃ©es par agent sur une pÃ©riode donnÃ©e
+     * Ventes validées par agent sur une période donnée
      */
     public function getVentesParAgent($dateDebut, $dateFin = null)
     {

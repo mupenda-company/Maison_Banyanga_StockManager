@@ -6,7 +6,36 @@
 class Perte extends Model
 {
     protected $table = 'pertes';
-    protected $fillable = ['produit_id', 'emplacement_id', 'quantite', 'type_perte', 'motif', 'date_perte', 'valeur_perte', 'agent_id', 'created_by', 'type_stock'];
+    protected $fillable = ['produit_id', 'emplacement_id', 'quantite', 'type_perte', 'motif', 'date_perte', 'valeur_perte', 'agent_id', 'created_by', 'type_stock', 'manquant_id'];
+
+    private static bool $columnsChecked = false;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->ensureColumns();
+    }
+
+    private function ensureColumns(): void
+    {
+        if (self::$columnsChecked) {
+            return;
+        }
+
+        $exists = (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*)
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'pertes'
+               AND COLUMN_NAME = 'manquant_id'"
+        );
+
+        if (!$exists) {
+            $this->db->query("ALTER TABLE pertes ADD manquant_id INT UNSIGNED NULL AFTER agent_id");
+        }
+
+        self::$columnsChecked = true;
+    }
     
     /**
      * Récupérer avec les détails
@@ -17,12 +46,17 @@ class Perte extends Model
             "SELECT p.*, pr.nom as produit_nom, pr.code as produit_code, pr.bouteilles_par_caisses,
                     e.nom as emplacement_nom, e.type as emplacement_type,
                     u.nom as created_by_nom, u.prenom as created_by_prenom,
-                    a.nom as agent_nom, a.prenom as agent_prenom
+                    a.nom as agent_nom, a.prenom as agent_prenom,
+                    m.statut as manquant_statut,
+                    GREATEST(COALESCE(m.montant, 0) - COALESCE(m.montant_paye, 0), 0) AS manquant_reste_montant,
+                    GREATEST(COALESCE(m.quantite_caisses, 0) - COALESCE(m.quantite_caisses_reglee, 0), 0) AS manquant_reste_caisses,
+                    GREATEST(COALESCE(m.quantite_emballages, 0) - COALESCE(m.quantite_emballages_reglee, 0), 0) AS manquant_reste_emballages
              FROM {$this->table} p
              JOIN produits pr ON p.produit_id = pr.id
              JOIN emplacements e ON p.emplacement_id = e.id
              LEFT JOIN users u ON p.created_by = u.id
              LEFT JOIN users a ON p.agent_id = a.id
+             LEFT JOIN manquants_agents m ON m.id = p.manquant_id
              WHERE p.id = :id",
             ['id' => $id]
         );
@@ -69,11 +103,16 @@ class Perte extends Model
         return $this->db->fetchAll(
             "SELECT p.*, pr.nom as produit_nom, pr.code as produit_code, pr.bouteilles_par_caisses,
                     e.nom as emplacement_nom, e.type as emplacement_type,
-                    a.nom as agent_nom, a.prenom as agent_prenom
+                    a.nom as agent_nom, a.prenom as agent_prenom,
+                    m.statut as manquant_statut,
+                    GREATEST(COALESCE(m.montant, 0) - COALESCE(m.montant_paye, 0), 0) AS manquant_reste_montant,
+                    GREATEST(COALESCE(m.quantite_caisses, 0) - COALESCE(m.quantite_caisses_reglee, 0), 0) AS manquant_reste_caisses,
+                    GREATEST(COALESCE(m.quantite_emballages, 0) - COALESCE(m.quantite_emballages_reglee, 0), 0) AS manquant_reste_emballages
              FROM {$this->table} p
              JOIN produits pr ON p.produit_id = pr.id
              JOIN emplacements e ON p.emplacement_id = e.id
              LEFT JOIN users a ON p.agent_id = a.id
+             LEFT JOIN manquants_agents m ON m.id = p.manquant_id
              WHERE {$where}
              ORDER BY p.date_perte DESC",
             $params
@@ -146,6 +185,15 @@ class Perte extends Model
                 'motif' => 'Perte (' . $typeStock . ') - ' . $data['type_perte'],
                 'created_by' => $data['created_by']
             ]);
+
+            $manquantId = $this->syncManquantForPerte($perteId, array_merge($data, [
+                'quantite' => $nbCaisses,
+                'produit_nom' => $produit['nom'] ?? '',
+                'produit_code' => $produit['code'] ?? '',
+            ]));
+            if ($manquantId) {
+                $this->update($perteId, ['manquant_id' => $manquantId]);
+            }
             
             $this->db->commit();
             return ['success' => true, 'id' => $perteId];
@@ -340,6 +388,22 @@ class Perte extends Model
                 'agent_id' => !empty($data['agent_id']) ? (int) $data['agent_id'] : null,
             ]);
 
+            $manquantId = $this->syncManquantForPerte((int) $id, [
+                'manquant_id' => $anciennePerte['manquant_id'] ?? null,
+                'produit_id' => (int) $data['produit_id'],
+                'produit_nom' => $produit['nom'] ?? '',
+                'produit_code' => $produit['code'] ?? '',
+                'quantite' => $nouvelleQuantiteCaisses,
+                'type_perte' => $data['type_perte'],
+                'type_stock' => $nouveauTypeStock,
+                'motif' => $data['motif'] ?? '',
+                'date_perte' => $data['date_perte'],
+                'valeur_perte' => max(0, (float) ($data['valeur_perte'] ?? 0)),
+                'agent_id' => !empty($data['agent_id']) ? (int) $data['agent_id'] : null,
+                'created_by' => $data['updated_by'] ?? ($_SESSION['user_id'] ?? null),
+            ]);
+            $this->update((int) $id, ['manquant_id' => $manquantId]);
+
             $this->db->commit();
             return ['success' => true, 'id' => (int) $id];
         } catch (Exception $e) {
@@ -392,6 +456,7 @@ class Perte extends Model
             ]);
 
             // 3. Supprimer l'enregistrement
+            $this->deleteLinkedManquantIfOpen($perte);
             $this->delete($id);
 
             $this->db->commit();
@@ -400,5 +465,97 @@ class Perte extends Model
             $this->db->rollBack();
             return ['success' => false, 'message' => $e->getMessage()];
         }
+    }
+
+    private function syncManquantForPerte(int $perteId, array $data): ?int
+    {
+        $agentId = !empty($data['agent_id']) ? (int) $data['agent_id'] : 0;
+        $manquantId = !empty($data['manquant_id']) ? (int) $data['manquant_id'] : 0;
+
+        if ($agentId <= 0) {
+            if ($manquantId > 0) {
+                $this->deleteLinkedManquantIfOpen(['manquant_id' => $manquantId]);
+            }
+            return null;
+        }
+
+        $quantite = max(0, (float) ($data['quantite'] ?? 0));
+        $typeStock = $data['type_stock'] ?? 'plein';
+        $montant = round(max(0, (float) ($data['valeur_perte'] ?? 0)), 2);
+        $motif = trim((string) ($data['motif'] ?? ''));
+        $produitLabel = trim(($data['produit_nom'] ?? '') . (!empty($data['produit_code']) ? ' (' . $data['produit_code'] . ')' : ''));
+
+        $payload = [
+            'agent_id' => $agentId,
+            'mission_id' => null,
+            'type_manquant' => 'perte',
+            'produit_id' => !empty($data['produit_id']) ? (int) $data['produit_id'] : null,
+            'quantite_caisses' => $typeStock === 'vide' ? 0 : $quantite,
+            'quantite_emballages' => $typeStock === 'vide' ? $quantite : 0,
+            'montant' => $montant,
+            'date_manquant' => $data['date_perte'] ?? date('Y-m-d'),
+            'motif' => 'Perte #' . $perteId . ($produitLabel !== '' ? ' - ' . $produitLabel : '') . ($motif !== '' ? ' : ' . $motif : ''),
+            'notes_reglement' => 'Manquant genere automatiquement depuis la perte #' . $perteId . '. A regler dans le module manquants.',
+            'created_by' => $data['created_by'] ?? ($_SESSION['user_id'] ?? null),
+        ];
+
+        if ($manquantId > 0 && $this->db->fetchColumn("SELECT COUNT(*) FROM manquants_agents WHERE id = :id", ['id' => $manquantId])) {
+            $manquant = $this->db->fetch("SELECT * FROM manquants_agents WHERE id = :id LIMIT 1", ['id' => $manquantId]);
+            $payload['quantite_caisses_reglee'] = min((float) ($manquant['quantite_caisses_reglee'] ?? 0), (float) $payload['quantite_caisses']);
+            $payload['quantite_emballages_reglee'] = min((float) ($manquant['quantite_emballages_reglee'] ?? 0), (float) $payload['quantite_emballages']);
+            $payload['montant_paye'] = min((float) ($manquant['montant_paye'] ?? 0), $montant);
+            $payload['statut'] = $this->determineManquantStatus($payload);
+            $payload['date_reglement'] = $payload['statut'] === 'paye' ? ($manquant['date_reglement'] ?? date('Y-m-d')) : null;
+            $this->db->update('manquants_agents', $payload, 'id = :id', ['id' => $manquantId]);
+            return $manquantId;
+        }
+
+        $payload['quantite_caisses_reglee'] = 0;
+        $payload['quantite_emballages_reglee'] = 0;
+        $payload['montant_paye'] = 0;
+        $payload['statut'] = $this->determineManquantStatus($payload);
+
+        return (int) $this->db->insert('manquants_agents', $payload);
+    }
+
+    private function determineManquantStatus(array $data): string
+    {
+        $resteMontant = max(0, (float) ($data['montant'] ?? 0) - (float) ($data['montant_paye'] ?? 0));
+        $resteCaisses = max(0, (float) ($data['quantite_caisses'] ?? 0) - (float) ($data['quantite_caisses_reglee'] ?? 0));
+        $resteEmballages = max(0, (float) ($data['quantite_emballages'] ?? 0) - (float) ($data['quantite_emballages_reglee'] ?? 0));
+
+        if ($resteMontant <= 0.01 && $resteCaisses <= 0.0001 && $resteEmballages <= 0.0001) {
+            return 'paye';
+        }
+
+        if ((float) ($data['montant_paye'] ?? 0) > 0 || (float) ($data['quantite_caisses_reglee'] ?? 0) > 0 || (float) ($data['quantite_emballages_reglee'] ?? 0) > 0) {
+            return 'partiel';
+        }
+
+        return 'ouvert';
+    }
+
+    private function deleteLinkedManquantIfOpen(array $perte): void
+    {
+        $manquantId = (int) ($perte['manquant_id'] ?? 0);
+        if ($manquantId <= 0) {
+            return;
+        }
+
+        $manquant = $this->db->fetch("SELECT * FROM manquants_agents WHERE id = :id LIMIT 1", ['id' => $manquantId]);
+        if (!$manquant) {
+            return;
+        }
+
+        $hasSettlement = (float) ($manquant['montant_paye'] ?? 0) > 0
+            || (float) ($manquant['quantite_caisses_reglee'] ?? 0) > 0
+            || (float) ($manquant['quantite_emballages_reglee'] ?? 0) > 0
+            || (int) $this->db->fetchColumn("SELECT COUNT(*) FROM manquant_paiements WHERE manquant_id = :id", ['id' => $manquantId]) > 0;
+
+        if ($hasSettlement) {
+            throw new Exception('Cette perte est deja liee a un manquant partiellement ou totalement regle. Annulez d abord le reglement du manquant avant de supprimer la perte.');
+        }
+
+        $this->db->delete('manquants_agents', 'id = :id', ['id' => $manquantId]);
     }
 }

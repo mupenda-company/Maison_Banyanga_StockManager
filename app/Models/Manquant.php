@@ -109,12 +109,21 @@ class Manquant extends Model
             }
         }
 
+        $resteMontantSql = "GREATEST(COALESCE(m.montant, 0) - COALESCE(m.montant_paye, 0), 0)";
+        $resteCaissesSql = "GREATEST(COALESCE(m.quantite_caisses, 0) - COALESCE(m.quantite_caisses_reglee, 0), 0)";
+        $resteEmballagesSql = "GREATEST(COALESCE(m.quantite_emballages, 0) - COALESCE(m.quantite_emballages_reglee, 0), 0)";
+
         if (!empty($filters['statut'])) {
             if ($filters['statut'] === 'paye') {
-                $where .= " AND m.statut IN ('paye', 'regle')";
-            } else {
-                $where .= " AND m.statut = :statut";
-                $params['statut'] = $filters['statut'];
+                $where .= " AND {$resteMontantSql} <= 0.01 AND {$resteCaissesSql} <= 0.0001 AND {$resteEmballagesSql} <= 0.0001";
+            } elseif ($filters['statut'] === 'partiel') {
+                $where .= " AND ({$resteMontantSql} > 0.01 OR {$resteCaissesSql} > 0.0001 OR {$resteEmballagesSql} > 0.0001)
+                            AND (COALESCE(m.montant_paye, 0) > 0 OR COALESCE(m.quantite_caisses_reglee, 0) > 0 OR COALESCE(m.quantite_emballages_reglee, 0) > 0)";
+            } elseif ($filters['statut'] === 'ouvert') {
+                $where .= " AND ({$resteMontantSql} > 0.01 OR {$resteCaissesSql} > 0.0001 OR {$resteEmballagesSql} > 0.0001)
+                            AND COALESCE(m.montant_paye, 0) <= 0
+                            AND COALESCE(m.quantite_caisses_reglee, 0) <= 0
+                            AND COALESCE(m.quantite_emballages_reglee, 0) <= 0";
             }
         }
 
@@ -131,9 +140,14 @@ class Manquant extends Model
         return $this->db->fetchAll(
             "SELECT m.*, CONCAT(a.prenom, ' ', a.nom) AS agent_nom, p.nom AS produit_nom,
                     p.code AS produit_code, CONCAT(u.prenom, ' ', u.nom) AS createur_nom,
-                    GREATEST(COALESCE(m.montant, 0) - COALESCE(m.montant_paye, 0), 0) AS reste_montant,
-                    GREATEST(COALESCE(m.quantite_caisses, 0) - COALESCE(m.quantite_caisses_reglee, 0), 0) AS reste_caisses,
-                    GREATEST(COALESCE(m.quantite_emballages, 0) - COALESCE(m.quantite_emballages_reglee, 0), 0) AS reste_emballages
+                    {$resteMontantSql} AS reste_montant,
+                    {$resteCaissesSql} AS reste_caisses,
+                    {$resteEmballagesSql} AS reste_emballages,
+                    CASE
+                        WHEN {$resteMontantSql} <= 0.01 AND {$resteCaissesSql} <= 0.0001 AND {$resteEmballagesSql} <= 0.0001 THEN 'paye'
+                        WHEN COALESCE(m.montant_paye, 0) > 0 OR COALESCE(m.quantite_caisses_reglee, 0) > 0 OR COALESCE(m.quantite_emballages_reglee, 0) > 0 THEN 'partiel'
+                        ELSE 'ouvert'
+                    END AS statut_effectif
              FROM manquants_agents m
              JOIN users a ON a.id = m.agent_id
              LEFT JOIN produits p ON p.id = m.produit_id
@@ -206,22 +220,52 @@ class Manquant extends Model
 
             $total = (float) ($manquant['montant'] ?? 0);
             $dejaPaye = (float) ($manquant['montant_paye'] ?? 0);
-            $nouveauPaye = $total > 0 ? min($total, $dejaPaye + $montantBase) : ($dejaPaye + $montantBase);
+            $resteMontantAvant = max(0, $total - $dejaPaye);
+            if ($montantBase > $resteMontantAvant + 0.01) {
+                throw new Exception('Le paiement dépasse le montant restant du manquant.');
+            }
+
+            $nouveauPaye = $total > 0 ? ($dejaPaye + $montantBase) : ($dejaPaye + $montantBase);
             $resteMontant = max(0, $total - $nouveauPaye);
 
             $totalCaisses = (float) ($manquant['quantite_caisses'] ?? 0);
             $caissesDejaReglees = (float) ($manquant['quantite_caisses_reglee'] ?? 0);
-            $nouvelleCaissesReglees = $totalCaisses > 0 ? min($totalCaisses, $caissesDejaReglees + $caissesReglees) : ($caissesDejaReglees + $caissesReglees);
+            $resteCaissesAvant = max(0, $totalCaisses - $caissesDejaReglees);
+            if ($caissesReglees > $resteCaissesAvant + 0.0001) {
+                throw new Exception('Le règlement dépasse les caisses restantes du manquant.');
+            }
+
+            $nouvelleCaissesReglees = $caissesDejaReglees + $caissesReglees;
             $resteCaisses = max(0, $totalCaisses - $nouvelleCaissesReglees);
 
             $totalEmballages = (float) ($manquant['quantite_emballages'] ?? 0);
             $emballagesDejaRegles = (float) ($manquant['quantite_emballages_reglee'] ?? 0);
-            $nouvelleEmballagesRegles = $totalEmballages > 0 ? min($totalEmballages, $emballagesDejaRegles + $emballagesRegles) : ($emballagesDejaRegles + $emballagesRegles);
+            $resteEmballagesAvant = max(0, $totalEmballages - $emballagesDejaRegles);
+            if ($emballagesRegles > $resteEmballagesAvant + 0.0001) {
+                throw new Exception('Le règlement dépasse les emballages restants du manquant.');
+            }
+
+            $nouvelleEmballagesRegles = $emballagesDejaRegles + $emballagesRegles;
             $resteEmballages = max(0, $totalEmballages - $nouvelleEmballagesRegles);
 
-            $statut = ($resteMontant <= 0.01 && $resteCaisses <= 0.0001 && $resteEmballages <= 0.0001)
-                ? 'paye'
-                : (($nouveauPaye > 0 || $nouvelleCaissesReglees > 0 || $nouvelleEmballagesRegles > 0) ? 'partiel' : 'ouvert');
+            $isPerte = ($manquant['type_manquant'] ?? '') === 'perte';
+            $argentComplet = $total > 0 && $resteMontant <= 0.01;
+            $caissesCompletes = $totalCaisses > 0 && $resteCaisses <= 0.0001;
+            $emballagesComplets = $totalEmballages > 0 && $resteEmballages <= 0.0001;
+
+            if ($isPerte && ($argentComplet || $caissesCompletes || $emballagesComplets)) {
+                $nouveauPaye = $total;
+                $nouvelleCaissesReglees = $totalCaisses;
+                $nouvelleEmballagesRegles = $totalEmballages;
+                $resteMontant = 0;
+                $resteCaisses = 0;
+                $resteEmballages = 0;
+                $statut = 'paye';
+            } else {
+                $statut = ($resteMontant <= 0.01 && $resteCaisses <= 0.0001 && $resteEmballages <= 0.0001)
+                    ? 'paye'
+                    : (($nouveauPaye > 0 || $nouvelleCaissesReglees > 0 || $nouvelleEmballagesRegles > 0) ? 'partiel' : 'ouvert');
+            }
 
             $this->db->insert('manquant_paiements', [
                 'manquant_id' => $id,

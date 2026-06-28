@@ -123,6 +123,8 @@
                         : max(0, $quantiteEmballages - $quantiteEmballagesReglee);
 
                     $resteMontant = (float) ($row['reste_montant'] ?? 0);
+                    $statut = $row['statut_effectif'] ?? ($row['statut'] ?? 'ouvert');
+                    $statutLabel = $statut === 'paye' ? 'Paye' : ($statut === 'partiel' ? 'Partiel' : 'Ouvert');
                 ?>
                 <tr>
                     <td><?= !empty($row['date_manquant']) ? date('d/m/Y', strtotime($row['date_manquant'])) : '' ?></td>
@@ -135,7 +137,7 @@
                     <td class="num"><?= format_money_dual($row['montant'] ?? 0) ?></td>
                     <td class="num"><?= format_money_dual($row['montant_paye'] ?? 0) ?></td>
                     <td class="num <?= $resteMontant > 0 ? 'warn' : 'ok' ?>"><?= format_money_dual($resteMontant) ?></td>
-                    <td class="center"><?= htmlspecialchars($row['statut'] ?? '') ?></td>
+                    <td class="center"><?= htmlspecialchars($statutLabel) ?></td>
                 </tr>
             <?php endforeach; endif; ?>
         </tbody>

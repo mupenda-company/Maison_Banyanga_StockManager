@@ -175,7 +175,7 @@ ob_start();
                         $reste = (float) ($m['reste_montant'] ?? 0);
                         $resteCaisses = (float) ($m['reste_caisses'] ?? max(0, (float)($m['quantite_caisses'] ?? 0) - (float)($m['quantite_caisses_reglee'] ?? 0)));
                         $resteEmb = (float) ($m['reste_emballages'] ?? max(0, (float)($m['quantite_emballages'] ?? 0) - (float)($m['quantite_emballages_reglee'] ?? 0)));
-                        $statut = $m['statut'] === 'regle' ? 'paye' : $m['statut'];
+                        $statut = $m['statut_effectif'] ?? ($m['statut'] === 'regle' ? 'paye' : $m['statut']);
                     ?>
                     <tr>
                         <td><?= date('d/m/Y', strtotime($m['date_manquant'])) ?></td>

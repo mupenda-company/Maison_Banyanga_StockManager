@@ -427,6 +427,7 @@ CREATE TABLE `pertes` (
   `date_perte` date NOT NULL,
   `valeur_perte` decimal(12,2) DEFAULT '0.00',
   `agent_id` int UNSIGNED DEFAULT NULL,
+  `manquant_id` int UNSIGNED DEFAULT NULL,
   `created_by` int UNSIGNED DEFAULT NULL,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -819,6 +820,7 @@ ALTER TABLE `pertes`
   ADD KEY `produit_id` (`produit_id`),
   ADD KEY `emplacement_id` (`emplacement_id`),
   ADD KEY `agent_id` (`agent_id`),
+  ADD KEY `manquant_id` (`manquant_id`),
   ADD KEY `created_by` (`created_by`);
 
 --
@@ -1243,7 +1245,8 @@ ALTER TABLE `pertes`
   ADD CONSTRAINT `pertes_ibfk_1` FOREIGN KEY (`produit_id`) REFERENCES `produits` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `pertes_ibfk_2` FOREIGN KEY (`emplacement_id`) REFERENCES `emplacements` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `pertes_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
-  ADD CONSTRAINT `pertes_ibfk_4` FOREIGN KEY (`agent_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+  ADD CONSTRAINT `pertes_ibfk_4` FOREIGN KEY (`agent_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `pertes_ibfk_5` FOREIGN KEY (`manquant_id`) REFERENCES `manquants_agents` (`id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `retours_emballages`

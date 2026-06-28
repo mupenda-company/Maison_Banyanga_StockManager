@@ -15,7 +15,7 @@ ob_start();
                 x-data="venteForm()"
                 @submit.prevent="saveVente"
             >
-                <!-- Informations gÃ©nÃ©rales -->
+                <!-- Informations générales -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div>
                         <label class="label">Client *</label>
@@ -341,7 +341,7 @@ document.addEventListener('alpine:init', () => {
         async saveVente() {
             this.loading = true;
             try {
-                if (!this.client_id) throw new Error('SÃ©lectionnez un client');
+                if (!this.client_id) throw new Error('Sélectionnez un client');
 
                 const detailsLignes = this.lignes.filter(l => l.produit_id && l.caisses > 0);
                 if (detailsLignes.length === 0) throw new Error('Ajoutez au moins un produit');
@@ -358,7 +358,7 @@ document.addEventListener('alpine:init', () => {
                     throw new Error('Le billetage ne correspond pas au total TTC.');
                 }
 
-                if (this.allEmballagesRecusZero() && !window.confirm('Aucun emballage vide nâ€™a Ã©tÃ© dÃ©clarÃ© pour cette vente. Confirmez-vous cette saisie ?')) {
+                if (this.allEmballagesRecusZero() && !window.confirm('Aucun emballage vide nâ€™a été déclaré pour cette vente. Confirmez-vous cette saisie ?')) {
                     return;
                 }
 
