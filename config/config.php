@@ -20,11 +20,11 @@ if ($isLocal) {
     define('DB_USER', 'root');
     define('DB_PASS', '');
 } else {
-    // suncity
+    // mugabo
     define('DB_HOST', 'localhost');
-    define('DB_NAME', 'suncityc_bralima_logistique');
-    define('DB_USER', 'suncityc_NelsonMupenda');
-    define('DB_PASS', 'HgK9Em3H=}lJ_[jj');
+    define('DB_NAME', 'mbmugabo_bralima_logistique');
+    define('DB_USER', 'mbmugabo_NelsonMupenda');
+    define('DB_PASS', 'B;C2.XN#(#2IOr9s');
 
 }
 define('DB_CHARSET', 'utf8mb4');
