@@ -91,7 +91,6 @@ class Approvisionnement extends Model
             // Créer les détails et mettre à jour le stock
             $stockModel = new Stock();
             $mouvementModel = new MouvementStock();
-            $detteModel = new DetteEmballage();
 
             $besoinsEmballages = [];
             foreach ($details as $detail) {
@@ -137,27 +136,9 @@ class Approvisionnement extends Model
                     $caissesNecessaires
                 );
                 
-                // Si stock vide insuffisant, créer une dette
                 if (!$resultDeduction['success']) {
-                    $detteCaisses = $caissesNecessaires - ($resultDeduction['disponible'] ?? 0);
-                    
-                    // Déduire ce qui est disponible
-                    if (($resultDeduction['disponible'] ?? 0) > 0) {
-                        $stockModel->deduireVide(
-                            $detail['produit_id'],
-                            $emplacementPrincipalId,
-                            $resultDeduction['disponible']
-                        );
-                    }
-                    
-                    // Créer la dette
-                    $detteModel->create([
-                        'approvisionnement_id' => $approvisionnementId,
-                        'produit_id' => $detail['produit_id'],
-                        'quantite_dette_caisses' => $detteCaisses,
-                        'statut' => 'en_cours',
-                        'notes' => 'Dette générée automatiquement - stock vide insuffisant'
-                    ]);
+                    $disponible = (int) ($resultDeduction['disponible'] ?? 0);
+                    throw new Exception('Emballages insuffisants pour ' . ($produit['nom'] ?? 'Produit') . ' : disponible ' . $disponible . ' cs, demande ' . $caissesNecessaires . ' cs. Enregistrez d\'abord un emprunt d\'emballages avant de valider cet achat.');
                 }
                 
                 // Enregistrer le mouvement

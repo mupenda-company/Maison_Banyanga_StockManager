@@ -69,6 +69,7 @@ CREATE TABLE `approvisionnement_details` (
   `id` int UNSIGNED NOT NULL,
   `approvisionnement_id` int UNSIGNED NOT NULL,
   `produit_id` int UNSIGNED NOT NULL,
+  `type_chargement` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'vente',
   `quantite_caisses` int NOT NULL,
   `quantite_bouteilles` int NOT NULL,
   `prix_caisse` decimal(12,2) NOT NULL DEFAULT '0.00',
@@ -276,6 +277,7 @@ CREATE TABLE `mission_chargements` (
   `id` int UNSIGNED NOT NULL,
   `mission_id` int UNSIGNED NOT NULL,
   `produit_id` int UNSIGNED NOT NULL,
+  `type_chargement` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'vente',
   `quantite_caisses` int NOT NULL DEFAULT '0' COMMENT 'Quantité en caisses',
   `prix_caisse` decimal(12,2) NOT NULL DEFAULT '0.00',
   `caisses_deja_dans_vehicule` int NOT NULL DEFAULT '0' COMMENT 'Caisses déjà présentes dans le véhicule au départ',
@@ -294,7 +296,7 @@ CREATE TABLE `mission_ristournes` (
   `id` int UNSIGNED NOT NULL,
   `mission_id` int UNSIGNED NOT NULL,
   `ristourne_id` int UNSIGNED NOT NULL,
-  `produit_id` int UNSIGNED NOT NULL,
+  `produit_id` int UNSIGNED DEFAULT NULL,
   `montant_ristourne` decimal(15,2) NOT NULL DEFAULT '0.00',
   `caisses_prevues` int NOT NULL DEFAULT '0',
   `bouteilles_prevues` int NOT NULL DEFAULT '0',
@@ -622,6 +624,7 @@ CREATE TABLE `vente_details` (
   `id` int UNSIGNED NOT NULL,
   `vente_id` int UNSIGNED NOT NULL,
   `produit_id` int UNSIGNED NOT NULL,
+  `type_chargement` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'vente',
   `quantite_caisses` int NOT NULL DEFAULT '0' COMMENT 'Quantité en caisses',
   `prix_caisse` decimal(12,2) NOT NULL DEFAULT '0.00',
   `caisses_vides_recues` int NOT NULL DEFAULT '0' COMMENT 'Caisses vides reçues',
@@ -1220,7 +1223,7 @@ ALTER TABLE `mission_chargements`
 ALTER TABLE `mission_ristournes`
   ADD CONSTRAINT `mission_ristournes_ibfk_1` FOREIGN KEY (`mission_id`) REFERENCES `missions` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `mission_ristournes_ibfk_2` FOREIGN KEY (`ristourne_id`) REFERENCES `ristournes` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `mission_ristournes_ibfk_3` FOREIGN KEY (`produit_id`) REFERENCES `produits` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `mission_ristournes_ibfk_3` FOREIGN KEY (`produit_id`) REFERENCES `produits` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `mission_ristournes_ibfk_4` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE;
 
 --
@@ -1450,5 +1453,6 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
 
 

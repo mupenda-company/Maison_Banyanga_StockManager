@@ -277,10 +277,22 @@ class StockController extends Controller
     // Helper pour envoyer le fichier xlsx au navigateur
     private function sendXlsx(\PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet, string $filename): void
     {
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+
+        if (headers_sent()) {
+            throw new Exception('Impossible de generer le fichier Excel: des donnees ont deja ete envoyees au navigateur.');
+        }
+
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
-        header('Cache-Control: max-age=0');
+        header('Cache-Control: max-age=0, must-revalidate');
+        header('Pragma: public');
+        header('Expires: 0');
+
         $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->setPreCalculateFormulas(false);
         $writer->save('php://output');
         exit;
     }
@@ -292,44 +304,53 @@ class StockController extends Controller
     {
         $this->requireAuth();
 
+        $data = [];
         if (!empty($filters['date_stock'])) {
             $data = $this->stockModel->getHistoricalInventory($filters['date_stock'], $filters);
         } else {
-            $result = $this->stockModel->getAllPaginated(1, 1000, $filters);
-            $data   = $result['data'];
+            $page = 1;
+            $last = 1;
+            do {
+                $result = $this->stockModel->getAllPaginated($page, 1000, $filters);
+                $data = array_merge($data, $result['data']);
+                $last = (int) $result['last_page'];
+                $page++;
+            } while ($page <= $last);
         }
 
+        $pivot = $this->buildStockPivot($data);
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet()->setTitle('Stocks');
 
-        $headers = ['Produit', 'Code', 'Emplacement', 'Type', 'Stock Plein (cs)', 'Stock Plein (btl)', 'Stock Vide (cs)', 'Statut'];
+        $headers = array_merge(['Produit', 'Entrepot'], $pivot['vehicles'], ['Emballages', 'Total']);
         $sheet->fromArray($headers, null, 'A1');
 
         $row = 2;
-        foreach ($data as $s) {
-            $statut = ($s['caisses_pleine'] <= ($s['seuil_alerte'] ?? 0)) ? 'CRITIQUE' : 'OK';
-            $sheet->fromArray([
-                $s['produit_nom'],
-                $s['produit_code'],
-                $s['emplacement_nom'],
-                ucfirst($s['emplacement_type']),
-                (int) round($s['caisses_pleine']),
-                (int) $s['quantite_pleine'],
-                (int) round($s['caisses_vide']),
-                $statut,
-            ], null, 'A' . $row++);
+        foreach ($pivot['rows'] as $item) {
+            $line = [$item['produit'], round((float) $item['entrepot'], 2)];
+            foreach ($pivot['vehicles'] as $vehicle) {
+                $line[] = round((float) ($item['vehicles'][$vehicle] ?? 0), 2);
+            }
+            $line[] = round((float) $item['emballages'], 2);
+            $line[] = round((float) $item['total'], 2);
+            $sheet->fromArray($line, null, 'A' . $row++);
         }
 
-        // Style conditionnel : rouge pour les lignes CRITIQUE
-        for ($i = 2; $i < $row; $i++) {
-            if ($sheet->getCell('H' . $i)->getValue() === 'CRITIQUE') {
-                $sheet->getStyle('A' . $i . ':H' . $i)->getFont()->getColor()->setARGB('FFCC0000');
-            }
+        $totalLine = [$pivot['totals']['produit'], round((float) $pivot['totals']['entrepot'], 2)];
+        foreach ($pivot['vehicles'] as $vehicle) {
+            $totalLine[] = round((float) ($pivot['totals']['vehicles'][$vehicle] ?? 0), 2);
         }
+        $totalLine[] = round((float) $pivot['totals']['emballages'], 2);
+        $totalLine[] = round((float) $pivot['totals']['total'], 2);
+        $sheet->fromArray($totalLine, null, 'A' . $row);
 
         $this->styleHeaderRow($sheet, count($headers));
+        $sheet->getStyle('A' . $row . ':' . $sheet->getHighestColumn() . $row)->getFont()->setBold(true);
+        foreach (range('A', $sheet->getHighestColumn()) as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
         $this->sendXlsx($spreadsheet, 'stocks_' . date('Y-m-d_H-i') . '.xlsx');
-}
+    }
 
     /**
      * Inventaire complet
@@ -401,6 +422,7 @@ class StockController extends Controller
             'filters' => $filters,
             'totaux' => $totaux,
             'print_mode' => $printMode,
+            'stockPivot' => $printMode ? $this->buildStockPivot($inventaire) : null,
             'pagination' => [
                 'current_page' => $page,
                 'last_page' => ceil($total / $perPage),
@@ -415,6 +437,64 @@ class StockController extends Controller
         }
 
         $this->view('stocks/inventaire', $viewData);
+    }
+
+
+    private function buildStockPivot(array $data): array
+    {
+        $products = [];
+        $vehicles = [];
+        foreach ($data as $item) {
+            $productId = (int) ($item['produit_id'] ?? 0);
+            if ($productId <= 0) {
+                continue;
+            }
+            if (!isset($products[$productId])) {
+                $products[$productId] = [
+                    'produit' => trim(($item['produit_nom'] ?? '') . (!empty($item['produit_code']) ? ' (' . $item['produit_code'] . ')' : '')),
+                    'entrepot' => 0.0,
+                    'vehicles' => [],
+                    'emballages' => 0.0,
+                    'total' => 0.0,
+                ];
+            }
+
+            $full = round((float) ($item['caisses_pleine'] ?? 0), 2);
+            $empty = round((float) ($item['caisses_vide'] ?? 0), 2);
+            $type = strtolower((string) ($item['emplacement_type'] ?? ''));
+            $vehicleLabel = trim((string) ($item['vehicule'] ?? ''));
+            if ($vehicleLabel === '' && $type === 'mobile') {
+                $vehicleLabel = trim((string) ($item['emplacement_nom'] ?? 'Vehicule'));
+            }
+
+            if ($type === 'mobile' || $vehicleLabel !== '') {
+                $label = $vehicleLabel !== '' ? $vehicleLabel : 'Vehicule';
+                $vehicles[$label] = true;
+                $products[$productId]['vehicles'][$label] = ($products[$productId]['vehicles'][$label] ?? 0) + $full;
+            } else {
+                $products[$productId]['entrepot'] += $full;
+            }
+            $products[$productId]['emballages'] += $empty;
+            $products[$productId]['total'] += $full;
+        }
+
+        $vehicleLabels = array_keys($vehicles);
+        sort($vehicleLabels, SORT_NATURAL | SORT_FLAG_CASE);
+        uasort($products, static function ($a, $b) {
+            return strcmp((string) $a['produit'], (string) $b['produit']);
+        });
+
+        $totals = ['produit' => 'TOTAL', 'entrepot' => 0.0, 'vehicles' => [], 'emballages' => 0.0, 'total' => 0.0];
+        foreach ($products as $row) {
+            $totals['entrepot'] += (float) $row['entrepot'];
+            $totals['emballages'] += (float) $row['emballages'];
+            $totals['total'] += (float) $row['total'];
+            foreach ($vehicleLabels as $label) {
+                $totals['vehicles'][$label] = ($totals['vehicles'][$label] ?? 0) + (float) ($row['vehicles'][$label] ?? 0);
+            }
+        }
+
+        return ['vehicles' => $vehicleLabels, 'rows' => array_values($products), 'totals' => $totals];
     }
 
     /**
@@ -432,34 +512,43 @@ class StockController extends Controller
             $last = 1;
             do {
                 $result = $this->stockModel->getInventairePaginated($page, 1000, $filters);
-                $data   = array_merge($data, $result['data']);
-                $last   = (int) $result['last_page'];
+                $data = array_merge($data, $result['data']);
+                $last = (int) $result['last_page'];
                 $page++;
             } while ($page <= $last);
         }
 
+        $pivot = $this->buildStockPivot($data);
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet()->setTitle('Inventaire stock');
 
-        $headers = ['Produit', 'Code', 'Catégorie', 'Emplacement', 'Type', 'Véhicule', 'Agent', 'Stock Plein (cs)', 'Stock Vide (cs)'];
+        $headers = array_merge(['Produit', 'Entrepot'], $pivot['vehicles'], ['Emballages', 'Total']);
         $sheet->fromArray($headers, null, 'A1');
 
         $row = 2;
-        foreach ($data as $item) {
-            $sheet->fromArray([
-                $item['produit_nom'],
-                $item['produit_code'],
-                $item['categorie'],
-                $item['emplacement_nom'],
-                ucfirst($item['emplacement_type']),
-                $item['vehicule'] ?: '-',
-                $item['agent_nom'] ? $item['agent_prenom'] . ' ' . $item['agent_nom'] : '-',
-                round((float) $item['caisses_pleine'], 2),
-                round((float) $item['caisses_vide'], 2),
-            ], null, 'A' . $row++);
+        foreach ($pivot['rows'] as $item) {
+            $line = [$item['produit'], round((float) $item['entrepot'], 2)];
+            foreach ($pivot['vehicles'] as $vehicle) {
+                $line[] = round((float) ($item['vehicles'][$vehicle] ?? 0), 2);
+            }
+            $line[] = round((float) $item['emballages'], 2);
+            $line[] = round((float) $item['total'], 2);
+            $sheet->fromArray($line, null, 'A' . $row++);
         }
 
+        $totalLine = [$pivot['totals']['produit'], round((float) $pivot['totals']['entrepot'], 2)];
+        foreach ($pivot['vehicles'] as $vehicle) {
+            $totalLine[] = round((float) ($pivot['totals']['vehicles'][$vehicle] ?? 0), 2);
+        }
+        $totalLine[] = round((float) $pivot['totals']['emballages'], 2);
+        $totalLine[] = round((float) $pivot['totals']['total'], 2);
+        $sheet->fromArray($totalLine, null, 'A' . $row);
+
         $this->styleHeaderRow($sheet, count($headers));
+        $sheet->getStyle('A' . $row . ':' . $sheet->getHighestColumn() . $row)->getFont()->setBold(true);
+        foreach (range('A', $sheet->getHighestColumn()) as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
         $this->sendXlsx($spreadsheet, 'inventaire_stock_' . date('Y-m-d_H-i') . '.xlsx');
     }
 

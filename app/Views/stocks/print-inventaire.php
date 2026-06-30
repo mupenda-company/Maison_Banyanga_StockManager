@@ -23,35 +23,44 @@
         <div class="summary-item"><div class="summary-label">Valeur estimee</div><div class="summary-value"><?= format_money_converted($totaux['valeur'] ?? 0) ?></div></div>
     </div>
 
-    <div class="section-title">Detail inventaire</div>
+    <?php $pivot = $stockPivot ?? ['vehicles' => [], 'rows' => [], 'totals' => []]; ?>
+    <div class="section-title">Inventaire par produit, entrepot et vehicule</div>
     <table>
         <thead>
             <tr>
-                <th style="width: 24%">Produit</th>
-                <th style="width: 16%">Categorie</th>
-                <th style="width: 24%">Emplacement</th>
-                <th style="width: 10%">Type</th>
-                <th style="width: 12%">Plein</th>
-                <th style="width: 12%">Vide</th>
-                <th style="width: 8%">Statut</th>
+                <th>Produit</th>
+                <th class="num">Entrepot</th>
+                <?php foreach (($pivot['vehicles'] ?? []) as $vehicle): ?>
+                    <th class="num"><?= htmlspecialchars($vehicle) ?></th>
+                <?php endforeach; ?>
+                <th class="num">Emballages</th>
+                <th class="num">Total</th>
             </tr>
         </thead>
         <tbody>
-            <?php if (empty($inventaire)): ?>
-                <tr><td colspan="7" class="center">Aucun enregistrement trouve</td></tr>
-            <?php else: foreach ($inventaire as $item):
-                $critique = (float) ($item['quantite_pleine'] ?? 0) <= (float) ($item['seuil_alerte'] ?? 0);
-            ?>
+            <?php if (empty($pivot['rows'])): ?>
+                <tr><td colspan="<?= 4 + count($pivot['vehicles'] ?? []) ?>" class="center">Aucun enregistrement trouve</td></tr>
+            <?php else: foreach ($pivot['rows'] as $item): ?>
                 <tr>
-                    <td><strong><?= htmlspecialchars($item['produit_nom'] ?? '') ?></strong><br><span class="muted"><?= htmlspecialchars($item['produit_code'] ?? '') ?></span></td>
-                    <td><?= htmlspecialchars($item['categorie'] ?? '-') ?></td>
-                    <td><?= htmlspecialchars($item['emplacement_nom'] ?? '') ?><?php if (!empty($item['vehicule'])): ?><br><span class="muted"><?= htmlspecialchars($item['vehicule']) ?></span><?php endif; ?></td>
-                    <td class="center"><?= htmlspecialchars(ucfirst($item['emplacement_type'] ?? '')) ?></td>
-                    <td class="num"><?= number_format((float) ($item['caisses_pleine'] ?? 0), 2, ',', ' ') ?> cs</td>
-                    <td class="num"><?= number_format((float) ($item['caisses_vide'] ?? 0), 2, ',', ' ') ?> cs</td>
-                    <td class="center <?= $critique ? 'warn' : 'ok' ?>"><?= $critique ? 'CRIT' : 'OK' ?></td>
+                    <td><strong><?= htmlspecialchars($item['produit'] ?? '') ?></strong></td>
+                    <td class="num"><?= number_format((float) ($item['entrepot'] ?? 0), 2, ',', ' ') ?></td>
+                    <?php foreach (($pivot['vehicles'] ?? []) as $vehicle): ?>
+                        <td class="num"><?= number_format((float) ($item['vehicles'][$vehicle] ?? 0), 2, ',', ' ') ?></td>
+                    <?php endforeach; ?>
+                    <td class="num"><?= number_format((float) ($item['emballages'] ?? 0), 2, ',', ' ') ?></td>
+                    <td class="num"><?= number_format((float) ($item['total'] ?? 0), 2, ',', ' ') ?></td>
                 </tr>
-            <?php endforeach; endif; ?>
+            <?php endforeach; ?>
+                <tr style="font-weight:700;background:#f3f4f6;">
+                    <td>TOTAL</td>
+                    <td class="num"><?= number_format((float) ($pivot['totals']['entrepot'] ?? 0), 2, ',', ' ') ?></td>
+                    <?php foreach (($pivot['vehicles'] ?? []) as $vehicle): ?>
+                        <td class="num"><?= number_format((float) ($pivot['totals']['vehicles'][$vehicle] ?? 0), 2, ',', ' ') ?></td>
+                    <?php endforeach; ?>
+                    <td class="num"><?= number_format((float) ($pivot['totals']['emballages'] ?? 0), 2, ',', ' ') ?></td>
+                    <td class="num"><?= number_format((float) ($pivot['totals']['total'] ?? 0), 2, ',', ' ') ?></td>
+                </tr>
+            <?php endif; ?>
         </tbody>
     </table>
     <?php print_report_scripts(); ?>

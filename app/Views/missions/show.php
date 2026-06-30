@@ -5,6 +5,12 @@ $mission['chargements'] = array_values(array_filter($mission['chargements'] ?? [
     return (float) ($chargement['caisses_total'] ?? $chargement['quantite_caisses'] ?? 0) > 0;
 }));
 $firstChargement = $mission['chargements'][0] ?? [];
+$chargementsRistourne = array_values(array_filter($mission['chargements'] ?? [], static function ($chargement) {
+    return (($chargement['type_chargement'] ?? 'vente') === 'ristourne');
+}));
+$chargementsVente = array_values(array_filter($mission['chargements'] ?? [], static function ($chargement) {
+    return (($chargement['type_chargement'] ?? 'vente') === 'vente');
+}));
 $retourMissionLignes = [];
 if (!$isRestourne) {
     foreach ($mission['chargements'] ?? [] as $item) {
@@ -160,7 +166,7 @@ ob_start();
                     <div>
                         <p class="text-sm text-gray-500 dark:text-gray-400">Caisses livrées / prévues</p>
                         <p class="font-medium text-gray-900 dark:text-white">
-                            <?= $totalCaissesLivrees ?> / <?= $totalCaissesPrevues ?> cs
+                            <?= $totalCaissesLivrees ?> cs
                         </p>
                     </div>
                     <div>
@@ -263,6 +269,7 @@ ob_start();
                         <thead>
                             <tr>
                                 <th class="text-left">Produit</th>
+                                <?php if ($isRestourne): ?><th class="text-left">Usage</th><?php endif; ?>
                                 <th class="text-right">Stock initial</th>
                                 <th class="text-right">Variation mission</th>
                                 <th class="text-right">Stock final</th>
@@ -287,6 +294,7 @@ ob_start();
                                     <div class="font-medium"><?= htmlspecialchars($item['produit_nom']) ?></div>
                                     <div class="text-xs text-gray-500"><?= htmlspecialchars($item['produit_code']) ?></div>
                                 </td>
+                                <?php if ($isRestourne): ?><td><span class="<?= (($item['type_chargement'] ?? 'vente') === 'ristourne') ? 'badge-success' : 'badge-info' ?>"><?= (($item['type_chargement'] ?? 'vente') === 'ristourne') ? 'Ristourne' : 'Vente' ?></span></td><?php endif; ?>
                                 <td class="text-right"><?= number_format($stockDepartCaisses, 0, '.', ' ') ?> cs</td>
                                 <td class="text-right<?= $ajustementMissionCaisses < 0 ? ' text-red-600 font-semibold' : '' ?>"><?= number_format($ajustementMissionCaisses, 0, '.', ' ') ?> cs</td>
                                 <td class="text-right font-semibold text-primary-600"><?= number_format($totalReelCaisses, 0, '.', ' ') ?> cs</td>
@@ -297,7 +305,7 @@ ob_start();
                         </tbody>
                         <tfoot class="bg-gray-50 dark:bg-gray-700/50">
                             <tr>
-                                <td colspan="3" class="text-right font-bold">Total stock final</td>
+                                <td colspan="<?= $isRestourne ? 4 : 3 ?>" class="text-right font-bold">Total stock final</td>
                                 <td class="text-right font-bold text-primary-600">
                                     <?= number_format((int) ($mission['total_caisses'] ?? 0), 0, '.', ' ') ?> cs
                                 </td>
@@ -334,7 +342,7 @@ ob_start();
                                             <span class="badge-warning text-[10px] ml-1">En attente</span>
                                         <?php endif; ?>
                                     </p>
-                                    <p class="text-sm text-gray-500">Produit: <?= htmlspecialchars($mr['produit_nom'] ?? 'N/A') ?></p>
+                                    <p class="text-sm text-gray-500">Produit choisi: <?= htmlspecialchars($mr['produit_nom'] ?? 'A choisir sur terrain') ?></p>
                                     <?php
                                         $caissesPrevuesMr2 = (int)($mr['caisses_prevues'] ?? $mr['caisses_livrees'] ?? 0);
                                         $caissesLivreesMr2 = (int)($mr['caisses_livrees'] ?? 0);

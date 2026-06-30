@@ -59,10 +59,22 @@ class FinanceController extends Controller
     // Helper pour envoyer le fichier xlsx au navigateur
     private function sendXlsx(\PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet, string $filename): void
     {
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+
+        if (headers_sent()) {
+            throw new Exception('Impossible de generer le fichier Excel: des donnees ont deja ete envoyees au navigateur.');
+        }
+
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
-        header('Cache-Control: max-age=0');
+        header('Cache-Control: max-age=0, must-revalidate');
+        header('Pragma: public');
+        header('Expires: 0');
+
         $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->setPreCalculateFormulas(false);
         $writer->save('php://output');
         exit;
     }

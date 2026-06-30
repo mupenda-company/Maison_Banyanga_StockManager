@@ -349,7 +349,8 @@ class MissionController extends Controller
             'vehicule_id' => 'required|numeric',
             'zone_id' => 'required|numeric',
             'date_depart' => 'required',
-            'ristournes' => 'required'
+            'ristournes' => 'required',
+            'chargements' => 'required'
         ]);
 
         if (!empty($errors)) {
@@ -361,11 +362,26 @@ class MissionController extends Controller
             return $this->error('Sélectionnez au moins une ristourne à livrer', 422);
         }
 
-        // Valider chaque ristourne
+        $chargementsData = $data['chargements'] ?? [];
+        if (empty($chargementsData) || !is_array($chargementsData)) {
+            return $this->error('Selectionnez au moins un produit a envoyer dans le vehicule', 422);
+        }
+
         foreach ($ristournesData as $i => $ristourneItem) {
-            if (empty($ristourneItem['ristourne_id']) || empty($ristourneItem['produit_id'])) {
-                return $this->error('Chaque ristourne doit avoir un produit sélectionné', 422);
+            if (empty($ristourneItem['ristourne_id'])) {
+                return $this->error('Chaque ligne doit avoir une ristourne selectionnee', 422);
             }
+        }
+
+        $hasChargementValide = false;
+        foreach ($chargementsData as $chargementItem) {
+            if (!empty($chargementItem['produit_id']) && (int) ($chargementItem['quantite_caisses'] ?? $chargementItem['caisses'] ?? 0) > 0) {
+                $hasChargementValide = true;
+                break;
+            }
+        }
+        if (!$hasChargementValide) {
+            return $this->error('Indiquez au moins une quantite de caisses pour les produits envoyes', 422);
         }
 
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
@@ -377,6 +393,8 @@ class MissionController extends Controller
             'date_depart' => $data['date_depart'],
             'zone_id' => $data['zone_id'] ?? null,
             'notes' => $data['notes'] ?? '',
+            'chargements' => $data['chargements'] ?? [],
+            'chargements_vente' => $data['chargements_vente'] ?? [],
             'created_by' => $_SESSION['user_id']
         ];
 
@@ -814,6 +832,8 @@ class MissionController extends Controller
         ]);
     }
 }
+
+
 
 
 
