@@ -430,14 +430,12 @@ document.addEventListener('alpine:init', () => {
                     return;
                 }
 
-                await App.api('/api/stocks/inventaire-initial', 'POST', {
-                    emplacement_id: parseInt(vehicule.emplacement_id, 10),
+                const result = await App.api('/api/vehicules/' + parseInt(this.vehicule_id, 10) + '/inventaire', 'POST', {
                     lignes: lignes,
                     motif_ecart: this.motif_ecart.trim()
                 });
 
-                App.notify('Inventaire du véhicule enregistré avec succès', 'success');
-                window.location.reload();
+                App.notify(result.message || 'Inventaire du vehicule enregistre avec succes', 'success');                window.location.reload();
             } catch (e) {
                 App.notify(e.message || 'Erreur lors de l\'enregistrement', 'error');
             } finally {

@@ -130,7 +130,8 @@ class MobileController extends Controller {
                         FLOOR(IFNULL(mc.quantite_vendue, 0) / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))) as stock_actuel
                 FROM mission_chargements mc
                 JOIN produits p ON mc.produit_id = p.id
-                WHERE mc.mission_id = ?";
+                WHERE mc.mission_id = ?
+                  AND COALESCE(mc.quantite_caisses, 0) > 0";
         $stock = $this->db->fetchAll($sql, [$missionId]);
         return $this->success($stock);
     }
@@ -186,7 +187,8 @@ class MobileController extends Controller {
                     COALESCE(SUM(COALESCE(mc.quantite_caisses, 0) - FLOOR(IFNULL(mc.quantite_vendue, 0) / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))), 0) as caisses_restantes
              FROM mission_chargements mc
              JOIN produits p ON mc.produit_id = p.id
-             WHERE mc.mission_id = :mission_id",
+             WHERE mc.mission_id = :mission_id
+               AND COALESCE(mc.quantite_caisses, 0) > 0",
             ['mission_id' => $missionId]
         );
 
@@ -285,7 +287,8 @@ class MobileController extends Controller {
                 'bouteilles_vide' => (float) ($stockTotals['bouteilles_vide'] ?? 0),
                 'stock_actuel_bouteilles' => array_sum(array_map(static function ($row) {
                     return (int) ($row['stock_actuel_bouteilles'] ?? 0);
-                }, $this->db->fetchAll("SELECT (COALESCE(mc.quantite_caisses, 0) * COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24)) - IFNULL(mc.quantite_vendue, 0) as stock_actuel_bouteilles FROM mission_chargements mc JOIN produits p ON mc.produit_id = p.id WHERE mc.mission_id = :mission_id", ['mission_id' => $missionId]))),
+                }, $this->db->fetchAll("SELECT (COALESCE(mc.quantite_caisses, 0) * COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24)) - IFNULL(mc.quantite_vendue, 0) as stock_actuel_bouteilles FROM mission_chargements mc JOIN produits p ON mc.produit_id = p.id WHERE mc.mission_id = :mission_id
+               AND COALESCE(mc.quantite_caisses, 0) > 0", ['mission_id' => $missionId]))),
             ]
         ]);
     }
@@ -427,9 +430,14 @@ class MobileController extends Controller {
             }
         }
 
-        // Ne pas livrer plus que prévu
-        if ($caissesPrevues > 0 && $caissesLivrees > $caissesPrevues) {
-            $caissesLivrees = $caissesPrevues;
+        $caissesPrevuesEffectives = $caissesPrevues;
+        if ($complementConfirme && $propositionMontant > 0 && $prixCaisse > 0) {
+            $caissesPrevuesEffectives = max($caissesPrevuesEffectives, (int) ceil(($montantRistourne + $propositionMontant) / $prixCaisse));
+        }
+
+        // Ne pas livrer plus que ce qui est couvert par la ristourne + complement confirme.
+        if ($caissesPrevuesEffectives > 0 && $caissesLivrees > $caissesPrevuesEffectives) {
+            $caissesLivrees = $caissesPrevuesEffectives;
         }
 
         $bouteillesLivrees = $caissesLivrees * $bouteillesParCaisse;
@@ -462,9 +470,9 @@ class MobileController extends Controller {
         $updates[] = 'statut = :statut';
         $params['statut'] = 'livree';
 
-        // Si complément confirmé, recalculer caisses_prevues pour refléter le ceil
+        // Si complement confirme, recalculer caisses_prevues pour refleter le montant total couvert.
         if ($complementConfirme && $propositionMontant > 0 && $prixCaisse > 0) {
-            $newPrevues = (int) ceil(($montantRistourne + $propositionMontant) / $prixCaisse);
+            $newPrevues = $caissesPrevuesEffectives;
             if ($newPrevues != $caissesPrevues) {
                 $updates[] = 'caisses_prevues = :new_caisses_prevues';
                 $params['new_caisses_prevues'] = $newPrevues;

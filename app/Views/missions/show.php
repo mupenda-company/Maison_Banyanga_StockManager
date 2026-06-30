@@ -1,6 +1,9 @@
 <?php 
 $pageTitle = 'Détail mission';
 $isRestourne = (($mission['type_mission'] ?? 'vente') === 'ristourne');
+$mission['chargements'] = array_values(array_filter($mission['chargements'] ?? [], static function ($chargement) {
+    return (float) ($chargement['caisses_total'] ?? $chargement['quantite_caisses'] ?? 0) > 0;
+}));
 $firstChargement = $mission['chargements'][0] ?? [];
 $retourMissionLignes = [];
 if (!$isRestourne) {

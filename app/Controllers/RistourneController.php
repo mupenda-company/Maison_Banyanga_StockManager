@@ -1,6 +1,6 @@
 <?php
 /**
- * Contrôleur des Ristournes
+ * Controleur des Ristournes
  */
 
 class RistourneController extends Controller
@@ -16,7 +16,7 @@ class RistourneController extends Controller
     }
 
     /**
-     * Liste des ristournes calculées
+     * Liste des ristournes calculees
      */
     public function index()
     {
@@ -52,6 +52,7 @@ class RistourneController extends Controller
             'print_mode' => $printMode
         ]);
     }
+
     private function styleHeaderRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $nbCols): void
     {
         $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($nbCols);
@@ -67,7 +68,6 @@ class RistourneController extends Controller
         }
     }
 
-    // Helper pour envoyer le fichier xlsx au navigateur
     private function sendXlsx(\PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet, string $filename): void
     {
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -103,13 +103,13 @@ class RistourneController extends Controller
 
         $this->styleHeaderRow($sheet, count($headers));
 
-        $mois   = $filters['mois']  ?? date('n');
-        $annee  = $filters['annee'] ?? date('Y');
+        $mois = $filters['mois'] ?? date('n');
+        $annee = $filters['annee'] ?? date('Y');
         $this->sendXlsx($spreadsheet, 'ristournes_' . $mois . '_' . $annee . '_' . date('Y-m-d_H-i') . '.xlsx');
     }
 
     /**
-     * Lancer le calcul des ristournes pour un mois donné
+     * Lancer ou actualiser le calcul des ristournes pour un mois donne.
      */
     public function calculer()
     {
@@ -119,39 +119,57 @@ class RistourneController extends Controller
         $annee = $_GET['annee'] ?? date('Y');
 
         $clients = $this->clientModel->all();
-        $nbCalcules = 0;
+        $nbCrees = 0;
+        $nbMaj = 0;
+        $nbVerrouilles = 0;
 
         foreach ($clients as $client) {
             $calcul = $this->ristourneModel->calculerRistourne($client['id'], $mois, $annee);
-            
-            if ($calcul) {
-                // Vérifier si déjà calculé pour éviter les doublons
-                $existe = $this->db->fetch(
-                    "SELECT id FROM ristournes WHERE client_id = :cid AND periode_debut = :debut AND statut != 'annulee'",
-                    ['cid' => $client['id'], 'debut' => $calcul['periode_debut']]
-                );
-
-                if (!$existe) {
-                    $this->ristourneModel->create([
-                        'client_id' => $calcul['client_id'],
-                        'periode_debut' => $calcul['periode_debut'],
-                        'periode_fin' => $calcul['periode_fin'],
-                        'ca_total' => $calcul['ca_total'],
-                        'palier_id' => $calcul['palier_id'],
-                        'taux_applique' => $calcul['taux_applique'],
-                        'montant_ristourne' => $calcul['montant_ristourne'],
-                        'statut' => 'calculee'
-                    ]);
-                    $nbCalcules++;
-                }
+            if (!$calcul) {
+                continue;
             }
+
+            $existe = $this->db->fetch(
+                "SELECT id, statut FROM ristournes WHERE client_id = :cid AND periode_debut = :debut AND statut != 'annulee' ORDER BY id DESC LIMIT 1",
+                ['cid' => $client['id'], 'debut' => $calcul['periode_debut']]
+            );
+
+            $dataRistourne = [
+                'client_id' => $calcul['client_id'],
+                'periode_debut' => $calcul['periode_debut'],
+                'periode_fin' => $calcul['periode_fin'],
+                'ca_total' => $calcul['ca_total'],
+                'palier_id' => $calcul['palier_id'],
+                'taux_applique' => $calcul['taux_applique'],
+                'montant_ristourne' => $calcul['montant_ristourne'],
+            ];
+
+            if (!$existe) {
+                $dataRistourne['statut'] = 'calculee';
+                $this->ristourneModel->create($dataRistourne);
+                $nbCrees++;
+                continue;
+            }
+
+            if (($existe['statut'] ?? '') === 'calculee') {
+                $this->ristourneModel->update((int) $existe['id'], $dataRistourne);
+                $nbMaj++;
+                continue;
+            }
+
+            $nbVerrouilles++;
         }
 
-        return $this->success(null, "$nbCalcules ristournes ont été générées pour la période.");
+        $message = $nbCrees . ' ristourne(s) creee(s), ' . $nbMaj . ' mise(s) a jour pour la periode.';
+        if ($nbVerrouilles > 0) {
+            $message .= ' ' . $nbVerrouilles . ' deja en livraison/payee(s) non modifiee(s).';
+        }
+
+        return $this->success(null, $message);
     }
 
     /**
-     * Marquer une ristourne comme payée
+     * Marquer une ristourne comme payee
      */
     public function payer($id)
     {
@@ -160,10 +178,10 @@ class RistourneController extends Controller
         $result = $this->ristourneModel->marquerPayee($id);
         
         if ($result) {
-            return $this->success(null, "Ristourne marquée comme payée.");
+            return $this->success(null, 'Ristourne marquee comme payee.');
         }
         
-        return $this->error("Erreur lors de la mise à jour.");
+        return $this->error('Erreur lors de la mise a jour.');
     }
 
     /**
@@ -177,7 +195,7 @@ class RistourneController extends Controller
     }
 
     /**
-     * Créer/Mettre à jour un palier
+     * Creer/mettre a jour un palier
      */
     public function storePalier()
     {
@@ -213,7 +231,7 @@ class RistourneController extends Controller
             $this->db->insert('paliers_ristourne', $params);
         }
 
-        return $this->success(null, 'Palier enregistré avec succès.');
+        return $this->success(null, 'Palier enregistre avec succes.');
     }
 
     /**
@@ -223,6 +241,6 @@ class RistourneController extends Controller
     {
         $this->requirePermission('admin.voir');
         $this->db->delete('paliers_ristourne', 'id = :id', ['id' => $id]);
-        return $this->success(null, 'Palier supprimé.');
+        return $this->success(null, 'Palier supprime.');
     }
 }

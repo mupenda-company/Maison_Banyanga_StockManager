@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * Point d'entrée de l'application
  */
@@ -129,6 +129,7 @@ $routes = [
     'PUT::/api/vehicules/(\d+)' => ['VehiculeController', 'update'],
     'DELETE::/api/vehicules/(\d+)' => ['VehiculeController', 'delete'],
     'POST::/api/vehicules/transfert' => ['VehiculeController', 'transfertVehicule'],
+    'POST::/api/vehicules/(\d+)/inventaire' => ['VehiculeController', 'enregistrerInventaire'],
     'POST::/api/vehicules/(\d+)/retour-emballages' => ['VehiculeController', 'retourEmballages'],
     
     // Missions

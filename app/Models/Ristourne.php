@@ -122,10 +122,17 @@ class Ristourne extends Model
             $params['client_id'] = $filters['client_id'];
         }
 
+        if (!empty($filters['mois']) && !empty($filters['annee'])) {
+            $where .= " AND MONTH(r.periode_debut) = :mois AND YEAR(r.periode_debut) = :annee";
+            $params['mois'] = (int) $filters['mois'];
+            $params['annee'] = (int) $filters['annee'];
+        }
+
         return $this->db->fetchAll(
-            "SELECT r.*, c.nom as client_nom
+            "SELECT r.*, c.nom as client_nom, c.numero_client, z.nom as zone_nom
              FROM {$this->table} r
              JOIN clients c ON r.client_id = c.id
+             LEFT JOIN zones z ON c.zone_id = z.id
              WHERE {$where}
              ORDER BY r.id DESC",
             $params
@@ -133,9 +140,8 @@ class Ristourne extends Model
     }
 
     /**
-     * Marquer comme payée
-     */
-    public function marquerPayee($id)
+     * Marquer comme payÃ©e
+     */    public function marquerPayee($id)
     {
         return $this->update($id, [
             'statut' => 'payee',

@@ -191,11 +191,6 @@ class MissionController extends Controller
             return $this->error('Véhicule non trouvé', 404);
         }
 
-        $stockVehiculeProduits = [];
-        foreach (($vehicule['stock'] ?? []) as $stock) {
-            $stockVehiculeProduits[(int) ($stock['produit_id'] ?? 0)] = true;
-        }
-
         $chargements = [];
         foreach ($data['chargements'] as $chargement) {
             $produitId = (int) ($chargement['produit_id'] ?? 0);
@@ -207,7 +202,7 @@ class MissionController extends Controller
                 continue;
             }
 
-            if ($quantiteCaisses <= 0 && $quantiteBouteilles <= 0 && empty($stockVehiculeProduits[$produitId])) {
+            if ($quantiteCaisses <= 0 && $quantiteBouteilles <= 0) {
                 continue;
             }
 
