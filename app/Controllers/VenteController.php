@@ -1031,15 +1031,9 @@ class VenteController extends Controller
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
 
-        // Téléchargement
+        // Telechargement
         $filename = 'ventes_' . $dateDebut . '_' . $dateFin . '.xlsx';
-        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
-        header('Cache-Control: max-age=0');
-
-        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
-        $writer->save('php://output');
-        exit;
+        $this->sendXlsx($spreadsheet, $filename);
     }
 }
 
