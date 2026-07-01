@@ -14,6 +14,8 @@ ob_start();
         <?php if (can('emballages.gerer')): ?>
         <a href="<?= url('emballages/inventaire-initial') ?>" class="btn btn-secondary">Inventaire initial</a>
         <?php endif; ?>
+        <a href="?<?= http_build_query(array_merge($_GET, ['print' => 1])) ?>" target="_blank" class="btn btn-secondary">Imprimer</a>
+        <a href="?<?= http_build_query(array_merge($_GET, ['export' => 'excel'])) ?>" class="btn btn-secondary">Exporter</a>
         <a href="<?= url('emballages/emprunts') ?>" class="btn btn-primary">Emprunts / prets</a>
     </div>
 </div>

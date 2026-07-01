@@ -390,6 +390,24 @@ ob_start();
                                 <p class="text-[10px] text-gray-500 mt-1">Le transfert sera converti en bouteilles selon le produit.</p>
                             </div>
                             <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <label class="label mb-0">Autres produits</label>
+                                    <button type="button" class="btn btn-secondary btn-sm" @click="form.lignes.push({ produit_id: '', caisses: 1 })">Ajouter</button>
+                                </div>
+                                <template x-for="(ligne, index) in form.lignes" :key="index">
+                                    <div class="grid grid-cols-12 gap-2 mb-2">
+                                        <select x-model="ligne.produit_id" class="input col-span-7">
+                                            <option value="">Selectionner</option>
+                                            <template x-for="p in produits" :key="p.id">
+                                                <option :value="String(p.id)" x-text="p.nom + ' (' + p.code + ')'"></option>
+                                            </template>
+                                        </select>
+                                        <input type="number" x-model.number="ligne.caisses" class="input col-span-4" min="0.01" step="0.01">
+                                        <button type="button" class="btn btn-danger btn-sm col-span-1" @click="form.lignes.splice(index, 1)">X</button>
+                                    </div>
+                                </template>
+                            </div>
+                            <div>
                                 <label class="label">Motif</label>
                                 <input type="text" x-model="form.motif" class="input" placeholder="Raison du transfert">
                             </div>
@@ -420,6 +438,7 @@ document.addEventListener('alpine:init', () => {
             emplacement_source: '',
             emplacement_dest: '',
             caisses: 1,
+            lignes: [],
             motif: ''
         },
         loading: false,
@@ -430,6 +449,7 @@ document.addEventListener('alpine:init', () => {
                 emplacement_source: '',
                 emplacement_dest: '',
                 caisses: 1,
+                lignes: [],
                 motif: ''
             };
             this.isOpen = true;
@@ -447,14 +467,22 @@ document.addEventListener('alpine:init', () => {
 
             this.loading = true;
             try {
-                const product = this.produits.find(p => p.id == this.form.produit_id);
-                const btlParCaisse = product ? (parseInt(product.bouteilles_par_caisses) || 24) : 24;
+                const lignes = [
+                    { produit_id: this.form.produit_id, caisses: this.form.caisses },
+                    ...(this.form.lignes || [])
+                ].filter(l => l.produit_id && parseFloat(l.caisses || 0) > 0).map(l => {
+                    const product = this.produits.find(p => p.id == l.produit_id);
+                    const btlParCaisse = product ? (parseInt(product.bouteilles_par_caisses) || 24) : 24;
+                    return {
+                        produit_id: parseInt(l.produit_id, 10),
+                        quantite: Math.round((parseFloat(l.caisses) || 0) * btlParCaisse)
+                    };
+                });
                 
                 const data = {
-                    produit_id: this.form.produit_id,
                     emplacement_source: this.form.emplacement_source,
                     emplacement_dest: this.form.emplacement_dest,
-                    quantite: this.form.caisses * btlParCaisse,
+                    lignes: lignes,
                     motif: this.form.motif
                 };
 

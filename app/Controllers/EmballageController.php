@@ -33,6 +33,23 @@ class EmballageController extends Controller
         $stockEmballages = $this->getStockEmballages();
         $resumeEmprunts = $this->getResumeEmprunts();
 
+        if (isset($_GET['export']) && $_GET['export'] === 'excel') {
+            $this->exportIndexExcel($stockEmballages, $clientsEmballage, $resumeEmprunts, $dateDebut, $dateFin);
+            return;
+        }
+
+        if (isset($_GET['print']) && (string) $_GET['print'] === '1') {
+            $this->view('emballages/print', [
+                'dateDebut' => $dateDebut,
+                'dateFin' => $dateFin,
+                'stockEmballages' => $stockEmballages,
+                'clientsEmballage' => $clientsEmballage,
+                'resumeEmprunts' => $resumeEmprunts,
+                'retoursRecents' => $retoursRecents,
+            ]);
+            return;
+        }
+
         $this->view('emballages/index', [
             'dateDebut' => $dateDebut,
             'dateFin' => $dateFin,
@@ -45,6 +62,56 @@ class EmballageController extends Controller
             'stockEmballages' => $stockEmballages,
             'resumeEmprunts' => $resumeEmprunts,
         ]);
+    }
+
+    private function exportIndexExcel(array $stockEmballages, array $clientsEmballage, array $resumeEmprunts, string $dateDebut, string $dateFin): void
+    {
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet()->setTitle('Emballages');
+
+        $sheet->fromArray(['Tableau de bord emballages', $dateDebut, $dateFin], null, 'A1');
+        $sheet->fromArray(['Total emballages', $stockEmballages['total_caisses'] ?? 0, 'Entrepot', $stockEmballages['fixe_caisses'] ?? 0, 'Vehicules', $stockEmballages['mobile_caisses'] ?? 0], null, 'A2');
+        $sheet->fromArray(['Operations ouvertes', $resumeEmprunts['nb_en_cours'] ?? 0, 'Dette clients', $clientsEmballage['total_dette'] ?? 0], null, 'A3');
+
+        $row = 5;
+        $sheet->fromArray(['Stock par produit'], null, 'A' . $row++);
+        $sheet->fromArray(['Produit', 'Code', 'Total', 'Entrepot', 'Vehicules'], null, 'A' . $row++);
+        foreach ($stockEmballages['par_produit'] ?? [] as $ligne) {
+            $sheet->fromArray([
+                $ligne['produit_nom'] ?? '',
+                $ligne['produit_code'] ?? '',
+                (int) ($ligne['total_caisses'] ?? 0),
+                (int) ($ligne['fixe_caisses'] ?? 0),
+                (int) ($ligne['mobile_caisses'] ?? 0),
+            ], null, 'A' . $row++);
+        }
+
+        $row += 2;
+        $sheet->fromArray(['Dettes clients'], null, 'A' . $row++);
+        $sheet->fromArray(['Client', 'Zone', 'Produit', 'Dette'], null, 'A' . $row++);
+        foreach ($clientsEmballage['lignes'] ?? [] as $ligne) {
+            $sheet->fromArray([
+                $ligne['client_nom'] ?? '',
+                $ligne['zone_nom'] ?? '',
+                $ligne['produit_nom'] ?? '',
+                (int) ($ligne['dette_caisses'] ?? 0),
+            ], null, 'A' . $row++);
+        }
+
+        foreach (range('A', 'E') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="emballages_' . date('Y-m-d_H-i') . '.xlsx"');
+        header('Cache-Control: max-age=0, must-revalidate');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->setPreCalculateFormulas(false);
+        $writer->save('php://output');
+        exit;
     }
 
     public function suivi()
@@ -81,7 +148,7 @@ class EmballageController extends Controller
              LEFT JOIN emplacements emp ON emp.id = s.emplacement_id
              WHERE p.actif = 1
              GROUP BY p.id, p.nom, p.code
-             ORDER BY p.nom"
+             ORDER BY p.position_affichage ASC, p.nom ASC"
         );
 
         $parEmplacement = $this->db->fetchAll(

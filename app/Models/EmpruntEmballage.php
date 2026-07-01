@@ -4,7 +4,7 @@ class EmpruntEmballage extends Model
 {
     protected $table = 'emprunts_emballages';
     protected $fillable = [
-        'direction', 'type_stock', 'source_type', 'client_id', 'source_nom', 'source_contact', 'produit_id',
+        'operation_ref', 'direction', 'type_stock', 'source_type', 'client_id', 'source_nom', 'source_contact', 'produit_id',
         'quantite_empruntee', 'quantite_utilisee', 'quantite_retournee',
         'emplacement_id', 'date_emprunt', 'statut', 'notes', 'created_by'
     ];
@@ -12,8 +12,20 @@ class EmpruntEmballage extends Model
     public function __construct()
     {
         parent::__construct();
+        $this->ensureOperationRefColumn();
         $this->ensureDirectionColumn();
         $this->ensureTypeStockColumn();
+    }
+
+    private function ensureOperationRefColumn(): void
+    {
+        $exists = (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'emprunts_emballages' AND COLUMN_NAME = 'operation_ref'"
+        );
+
+        if (!$exists) {
+            $this->db->query("ALTER TABLE emprunts_emballages ADD operation_ref VARCHAR(50) NULL AFTER id");
+        }
     }
 
     private function ensureDirectionColumn(): void
@@ -71,8 +83,19 @@ class EmpruntEmballage extends Model
             $params['type_stock'] = $filters['type_stock'];
         }
 
+        if (!empty($filters['date_debut'])) {
+            $where .= ' AND e.date_emprunt >= :date_debut';
+            $params['date_debut'] = $filters['date_debut'];
+        }
+
+        if (!empty($filters['date_fin'])) {
+            $where .= ' AND e.date_emprunt <= :date_fin';
+            $params['date_fin'] = $filters['date_fin'];
+        }
+
         return $this->db->fetchAll(
-            "SELECT e.*, c.nom as client_nom, p.nom as produit_nom, p.code as produit_code,
+            "SELECT e.*, COALESCE(e.operation_ref, CONCAT('EMP-', e.id)) as operation_ref_label,
+                    c.nom as client_nom, p.nom as produit_nom, p.code as produit_code,
                     p.bouteilles_par_caisses, emp.nom as emplacement_nom,
                     (e.quantite_empruntee - e.quantite_utilisee - e.quantite_retournee) as reste_caisses
              FROM {$this->table} e
@@ -80,7 +103,7 @@ class EmpruntEmballage extends Model
              JOIN produits p ON e.produit_id = p.id
              JOIN emplacements emp ON e.emplacement_id = emp.id
              WHERE {$where}
-             ORDER BY e.date_emprunt DESC, e.id DESC",
+             ORDER BY e.date_emprunt DESC, e.id DESC, p.position_affichage ASC, p.nom ASC",
             $params
         );
     }
@@ -98,6 +121,7 @@ class EmpruntEmballage extends Model
 
             $data['direction'] = in_array(($data['direction'] ?? 'recu'), ['recu', 'donne'], true) ? $data['direction'] : 'recu';
             $data['type_stock'] = in_array(($data['type_stock'] ?? 'vide'), ['vide', 'plein'], true) ? $data['type_stock'] : 'vide';
+            $data['operation_ref'] = $data['operation_ref'] ?? ('EMP-' . date('YmdHis') . '-' . random_int(100, 999));
             $data['quantite_empruntee'] = (int) $data['quantite_empruntee'];
             $data['quantite_utilisee'] = 0;
             $data['quantite_retournee'] = 0;

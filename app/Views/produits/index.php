@@ -33,6 +33,7 @@ ob_start();
                 <thead>
                     <tr>
                         <th>Code</th>
+                        <th>Ordre</th>
                         <th>Nom</th>
                         <th>Catégorie</th>
                         <th>Prix achat Déposer</th>
@@ -48,7 +49,7 @@ ob_start();
                 <tbody>
                     <?php if (empty($produits)): ?>
                     <tr>
-                        <td colspan="9" class="text-center py-8 text-gray-500 dark:text-gray-400">
+                        <td colspan="12" class="text-center py-8 text-gray-500 dark:text-gray-400">
                             Aucun produit trouvé
                         </td>
                     </tr>
@@ -57,6 +58,9 @@ ob_start();
                         <tr>
                             <td>
                                 <span class="font-mono text-sm"><?= htmlspecialchars($produit['code']) ?></span>
+                            </td>
+                            <td>
+                                <span class="font-semibold text-primary-600"><?= (int) ($produit['position_affichage'] ?? 999) ?></span>
                             </td>
                             <td>
                                 <div class="font-medium"><?= htmlspecialchars($produit['nom']) ?></div>
@@ -224,6 +228,10 @@ ob_start();
                                 <label class="label">Seuil d'alerte (en caisses)</label>
                                 <input type="number" x-model.number="form.seuil_alerte" class="input" min="0">
                             </div>
+                            <div>
+                                <label class="label">Position d'affichage</label>
+                                <input type="number" x-model.number="form.position_affichage" class="input" min="1" step="1">
+                            </div>
                         </div>
                         
                         <div class="flex justify-end space-x-3 mt-6">
@@ -258,7 +266,8 @@ document.addEventListener('alpine:init', () => {
             prix_achat_deposer: '',
             prix_achat_enlever: '',
             prix_vente_caisses: '',
-            seuil_alerte: 10
+            seuil_alerte: 10,
+            position_affichage: 999
         },
         errors: {},
         loading: false,
@@ -276,7 +285,8 @@ document.addEventListener('alpine:init', () => {
                 prix_achat_deposer: '',
                 prix_achat_enlever: '',
                 prix_vente_caisses: '',
-                seuil_alerte: 10
+                seuil_alerte: 10,
+                position_affichage: 999
             };
             this.errors = {};
             this.genererCode();

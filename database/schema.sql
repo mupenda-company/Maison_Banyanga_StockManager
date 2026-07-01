@@ -453,6 +453,7 @@ CREATE TABLE `produits` (
   `prix_vente_unitaire` decimal(12,2) NOT NULL DEFAULT '0.00',
   `prix_vente_caisses` decimal(12,2) NOT NULL DEFAULT '0.00',
   `seuil_alerte` int NOT NULL DEFAULT '10',
+  `position_affichage` int NOT NULL DEFAULT '999',
   `actif` tinyint(1) NOT NULL DEFAULT '1',
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

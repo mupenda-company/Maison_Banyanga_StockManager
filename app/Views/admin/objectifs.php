@@ -125,6 +125,7 @@ ob_start();
                                 <th class="text-right">Objectif (cs)</th>
                                 <th class="text-right"><?= htmlspecialchars($typeObjectif === 'approvisionnement' ? 'Approvisionne' : 'Vendu') ?> (cs)</th>
                                 <th class="text-right">Reste (cs)</th>
+                                <th class="text-right">Surplus (cs)</th>
                                 <th>Progression</th>
                             </tr>
                         </thead>
@@ -134,6 +135,7 @@ ob_start();
                                 $objectif = (int) ($row['objectif_caisses'] ?? 0);
                                 $realise = (int) ($row['realise_caisses'] ?? ($typeObjectif === 'approvisionnement' ? ($row['approvisionnement_caisses'] ?? 0) : ($row['ventes_caisses'] ?? 0)));
                                 $reste = (int) ($row['reste_caisses'] ?? max(0, $objectif - $realise));
+                                $surplus = $objectif > 0 ? max(0, $realise - $objectif) : 0;
                                 $progress = $objectif > 0 ? min(100, ($realise / $objectif) * 100) : 0;
                             ?>
                             <tr>
@@ -158,6 +160,9 @@ ob_start();
                                 </td>
                                 <td class="text-right font-semibold text-orange-600">
                                     <?= number_format($reste, 0, ',', ' ') ?>
+                                </td>
+                                <td class="text-right font-semibold <?= $surplus > 0 ? 'text-green-700' : 'text-gray-400' ?>">
+                                    <?= number_format($surplus, 0, ',', ' ') ?>
                                 </td>
                                 <td>
                                     <div class="flex items-center gap-3">

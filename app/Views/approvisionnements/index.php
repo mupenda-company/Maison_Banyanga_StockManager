@@ -282,6 +282,7 @@ document.addEventListener('alpine:init', () => {
                         <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">N° Bon</th>
                         <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Date</th>
                         <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Fournisseur</th>
+                        <th class="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Qte achetee</th>
                         <th class="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Total HT</th>
                         <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Statut</th>
                         <th class="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Actions</th>
@@ -290,7 +291,7 @@ document.addEventListener('alpine:init', () => {
                 <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                     <?php if (empty($approvisionnements['data'])): ?>
                     <tr>
-                        <td colspan="6" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colspan="7" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                             Aucun approvisionnement trouvé
                         </td>
                     </tr>
@@ -305,6 +306,9 @@ document.addEventListener('alpine:init', () => {
                             </td>
                             <td class="px-4 py-3 text-left text-sm text-gray-600 dark:text-gray-400">
                                 <?= htmlspecialchars($appro['fournisseur'] ?? '-') ?>
+                            </td>
+                            <td class="px-4 py-3 text-right font-bold text-primary-600">
+                                <?= number_format((int) ($appro['total_quantite_caisses'] ?? 0), 0, ',', ' ') ?> cs
                             </td>
                             <td class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">
                                 <?= format_money_converted($appro['total_ht'] ?? 0) ?>

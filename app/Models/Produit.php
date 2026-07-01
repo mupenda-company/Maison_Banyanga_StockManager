@@ -10,8 +10,37 @@ class Produit extends Model
         'code', 'nom', 'description', 'categorie', 'unite_base',
         'bouteilles_par_caisses', 'caisses_par_palette',
         'prix_achat_unitaire', 'prix_achat_deposer', 'prix_achat_enlever',
-        'prix_vente_unitaire', 'prix_vente_caisses', 'seuil_alerte', 'actif'
+        'prix_vente_unitaire', 'prix_vente_caisses', 'seuil_alerte', 'position_affichage', 'actif'
     ];
+
+    private static bool $positionColumnChecked = false;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->ensurePositionAffichageColumn();
+    }
+
+    private function ensurePositionAffichageColumn(): void
+    {
+        if (self::$positionColumnChecked) {
+            return;
+        }
+
+        $exists = (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*)
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'produits'
+               AND COLUMN_NAME = 'position_affichage'"
+        );
+
+        if (!$exists) {
+            $this->db->query("ALTER TABLE produits ADD position_affichage INT NOT NULL DEFAULT 999 AFTER seuil_alerte");
+        }
+
+        self::$positionColumnChecked = true;
+    }
     
     /**
      * Récupérer tous les produits actifs
@@ -19,7 +48,7 @@ class Produit extends Model
     public function getActive()
     {
         return $this->db->fetchAll(
-            "SELECT * FROM {$this->table} WHERE actif = 1 ORDER BY nom"
+            "SELECT * FROM {$this->table} WHERE actif = 1 ORDER BY position_affichage ASC, nom ASC"
         );
     }
     
@@ -49,7 +78,7 @@ class Produit extends Model
                 ON p.id = s.produit_id 
             AND s.emplacement_id = :emplacement_id
             WHERE p.actif = 1
-            ORDER BY p.nom",
+            ORDER BY p.position_affichage ASC, p.nom ASC",
             [
                 'emplacement_id' => $emplacementPrincipalId
             ]
@@ -80,7 +109,7 @@ class Produit extends Model
     public function getByCategory($categorie)
     {
         return $this->db->fetchAll(
-            "SELECT * FROM {$this->table} WHERE categorie = :categorie AND actif = 1 ORDER BY nom",
+            "SELECT * FROM {$this->table} WHERE categorie = :categorie AND actif = 1 ORDER BY position_affichage ASC, nom ASC",
             ['categorie' => $categorie]
         );
     }

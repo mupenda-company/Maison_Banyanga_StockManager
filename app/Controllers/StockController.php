@@ -743,6 +743,58 @@ class StockController extends Controller
         $data = $this->getJsonInput();
         $mode = ($data['mode'] ?? 'stock') === 'emballage' ? 'emballage' : 'stock';
         $this->requirePermission($mode === 'emballage' ? 'emballages.gerer' : 'stock.gerer');
+
+        if (!empty($data['lignes']) && is_array($data['lignes'])) {
+            $totalLignes = 0;
+            try {
+                $this->db->beginTransaction();
+
+                if (($data['emplacement_source'] ?? null) === ($data['emplacement_dest'] ?? null)) {
+                    throw new Exception('Les emplacements source et destination doivent etre differents');
+                }
+
+                foreach ($data['lignes'] as $ligne) {
+                    $produitId = (int) ($ligne['produit_id'] ?? 0);
+                    $quantite = (int) ($ligne['quantite'] ?? 0);
+                    if ($produitId <= 0 || $quantite <= 0) {
+                        continue;
+                    }
+
+                    $stockSource = $this->stockModel->getStock($produitId, $data['emplacement_source']);
+                    if (!$stockSource || (int) ($stockSource['quantite_pleine'] ?? 0) < $quantite) {
+                        $produit = $this->produitModel->find($produitId);
+                        throw new Exception('Stock insuffisant pour ' . ($produit['nom'] ?? ('produit #' . $produitId)));
+                    }
+
+                    $this->stockModel->updateOrCreate($produitId, $data['emplacement_source'], ['quantite_pleine' => -$quantite]);
+                    $this->stockModel->updateOrCreate($produitId, $data['emplacement_dest'], ['quantite_pleine' => $quantite]);
+
+                    $this->mouvementModel->create([
+                        'produit_id' => $produitId,
+                        'emplacement_id' => $data['emplacement_source'],
+                        'type_mouvement' => 'transfert',
+                        'quantite' => -$quantite,
+                        'reference_type' => 'transfert',
+                        'reference_id' => $data['emplacement_dest'],
+                        'motif' => $data['motif'] ?? 'Transfert multi-produits',
+                        'created_by' => $_SESSION['user_id']
+                    ]);
+                    $totalLignes++;
+                }
+
+                if ($totalLignes <= 0) {
+                    throw new Exception('Ajoutez au moins un produit a transferer');
+                }
+
+                $this->db->commit();
+                return $this->success(['total_lignes' => $totalLignes], 'Transfert multi-produits effectue avec succes');
+            } catch (Exception $e) {
+                if ($this->db->inTransaction()) {
+                    $this->db->rollBack();
+                }
+                return $this->error($e->getMessage(), 400);
+            }
+        }
         
         
         $errors = $this->validate($data, [

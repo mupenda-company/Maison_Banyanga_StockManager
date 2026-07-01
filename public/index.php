@@ -91,7 +91,10 @@ $routes = [
     'GET::/emballages/inventaire-initial' => ['StockController', 'inventaireInitial'],
     'GET::/emballages/suivi' => ['EmballageController', 'suivi'],
     'GET::/emballages/emprunts' => ['EmpruntEmballageController', 'index'],
+    'GET::/api/emballages/emprunts/(\d+)' => ['EmpruntEmballageController', 'show'],
     'POST::/api/emballages/emprunts' => ['EmpruntEmballageController', 'store'],
+    'PUT::/api/emballages/emprunts/(\d+)' => ['EmpruntEmballageController', 'update'],
+    'DELETE::/api/emballages/emprunts/(\d+)' => ['EmpruntEmballageController', 'delete'],
     'POST::/api/emballages/emprunts/(\d+)/rembourser' => ['EmpruntEmballageController', 'rembourser'],
     
     // Ventes

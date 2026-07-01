@@ -157,14 +157,15 @@
         $justificationCloture = trim((string) ($mission['justification_cloture'] ?? ''));
         $hasDiscrepancy = abs($montantEcart) > 0.01 || $caissesVidesEcart !== 0;
 
-        $renderMissionFooter = function () use ($totalCaissesChargees, $totalCaissesVendues, $totalCaissesRestantes, $totalValeurEstimee) {
+        $renderMissionFooter = function () use ($totalCaissesChargees, $totalCaissesVendues, $totalCaissesRestantes, $totalCaissesRetournees, $totalValeurEstimee) {
             ?>
             <div class="mt-3 border-t border-gray-200 pt-2 text-sm">
-                <div class="grid grid-cols-5 gap-2 items-center rounded-md bg-gray-50 px-3 py-2">
+                <div class="grid grid-cols-6 gap-2 items-center rounded-md bg-gray-50 px-3 py-2">
                     <div class="text-xs font-semibold uppercase tracking-wide text-gray-600">Total</div>
                     <div class="text-right font-bold whitespace-nowrap"><?= number_format($totalCaissesChargees, 0, ',', ' ') ?> cs</div>
                     <div class="text-right font-bold whitespace-nowrap"><?= number_format($totalCaissesVendues, 0, ',', ' ') ?> cs</div>
                     <div class="text-right font-bold whitespace-nowrap"><?= number_format($totalCaissesRestantes, 0, ',', ' ') ?> cs</div>
+                    <div class="text-right font-bold whitespace-nowrap"><?= number_format($totalCaissesRetournees, 0, ',', ' ') ?> cs</div>
                     <div class="text-right font-bold whitespace-nowrap text-primary-600"><?= format_money_converted($totalValeurEstimee) ?></div>
                 </div>
             </div>
@@ -345,14 +346,10 @@
         <?php endif; ?>
 
         <?php else: ?>
-        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-4 text-sm">
+        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mb-4 text-sm">
             <div class="p-3 bg-gray-50 rounded-lg border flex items-center justify-between gap-3">
                 <p class="text-gray-500 uppercase text-xs">Montant attendu</p>
                 <p class="text-base font-bold whitespace-nowrap"><?= format_money_converted($montantAttendu) ?></p>
-            </div>
-            <div class="p-3 bg-gray-50 rounded-lg border flex items-center justify-between gap-3">
-                <p class="text-gray-500 uppercase text-xs">Montant encaissé</p>
-                <p class="text-base font-bold text-green-700 whitespace-nowrap"><?= format_money_converted($montantEncaisse) ?></p>
             </div>
             <div class="p-3 bg-gray-50 rounded-lg border flex items-center justify-between gap-3">
                 <p class="text-gray-500 uppercase text-xs">Écart caisse</p>
@@ -415,6 +412,7 @@
                         <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Chargé</th>
                         <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase"><?= $isRistourne ? 'Livré' : 'Vendu' ?></th>
                         <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Restant</th>
+                        <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Emballages</th>
                         <th class="text-right py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Valeur estimée</th>
                     </tr>
                 </thead>
@@ -426,6 +424,7 @@
                         $prixCaisse = (float) ($chargement['prix_caisse'] ?? 0);
                         $caissesChargees = (int) ($chargement['caisses_total'] ?? max(0, (int) ($chargement['quantite_caisses'] ?? 0)));
                         $caissesVendues = $btlParCaisse > 0 ? round($quantiteVendue / $btlParCaisse, 0) : 0;
+                        $caissesRetournees = $btlParCaisse > 0 ? round((int) ($chargement['quantite_retournee'] ?? 0) / $btlParCaisse, 0) : 0;
                         $caissesRestantes = max(0, $caissesChargees - $caissesVendues);
                         $valeurEstimee = $caissesRestantes * $prixCaisse;
                     ?>
@@ -434,6 +433,7 @@
                         <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesChargees, 0, ',', ' ') ?> cs</td>
                         <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesVendues, 0, ',', ' ') ?> cs</td>
                         <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesRestantes, 0, ',', ' ') ?> cs</td>
+                        <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesRetournees, 0, ',', ' ') ?> cs</td>
                         <td class="py-1.5 text-right whitespace-nowrap"><?= format_money_converted($valeurEstimee) ?></td>
                     </tr>
                     <?php endforeach; ?>

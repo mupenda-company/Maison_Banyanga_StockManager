@@ -74,7 +74,28 @@ class Approvisionnement extends Model
             $params['statut'] = $filters['statut'];
         }
         
-        return $this->paginate($page, $perPage, $where, $params, "date_approvisionnement DESC");
+        $offset = ($page - 1) * $perPage;
+        $total = (int) $this->db->fetchColumn("SELECT COUNT(*) FROM {$this->table} WHERE {$where}", $params);
+
+        $data = $this->db->fetchAll(
+            "SELECT a.*,
+                    COALESCE(SUM(ad.quantite_caisses), 0) as total_quantite_caisses
+             FROM {$this->table} a
+             LEFT JOIN approvisionnement_details ad ON ad.approvisionnement_id = a.id
+             WHERE {$where}
+             GROUP BY a.id
+             ORDER BY a.date_approvisionnement DESC, a.id DESC
+             LIMIT {$perPage} OFFSET {$offset}",
+            $params
+        );
+
+        return [
+            'data' => $data,
+            'total' => $total,
+            'per_page' => $perPage,
+            'current_page' => $page,
+            'last_page' => ceil($total / $perPage),
+        ];
     }
     
     /**

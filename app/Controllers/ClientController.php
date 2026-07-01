@@ -24,20 +24,151 @@ class ClientController extends Controller
         
         $search = trim((string) ($_GET['q'] ?? ''));
         $zoneId = $_GET['zone_id'] ?? null;
+        $activite = in_array(($_GET['activite'] ?? 'tous'), ['tous', 'actif', 'non_actif'], true)
+            ? $_GET['activite']
+            : 'tous';
 
-        if ($search !== '' || !empty($zoneId)) {
-            $clients = $this->clientModel->searchWithZone($search, $zoneId);
-        } else {
-            $clients = $this->clientModel->getAllWithZone();
+        $filters = [
+            'q' => $search,
+            'zone_id' => $zoneId,
+            'activite' => $activite,
+        ];
+
+        $clients = $this->getClientsWithActivity($filters);
+        $stats = $this->getClientActivityStats($search, $zoneId);
+
+        if (isset($_GET['export']) && $_GET['export'] === 'excel') {
+            $this->exportClientsExcel($clients, $filters, $stats);
+            return;
         }
+
+        if (isset($_GET['print']) && (string) $_GET['print'] === '1') {
+            $this->view('clients/print', [
+                'clients' => $clients,
+                'filters' => $filters,
+                'stats' => $stats,
+            ]);
+            return;
+        }
+
         $zones = $this->zoneModel->all();
         
         $this->view('clients/index', [
             'clients' => $clients,
             'zones' => $zones,
             'search' => $search,
-            'selectedZoneId' => $zoneId
+            'selectedZoneId' => $zoneId,
+            'activite' => $activite,
+            'stats' => $stats,
         ]);
+    }
+
+    private function getClientsWithActivity(array $filters = []): array
+    {
+        $where = ['c.actif = 1'];
+        $having = '';
+        $params = [];
+
+        if (!empty($filters['zone_id'])) {
+            $where[] = 'c.zone_id = :zone_id';
+            $params['zone_id'] = $filters['zone_id'];
+        }
+
+        $term = trim((string) ($filters['q'] ?? ''));
+        if ($term !== '') {
+            $where[] = "(c.nom LIKE :term_nom OR c.telephone LIKE :term_telephone OR c.numero_client LIKE :term_numero OR c.email LIKE :term_email OR c.adresse LIKE :term_adresse OR z.nom LIKE :term_zone)";
+            $like = '%' . $term . '%';
+            $params['term_nom'] = $like;
+            $params['term_telephone'] = $like;
+            $params['term_numero'] = $like;
+            $params['term_email'] = $like;
+            $params['term_adresse'] = $like;
+            $params['term_zone'] = $like;
+        }
+
+        if (($filters['activite'] ?? 'tous') === 'actif') {
+            $having = ' HAVING nb_ventes_validees > 0';
+        } elseif (($filters['activite'] ?? 'tous') === 'non_actif') {
+            $having = ' HAVING nb_ventes_validees = 0';
+        }
+
+        return $this->db->fetchAll(
+            "SELECT c.*, z.nom as zone_nom,
+                    COUNT(v.id) as nb_ventes_validees,
+                    COALESCE(SUM(v.total_ttc), 0) as ca_total
+             FROM clients c
+             LEFT JOIN zones z ON c.zone_id = z.id
+             LEFT JOIN ventes v ON v.client_id = c.id AND v.statut = 'validee'
+             WHERE " . implode(' AND ', $where) . "
+             GROUP BY c.id
+             {$having}
+             ORDER BY c.nom",
+            $params
+        );
+    }
+
+    private function getClientActivityStats(string $search = '', $zoneId = null): array
+    {
+        $clients = $this->getClientsWithActivity([
+            'q' => $search,
+            'zone_id' => $zoneId,
+            'activite' => 'tous',
+        ]);
+
+        $total = count($clients);
+        $actifs = 0;
+        foreach ($clients as $client) {
+            if ((int) ($client['nb_ventes_validees'] ?? 0) > 0) {
+                $actifs++;
+            }
+        }
+
+        return [
+            'total' => $total,
+            'actifs' => $actifs,
+            'non_actifs' => max(0, $total - $actifs),
+        ];
+    }
+
+    private function exportClientsExcel(array $clients, array $filters, array $stats): void
+    {
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet()->setTitle('Clients');
+
+        $sheet->fromArray(['Clients', 'Categorie', $filters['activite'] ?? 'tous'], null, 'A1');
+        $sheet->fromArray(['Total', $stats['total'], 'Actifs', $stats['actifs'], 'Non actifs', $stats['non_actifs']], null, 'A2');
+        $headers = ['Nom', 'Numero client', 'Telephone', 'Zone', 'Adresse', 'Nb ventes', 'CA total'];
+        $sheet->fromArray($headers, null, 'A4');
+
+        $row = 5;
+        foreach ($clients as $client) {
+            $sheet->fromArray([
+                $client['nom'] ?? '',
+                $client['numero_client'] ?? '',
+                $client['telephone'] ?? '',
+                $client['zone_nom'] ?? '',
+                $client['adresse'] ?? '',
+                (int) ($client['nb_ventes_validees'] ?? 0),
+                (float) ($client['ca_total'] ?? 0),
+            ], null, 'A' . $row++);
+        }
+
+        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($headers));
+        $sheet->getStyle('A4:' . $lastCol . '4')->getFont()->setBold(true);
+        foreach (range(1, count($headers)) as $col) {
+            $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
+        }
+
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="clients_' . date('Y-m-d_H-i') . '.xlsx"');
+        header('Cache-Control: max-age=0, must-revalidate');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->setPreCalculateFormulas(false);
+        $writer->save('php://output');
+        exit;
     }
 
     public function apiList()

@@ -25,6 +25,8 @@ class EmpruntEmballageController extends Controller
             'source_type' => $_GET['source_type'] ?? null,
             'direction' => $_GET['direction'] ?? null,
             'type_stock' => $_GET['type_stock'] ?? null,
+            'date_debut' => $_GET['date_debut'] ?? null,
+            'date_fin' => $_GET['date_fin'] ?? null,
         ];
 
         $this->view('emballages/emprunts', [
@@ -40,6 +42,37 @@ class EmpruntEmballageController extends Controller
     {
         $this->requirePermission('emballages.gerer');
         $data = $this->getJsonInput();
+
+        $lignes = $data['lignes'] ?? null;
+        if (is_array($lignes)) {
+            $operationRef = 'EMP-' . date('YmdHis') . '-' . random_int(100, 999);
+            $createdIds = [];
+
+            foreach ($lignes as $ligne) {
+                if (empty($ligne['produit_id']) || (int) ($ligne['quantite_empruntee'] ?? 0) <= 0) {
+                    continue;
+                }
+
+                $payload = array_merge($data, [
+                    'operation_ref' => $operationRef,
+                    'produit_id' => (int) $ligne['produit_id'],
+                    'quantite_empruntee' => (int) $ligne['quantite_empruntee'],
+                ]);
+                unset($payload['lignes']);
+
+                $result = $this->empruntModel->createWithStock($payload + ['created_by' => $_SESSION['user_id']]);
+                if (empty($result['success'])) {
+                    return $this->error($result['message'] ?? 'Operation impossible', 400);
+                }
+                $createdIds[] = (int) $result['id'];
+            }
+
+            if (empty($createdIds)) {
+                return $this->error('Ajoutez au moins un produit avec une quantite', 422);
+            }
+
+            return $this->success(['ids' => $createdIds, 'operation_ref' => $operationRef], 'Operation multi-produits enregistree avec succes');
+        }
 
         $errors = $this->validate($data, [
             'source_type' => 'required',
@@ -95,6 +128,113 @@ class EmpruntEmballageController extends Controller
         }
 
         return $this->error($result['message'], 400);
+    }
+
+    public function show($id)
+    {
+        $this->requirePermission('emballages.voir');
+
+        $emprunt = $this->empruntModel->find($id);
+        if (!$emprunt) {
+            return $this->error('Operation non trouvee', 404);
+        }
+
+        $operationRef = $emprunt['operation_ref'] ?: ('EMP-' . $emprunt['id']);
+        $rows = $this->db->fetchAll(
+            "SELECT e.*, c.nom as client_nom, p.nom as produit_nom, p.code as produit_code,
+                    emp.nom as emplacement_nom,
+                    (e.quantite_empruntee - e.quantite_utilisee - e.quantite_retournee) as reste_caisses
+             FROM emprunts_emballages e
+             LEFT JOIN clients c ON e.client_id = c.id
+             JOIN produits p ON p.id = e.produit_id
+             JOIN emplacements emp ON emp.id = e.emplacement_id
+             WHERE COALESCE(e.operation_ref, CONCAT('EMP-', e.id)) = :ref
+             ORDER BY p.nom",
+            ['ref' => $operationRef]
+        );
+
+        return $this->success(['operation_ref' => $operationRef, 'lignes' => $rows]);
+    }
+
+    public function update($id)
+    {
+        $this->requirePermission('emballages.gerer');
+        $data = $this->getJsonInput();
+        $emprunt = $this->empruntModel->find($id);
+        if (!$emprunt) {
+            return $this->error('Operation non trouvee', 404);
+        }
+        if ((int) ($emprunt['quantite_utilisee'] ?? 0) > 0 || (int) ($emprunt['quantite_retournee'] ?? 0) > 0) {
+            return $this->error('Cette operation a deja ete utilisee ou remboursee. Modification bloquee.', 422);
+        }
+
+        $updateData = array_intersect_key($data, array_flip(['date_emprunt', 'notes', 'source_contact']));
+        $quantite = isset($data['quantite_empruntee']) ? max(1, (int) $data['quantite_empruntee']) : (int) $emprunt['quantite_empruntee'];
+        $diff = $quantite - (int) $emprunt['quantite_empruntee'];
+
+        try {
+            $this->db->beginTransaction();
+
+            if ($diff !== 0) {
+                $produit = $this->produitModel->find($emprunt['produit_id']);
+                $btl = max(1, (int) ($produit['bouteilles_par_caisses'] ?? 24));
+                $isPlein = ($emprunt['type_stock'] ?? 'vide') === 'plein';
+                $quantiteKey = $isPlein ? 'quantite_pleine' : 'quantite_vide';
+                $caissesKey = $isPlein ? 'caisses_pleine' : 'caisses_vide';
+                $factor = ($emprunt['direction'] ?? 'recu') === 'donne' ? -1 : 1;
+                (new Stock())->updateOrCreate($emprunt['produit_id'], $emprunt['emplacement_id'], [
+                    $quantiteKey => $factor * $diff * $btl,
+                    $caissesKey => $factor * $diff,
+                ]);
+                $updateData['quantite_empruntee'] = $quantite;
+            }
+
+            if (!empty($updateData)) {
+                $this->empruntModel->update($id, $updateData);
+            }
+
+            $this->db->commit();
+            return $this->success(null, 'Operation modifiee avec succes');
+        } catch (Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            return $this->error($e->getMessage(), 400);
+        }
+    }
+
+    public function delete($id)
+    {
+        $this->requirePermission('emballages.gerer');
+        $emprunt = $this->empruntModel->find($id);
+        if (!$emprunt) {
+            return $this->error('Operation non trouvee', 404);
+        }
+        if ((int) ($emprunt['quantite_utilisee'] ?? 0) > 0 || (int) ($emprunt['quantite_retournee'] ?? 0) > 0) {
+            return $this->error('Cette operation a deja ete utilisee ou remboursee. Suppression bloquee.', 422);
+        }
+
+        try {
+            $this->db->beginTransaction();
+            $produit = $this->produitModel->find($emprunt['produit_id']);
+            $btl = max(1, (int) ($produit['bouteilles_par_caisses'] ?? 24));
+            $isPlein = ($emprunt['type_stock'] ?? 'vide') === 'plein';
+            $quantiteKey = $isPlein ? 'quantite_pleine' : 'quantite_vide';
+            $caissesKey = $isPlein ? 'caisses_pleine' : 'caisses_vide';
+            $factor = ($emprunt['direction'] ?? 'recu') === 'donne' ? 1 : -1;
+            (new Stock())->updateOrCreate($emprunt['produit_id'], $emprunt['emplacement_id'], [
+                $quantiteKey => $factor * (int) $emprunt['quantite_empruntee'] * $btl,
+                $caissesKey => $factor * (int) $emprunt['quantite_empruntee'],
+            ]);
+            $this->empruntModel->delete($id);
+            $this->db->commit();
+            return $this->success(null, 'Operation supprimee avec succes');
+        } catch (Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            return $this->error($e->getMessage(), 400);
+        }
     }
 
     public function rembourser($id)

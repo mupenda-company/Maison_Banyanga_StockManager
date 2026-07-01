@@ -1,9 +1,28 @@
 <?php 
 $pageTitle = 'Clients';
+$stats = $stats ?? ['total' => 0, 'actifs' => 0, 'non_actifs' => 0];
+$activite = $activite ?? 'tous';
 ob_start();
 ?>
 
 <div x-data="clientList" class="space-y-6">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="stat-card">
+            <p class="stat-label">Total clients</p>
+            <p class="stat-value text-primary-600"><?= number_format((int) $stats['total'], 0, ',', ' ') ?></p>
+        </div>
+        <div class="stat-card">
+            <p class="stat-label">Clients actifs</p>
+            <p class="stat-value text-green-600"><?= number_format((int) $stats['actifs'], 0, ',', ' ') ?></p>
+            <p class="text-xs text-gray-400 mt-1">Au moins une vente validee</p>
+        </div>
+        <div class="stat-card">
+            <p class="stat-label">Clients non actifs</p>
+            <p class="stat-value text-orange-600"><?= number_format((int) $stats['non_actifs'], 0, ',', ' ') ?></p>
+            <p class="text-xs text-gray-400 mt-1">Aucune vente validee</p>
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Liste des clients</h2>
@@ -23,7 +42,14 @@ ob_start();
                     </option>
                     <?php endforeach; ?>
                 </select>
+                <select name="activite" class="input w-auto">
+                    <option value="tous" <?= $activite === 'tous' ? 'selected' : '' ?>>Tous</option>
+                    <option value="actif" <?= $activite === 'actif' ? 'selected' : '' ?>>Actifs</option>
+                    <option value="non_actif" <?= $activite === 'non_actif' ? 'selected' : '' ?>>Non actifs</option>
+                </select>
                 <button type="submit" class="btn btn-secondary">Rechercher</button>
+                <a href="?<?= http_build_query(array_merge($_GET, ['print' => 1])) ?>" target="_blank" class="btn btn-secondary">Imprimer</a>
+                <a href="?<?= http_build_query(array_merge($_GET, ['export' => 'excel'])) ?>" class="btn btn-secondary">Exporter</a>
                 <?php if (can('clients.creer')): ?>
                 <button type="button" @click="openModal()" class="btn btn-primary">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

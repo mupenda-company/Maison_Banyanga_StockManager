@@ -48,6 +48,14 @@ ob_start();
                     <option value="solde" <?= ($filters['statut'] ?? '') === 'solde' ? 'selected' : '' ?>>Solde</option>
                 </select>
             </div>
+            <div>
+                <label class="label">Du</label>
+                <input type="date" name="date_debut" value="<?= htmlspecialchars($filters['date_debut'] ?? '') ?>" class="input">
+            </div>
+            <div>
+                <label class="label">Au</label>
+                <input type="date" name="date_fin" value="<?= htmlspecialchars($filters['date_fin'] ?? '') ?>" class="input">
+            </div>
             <button type="submit" class="btn btn-primary">Filtrer</button>
             <a href="<?= url('emballages/emprunts') ?>" class="btn btn-secondary">Reset</a>
         </form>
@@ -103,6 +111,11 @@ ob_start();
                             <td><?= htmlspecialchars($emprunt['emplacement_nom']) ?></td>
                             <td><?= $emprunt['statut'] === 'solde' ? '<span class="badge-success">Solde</span>' : '<span class="badge-warning">En cours</span>' ?></td>
                             <td class="text-right">
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="openDetailsModal(<?= (int) $emprunt['id'] ?>)">Detail</button>
+                                <?php if (can('emballages.gerer') && $emprunt['statut'] === 'en_cours' && (int) $emprunt['quantite_utilisee'] === 0 && (int) $emprunt['quantite_retournee'] === 0): ?>
+                                <button type="button" class="btn btn-sm btn-primary" onclick='openEditEmpruntModal(<?= htmlspecialchars(json_encode($emprunt), ENT_QUOTES, 'UTF-8') ?>)'>Modifier</button>
+                                <button type="button" class="btn btn-sm btn-danger" onclick="deleteEmprunt(<?= (int) $emprunt['id'] ?>)">Supprimer</button>
+                                <?php endif; ?>
                                 <?php if (can('emballages.gerer') && $emprunt['statut'] === 'en_cours' && (int) $emprunt['reste_caisses'] > 0): ?>
                                 <button type="button" class="btn btn-sm btn-secondary" onclick="openRemboursementModal(<?= (int) $emprunt['id'] ?>, <?= (int) $emprunt['reste_caisses'] ?>, '<?= htmlspecialchars($emprunt['source_type'] === 'client' ? ($emprunt['client_nom'] ?? 'Client') : ($emprunt['source_nom'] ?? 'Externe'), ENT_QUOTES, 'UTF-8') ?>')">
                                     <?= ($emprunt['direction'] ?? 'recu') === 'donne' ? 'Retour recu' : 'Rembourser' ?>
@@ -210,6 +223,24 @@ ob_start();
                         <label class="label">Quantite (cs)</label>
                         <input type="number" x-model.number="form.quantite_empruntee" class="input" min="1" step="1" required>
                     </div>
+                    <div class="md:col-span-2">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="label mb-0">Autres produits dans la meme operation</label>
+                            <button type="button" class="btn btn-secondary btn-sm" @click="form.lignes.push({ produit_id: '', quantite_empruntee: 1 })">Ajouter produit</button>
+                        </div>
+                        <template x-for="(ligne, index) in form.lignes" :key="index">
+                            <div class="grid grid-cols-12 gap-2 mb-2">
+                                <select x-model="ligne.produit_id" class="input col-span-7">
+                                    <option value="">Selectionner</option>
+                                    <template x-for="produit in produits" :key="produit.id">
+                                        <option :value="String(produit.id)" x-text="produit.nom"></option>
+                                    </template>
+                                </select>
+                                <input type="number" x-model.number="ligne.quantite_empruntee" class="input col-span-4" min="1" step="1">
+                                <button type="button" class="btn btn-danger btn-sm col-span-1" @click="form.lignes.splice(index, 1)">X</button>
+                            </div>
+                        </template>
+                    </div>
                     <div>
                         <label class="label">Emplacement</label>
                         <select x-model="form.emplacement_id" class="input" required>
@@ -270,6 +301,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('empruntModal', () => ({
         isOpen: false,
         loading: false,
+        produits: <?= json_encode($produits, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
         form: {},
         reset() {
             this.form = {
@@ -281,6 +313,7 @@ document.addEventListener('alpine:init', () => {
                 source_contact: '',
                 produit_id: '',
                 quantite_empruntee: 1,
+                lignes: [],
                 emplacement_id: '<?= $emplacements[0]['id'] ?? '' ?>',
                 date_emprunt: new Date().toISOString().split('T')[0],
                 notes: ''
@@ -291,7 +324,12 @@ document.addEventListener('alpine:init', () => {
         async save() {
             this.loading = true;
             try {
-                const result = await App.api('/api/emballages/emprunts', 'POST', this.form);
+                const lignes = [
+                    { produit_id: this.form.produit_id, quantite_empruntee: this.form.quantite_empruntee },
+                    ...(this.form.lignes || [])
+                ].filter(l => l.produit_id && parseInt(l.quantite_empruntee || 0, 10) > 0);
+                const payload = { ...this.form, lignes };
+                const result = await App.api('/api/emballages/emprunts', 'POST', payload);
                 App.notify(result.message || 'Operation enregistree', 'success');
                 setTimeout(() => location.reload(), 800);
             } catch (e) {
@@ -309,6 +347,57 @@ function openEmpruntModal() {
 
 function openRemboursementModal(id, reste, sourceLabel) {
     Alpine.$data(document.querySelector('[x-data="remboursementModal"]')).open(id, reste, sourceLabel);
+}
+
+async function openDetailsModal(id) {
+    try {
+        const result = await App.api('/api/emballages/emprunts/' + id, 'GET');
+        const lignes = (result.data?.lignes || result.lignes || []).map(l => `${l.produit_nom}: ${l.quantite_empruntee} cs, reste ${l.reste_caisses} cs`).join('\n');
+        await App.confirm({
+            title: 'Detail de l\'operation',
+            message: lignes || 'Aucun detail disponible',
+            confirmText: 'Fermer',
+            cancelText: 'Fermer',
+            type: 'info'
+        });
+    } catch (e) {
+        App.notify(e.message || 'Impossible de charger le detail', 'error');
+    }
+}
+
+async function openEditEmpruntModal(emprunt) {
+    const value = prompt('Nouvelle quantite (cs)', emprunt.quantite_empruntee || 1);
+    if (value === null) return;
+    try {
+        await App.api('/api/emballages/emprunts/' + emprunt.id, 'PUT', {
+            quantite_empruntee: parseInt(value, 10) || emprunt.quantite_empruntee,
+            date_emprunt: emprunt.date_emprunt,
+            notes: emprunt.notes || '',
+            source_contact: emprunt.source_contact || ''
+        });
+        App.notify('Operation modifiee', 'success');
+        setTimeout(() => location.reload(), 500);
+    } catch (e) {
+        App.notify(e.message || 'Modification impossible', 'error');
+    }
+}
+
+async function deleteEmprunt(id) {
+    const ok = await App.confirm({
+        title: 'Supprimer l\'operation ?',
+        message: 'Le stock sera restaure si l\'operation n\'a pas encore ete utilisee.',
+        confirmText: 'Supprimer',
+        cancelText: 'Annuler',
+        type: 'danger'
+    });
+    if (!ok) return;
+    try {
+        await App.api('/api/emballages/emprunts/' + id, 'DELETE');
+        App.notify('Operation supprimee', 'success');
+        setTimeout(() => location.reload(), 500);
+    } catch (e) {
+        App.notify(e.message || 'Suppression impossible', 'error');
+    }
 }
 </script>
 <?php endif; ?>
