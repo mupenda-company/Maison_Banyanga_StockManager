@@ -66,15 +66,18 @@ ob_start();
                     </table>
                 </div>
 
-                <!-- Motif d'ecart -->
+                <!-- Resume des differences avant reprise de base -->
                 <div x-show="hasAnyEcart()" x-transition class="mt-4 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-800">
                     <div class="flex items-center gap-2 mb-2">
                         <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-                        <span class="font-semibold text-yellow-700 dark:text-yellow-300">Ecarts detectes</span>
+                        <span class="font-semibold text-yellow-700 dark:text-yellow-300">Differences detectees</span>
                         <span class="text-sm text-yellow-600 dark:text-yellow-400" x-text="ecartCount() + ' produit(s) avec ecart(s)'"></span>
                     </div>
-                    <label class="label">Motif de l'ecart *</label>
-                    <textarea x-model="motif_ecart" class="input" rows="2" placeholder="Expliquez la raison des differences constatees (ex: casse, vol, erreur de comptage...)" :required="hasAnyEcart()"></textarea>
+                    <p class="text-sm text-yellow-700 dark:text-yellow-300">Ces differences seront enregistrees comme nouvelle base. Aucun ecart ne sera cree.</p>
+                    <label class="label">Motif de l'inventaire *</label>
+                    <textarea x-model="motif_ecart" class="input" rows="2"
+                    placeholder="Expliquez la raison du changement d'inventaire"
+                    required></textarea>
                 </div>
 
                 <div class="mt-6 flex items-center justify-between gap-4 flex-wrap">
@@ -152,11 +155,6 @@ document.addEventListener('alpine:init', () => {
         },
 
         async save() {
-            if (this.hasAnyEcart() && !this.motif_ecart.trim()) {
-                App.notify('Veuillez indiquer le motif des ecarts constates', 'error');
-                return;
-            }
-
             this.loading = true;
             try {
                 const lignes = this.lignes
@@ -172,6 +170,10 @@ document.addEventListener('alpine:init', () => {
 
                 if (lignes.length === 0) {
                     throw new Error('Saisissez au moins une quantite');
+                }
+
+                if (this.hasAnyEcart() && !this.motif_ecart.trim()) {
+                    throw new Error('Veuillez indiquer le motif de l\'inventaire');
                 }
 
                 const result = await App.api('/api/stocks/inventaire-initial', 'POST', {

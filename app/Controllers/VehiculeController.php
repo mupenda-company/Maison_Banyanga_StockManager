@@ -564,8 +564,6 @@ class VehiculeController extends Controller
             return $this->error('Aucune ligne d\'inventaire a enregistrer', 422);
         }
 
-        $motif = trim((string) ($data['motif_ecart'] ?? $data['motif'] ?? ''));
-
         try {
             $this->db->beginTransaction();
 
@@ -576,35 +574,10 @@ class VehiculeController extends Controller
 
             $emplacementId = (int) $vehicule['emplacement_id'];
             $stockModel = new Stock();
+            $mouvementModel = new MouvementStock();
+            $motifInventaire = trim((string) ($data['motif_ecart'] ?? $data['motif'] ?? ''));
             $totalLignes = 0;
             $totalEcarts = 0;
-            $hasEcart = false;
-
-            foreach ($lignes as $ligne) {
-                $produitId = (int) ($ligne['produit_id'] ?? 0);
-                if ($produitId <= 0) {
-                    continue;
-                }
-
-                $nouveauPlein = max(0, (int) round((float) ($ligne['caisses_pleine'] ?? 0)));
-                $nouveauVide = max(0, (int) round((float) ($ligne['caisses_vide'] ?? 0)));
-
-                $stock = $this->db->fetch(
-                    "SELECT * FROM stocks WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id FOR UPDATE",
-                    ['produit_id' => $produitId, 'emplacement_id' => $emplacementId]
-                );
-                $ancienPlein = (int) round((float) ($stock['caisses_pleine'] ?? 0));
-                $ancienVide = (int) round((float) ($stock['caisses_vide'] ?? 0));
-
-                if ($ancienPlein !== $nouveauPlein || $ancienVide !== $nouveauVide) {
-                    $hasEcart = true;
-                    break;
-                }
-            }
-
-            if ($hasEcart && $motif === '') {
-                throw new Exception('Le motif de l\'ecart est obligatoire pour corriger l\'inventaire du vehicule');
-            }
 
             foreach ($lignes as $ligne) {
                 $produitId = (int) ($ligne['produit_id'] ?? 0);
@@ -624,23 +597,47 @@ class VehiculeController extends Controller
 
                 $nouveauPlein = max(0, (int) round((float) ($ligne['caisses_pleine'] ?? 0)));
                 $nouveauVide = max(0, (int) round((float) ($ligne['caisses_vide'] ?? 0)));
-
-                $stock = $this->db->fetch(
-                    "SELECT * FROM stocks WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id FOR UPDATE",
-                    ['produit_id' => $produitId, 'emplacement_id' => $emplacementId]
-                );
-                $ancienPlein = (int) round((float) ($stock['caisses_pleine'] ?? 0));
-                $ancienVide = (int) round((float) ($stock['caisses_vide'] ?? 0));
-                $ecartPlein = $nouveauPlein - $ancienPlein;
-                $ecartVide = $nouveauVide - $ancienVide;
+                $stock = $stockModel->getStock($produitId, $emplacementId);
 
                 if (!$stock && $nouveauPlein <= 0 && $nouveauVide <= 0) {
                     continue;
                 }
 
-                $totalLignes++;
-                if ($ecartPlein === 0 && $ecartVide === 0) {
-                    continue;
+                $ancienPlein = max(0, (int) round((float) ($stock['caisses_pleine'] ?? 0)));
+                $ancienVide = max(0, (int) round((float) ($stock['caisses_vide'] ?? 0)));
+                $ecartPlein = $nouveauPlein - $ancienPlein;
+                $ecartVide = $nouveauVide - $ancienVide;
+
+                if (($ecartPlein !== 0 || $ecartVide !== 0) && $motifInventaire === '') {
+                    throw new Exception('Le motif de l\'inventaire est obligatoire lorsqu\'une quantite change.');
+                }
+
+                if ($ecartPlein !== 0) {
+                    $mouvementModel->create([
+                        'produit_id' => $produitId,
+                        'emplacement_id' => $emplacementId,
+                        'type_mouvement' => 'inventaire',
+                        'quantite' => $ecartPlein * $btlParCaisse,
+                        'reference_type' => 'inventaire_vehicule',
+                        'reference_id' => (int) $id,
+                        'motif' => 'Inventaire vehicule plein: ' . $motifInventaire,
+                        'created_by' => $_SESSION['user_id'] ?? null,
+                    ]);
+                    $totalEcarts++;
+                }
+
+                if ($ecartVide !== 0) {
+                    $mouvementModel->create([
+                        'produit_id' => $produitId,
+                        'emplacement_id' => $emplacementId,
+                        'type_mouvement' => 'inventaire',
+                        'quantite' => $ecartVide * $btlParCaisse,
+                        'reference_type' => 'inventaire_vehicule',
+                        'reference_id' => (int) $id,
+                        'motif' => 'Inventaire vehicule vide: ' . $motifInventaire,
+                        'created_by' => $_SESSION['user_id'] ?? null,
+                    ]);
+                    $totalEcarts++;
                 }
 
                 $stockModel->setInitialStock($produitId, $emplacementId, [
@@ -649,73 +646,7 @@ class VehiculeController extends Controller
                     'quantite_pleine' => $nouveauPlein * $btlParCaisse,
                     'quantite_vide' => $nouveauVide * $btlParCaisse,
                 ]);
-
-                $this->db->query(
-                    "UPDATE stocks SET
-                        caisses_pleine_physique = :caisses_pleine_physique,
-                        quantite_pleine_physique = :quantite_pleine_physique,
-                        caisses_vide_physique = :caisses_vide_physique,
-                        quantite_vide_physique = :quantite_vide_physique,
-                        last_physical_count_at = NOW(),
-                        last_physical_mission_id = NULL
-                     WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id",
-                    [
-                        'produit_id' => $produitId,
-                        'emplacement_id' => $emplacementId,
-                        'caisses_pleine_physique' => $nouveauPlein,
-                        'quantite_pleine_physique' => $nouveauPlein * $btlParCaisse,
-                        'caisses_vide_physique' => $nouveauVide,
-                        'quantite_vide_physique' => $nouveauVide * $btlParCaisse,
-                    ]
-                );
-
-                $this->db->insert('ajustements_stock', [
-                    'produit_id' => $produitId,
-                    'emplacement_id' => $emplacementId,
-                    'type_ajustement' => 'inventaire_vehicule',
-                    'ancien_systeme_plein' => $ancienPlein,
-                    'physique_plein' => $nouveauPlein,
-                    'nouveau_systeme_plein' => $nouveauPlein,
-                    'ecart_plein' => $ecartPlein,
-                    'ancien_systeme_vide' => $ancienVide,
-                    'physique_vide' => $nouveauVide,
-                    'nouveau_systeme_vide' => $nouveauVide,
-                    'ecart_vide' => $ecartVide,
-                    'motif' => $motif,
-                    'created_by' => $_SESSION['user_id'] ?? null,
-                ]);
-
-                if ($ecartPlein !== 0) {
-                    $this->db->insert('mouvements_stock', [
-                        'produit_id' => $produitId,
-                        'emplacement_id' => $emplacementId,
-                        'type_mouvement' => 'inventaire',
-                        'quantite' => $ecartPlein * $btlParCaisse,
-                        'quantite_avant' => $ancienPlein * $btlParCaisse,
-                        'quantite_apres' => $nouveauPlein * $btlParCaisse,
-                        'reference_type' => 'inventaire_vehicule',
-                        'reference_id' => (int) $id,
-                        'motif' => 'Correction inventaire vehicule pleines: ' . ($ecartPlein > 0 ? '+' : '') . $ecartPlein . ' cs - ' . $motif,
-                        'created_by' => $_SESSION['user_id'] ?? null,
-                    ]);
-                    $totalEcarts++;
-                }
-
-                if ($ecartVide !== 0) {
-                    $this->db->insert('mouvements_stock', [
-                        'produit_id' => $produitId,
-                        'emplacement_id' => $emplacementId,
-                        'type_mouvement' => 'inventaire',
-                        'quantite' => $ecartVide * $btlParCaisse,
-                        'quantite_avant' => $ancienVide * $btlParCaisse,
-                        'quantite_apres' => $nouveauVide * $btlParCaisse,
-                        'reference_type' => 'inventaire_vehicule',
-                        'reference_id' => (int) $id,
-                        'motif' => 'Correction inventaire vehicule vides: ' . ($ecartVide > 0 ? '+' : '') . $ecartVide . ' cs - ' . $motif,
-                        'created_by' => $_SESSION['user_id'] ?? null,
-                    ]);
-                    $totalEcarts++;
-                }
+                $totalLignes++;
             }
 
             $this->db->commit();
@@ -723,7 +654,7 @@ class VehiculeController extends Controller
             return $this->success([
                 'total_lignes' => $totalLignes,
                 'total_ecarts' => $totalEcarts,
-            ], $totalEcarts > 0 ? 'Inventaire du vehicule corrige avec succes (' . $totalEcarts . ' ecart(s))' : 'Aucun ecart detecte pour ce vehicule');
+            ], 'Inventaire du vehicule enregistre comme nouvelle base');
         } catch (Exception $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();

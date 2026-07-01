@@ -6,7 +6,7 @@
 class Stock extends Model
 {
     protected $table = 'stocks';
-    protected $fillable = ['produit_id', 'emplacement_id', 'quantite_pleine', 'quantite_vide', 'caisses_pleine', 'caisses_vide'];
+    protected $fillable = ['produit_id', 'emplacement_id', 'quantite_pleine', 'quantite_vide', 'caisses_pleine', 'caisses_vide', 'quantite_pleine_physique', 'quantite_vide_physique', 'caisses_pleine_physique', 'caisses_vide_physique', 'last_physical_count_at', 'last_physical_mission_id'];
 
     private function refreshStockAlerts()
     {
@@ -292,6 +292,10 @@ class Stock extends Model
                     quantite_vide = quantite_vide + :quantite_vide,
                     caisses_pleine = caisses_pleine + :caisses_pleine,
                     caisses_vide = caisses_vide + :caisses_vide,
+                    quantite_pleine_physique = CASE WHEN quantite_pleine_physique IS NULL THEN NULL ELSE quantite_pleine_physique + :quantite_pleine_physique_delta END,
+                    quantite_vide_physique = CASE WHEN quantite_vide_physique IS NULL THEN NULL ELSE quantite_vide_physique + :quantite_vide_physique_delta END,
+                    caisses_pleine_physique = CASE WHEN caisses_pleine_physique IS NULL THEN NULL ELSE caisses_pleine_physique + :caisses_pleine_physique_delta END,
+                    caisses_vide_physique = CASE WHEN caisses_vide_physique IS NULL THEN NULL ELSE caisses_vide_physique + :caisses_vide_physique_delta END,
                     updated_at = NOW()
                  WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id",
                 [
@@ -300,7 +304,11 @@ class Stock extends Model
                     'quantite_pleine' => $delta['quantite_pleine'],
                     'quantite_vide' => $delta['quantite_vide'],
                     'caisses_pleine' => $delta['caisses_pleine'],
-                    'caisses_vide' => $delta['caisses_vide']
+                    'caisses_vide' => $delta['caisses_vide'],
+                    'quantite_pleine_physique_delta' => $delta['quantite_pleine'],
+                    'quantite_vide_physique_delta' => $delta['quantite_vide'],
+                    'caisses_pleine_physique_delta' => $delta['caisses_pleine'],
+                    'caisses_vide_physique_delta' => $delta['caisses_vide']
                 ]
             );
             $this->refreshStockAlerts();
@@ -312,7 +320,11 @@ class Stock extends Model
                 'quantite_pleine' => $delta['quantite_pleine'],
                 'quantite_vide' => $delta['quantite_vide'],
                 'caisses_pleine' => $delta['caisses_pleine'],
-                'caisses_vide' => $delta['caisses_vide']
+                'caisses_vide' => $delta['caisses_vide'],
+                'quantite_pleine_physique' => $delta['quantite_pleine'],
+                'quantite_vide_physique' => $delta['quantite_vide'],
+                'caisses_pleine_physique' => $delta['caisses_pleine'],
+                'caisses_vide_physique' => $delta['caisses_vide']
             ]);
             $this->refreshStockAlerts();
             return $id;
@@ -347,6 +359,11 @@ class Stock extends Model
                     quantite_vide = :quantite_vide,
                     caisses_pleine = :caisses_pleine,
                     caisses_vide = :caisses_vide,
+                    quantite_pleine_physique = :quantite_pleine_physique,
+                    quantite_vide_physique = :quantite_vide_physique,
+                    caisses_pleine_physique = :caisses_pleine_physique,
+                    caisses_vide_physique = :caisses_vide_physique,
+                    last_physical_count_at = NOW(),
                     updated_at = NOW()
                  WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id",
                 [
@@ -355,7 +372,11 @@ class Stock extends Model
                     'quantite_pleine' => $quantitePleine,
                     'quantite_vide' => $quantiteVide,
                     'caisses_pleine' => $caissesPleines,
-                    'caisses_vide' => $caissesVides
+                    'caisses_vide' => $caissesVides,
+                    'quantite_pleine_physique' => $quantitePleine,
+                    'quantite_vide_physique' => $quantiteVide,
+                    'caisses_pleine_physique' => $caissesPleines,
+                    'caisses_vide_physique' => $caissesVides
                 ]
             );
 
@@ -369,7 +390,12 @@ class Stock extends Model
             'quantite_pleine' => $quantitePleine,
             'quantite_vide' => $quantiteVide,
             'caisses_pleine' => $caissesPleines,
-            'caisses_vide' => $caissesVides
+            'caisses_vide' => $caissesVides,
+            'quantite_pleine_physique' => $quantitePleine,
+            'quantite_vide_physique' => $quantiteVide,
+            'caisses_pleine_physique' => $caissesPleines,
+            'caisses_vide_physique' => $caissesVides,
+            'last_physical_count_at' => date('Y-m-d H:i:s')
         ]);
         $this->refreshStockAlerts();
         return $id;
@@ -440,6 +466,12 @@ class Stock extends Model
     public function deduireVide($produitId, $emplacementId, $quantiteCaisses)
     {
         $existing = $this->getStock($produitId, $emplacementId);
+        $produit = (new Produit())->find($produitId);
+        $btlParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+        if ($btlParCaisse <= 0) {
+            $btlParCaisse = 24;
+        }
+        $quantiteBouteilles = (int) $quantiteCaisses * $btlParCaisse;
         
         if (!$existing) {
             return ['success' => false, 'message' => 'Stock non trouvé'];
@@ -456,13 +488,17 @@ class Stock extends Model
         
         $this->db->query(
             "UPDATE {$this->table} SET 
+                quantite_vide = GREATEST(0, quantite_vide - :quantite_bouteilles),
                 caisses_vide = caisses_vide - :quantite,
+                quantite_vide_physique = CASE WHEN quantite_vide_physique IS NULL THEN NULL ELSE GREATEST(0, quantite_vide_physique - :quantite_bouteilles) END,
+                caisses_vide_physique = CASE WHEN caisses_vide_physique IS NULL THEN NULL ELSE caisses_vide_physique - :quantite END,
                 updated_at = NOW()
              WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id",
             [
                 'produit_id' => $produitId,
                 'emplacement_id' => $emplacementId,
-                'quantite' => $quantiteCaisses
+                'quantite' => $quantiteCaisses,
+                'quantite_bouteilles' => $quantiteBouteilles
             ]
         );
         

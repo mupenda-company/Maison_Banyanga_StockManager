@@ -106,7 +106,11 @@ ob_start();
         $systeme = (int) round($emp['total_caisses_pleine'] ?? 0);
         $physique = (int) round($emp['total_caisses_pleine_physique'] ?? $emp['total_caisses_pleine'] ?? 0);
         $ecart = (int) round($emp['ecart_caisses_pleine'] ?? ($physique - $systeme));
-        $hasEcart = $ecart !== 0 || (int) round($emp['ecart_caisses_vide'] ?? 0) !== 0;
+        $ecartVide = (int) round($emp['ecart_caisses_vide'] ?? 0);
+        $hasEcart = $ecart !== 0 || $ecartVide !== 0;
+        $ecartLabel = $ecart !== 0
+            ? '?cart pleins: ' . ($ecart > 0 ? '+' : '') . number_format($ecart, 0, '.', ' ') . ' cs'
+            : '?cart emballages: ' . ($ecartVide > 0 ? '+' : '') . number_format($ecartVide, 0, '.', ' ') . ' cs';
     ?>
     <div class="stat-card">
         <div class="flex items-center justify-between">

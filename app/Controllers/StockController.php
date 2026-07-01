@@ -163,24 +163,72 @@ class StockController extends Controller
         }
 
         $emplacementId = (int) $data['emplacement_id'];
+        $motifInventaire = trim((string) ($data['motif_ecart'] ?? $data['motif'] ?? ''));
         try {
             $this->db->beginTransaction();
 
             $totalProduits = 0;
+            $totalEcarts = 0;
             foreach ($data['lignes'] as $ligne) {
                 $produitId = (int) ($ligne['produit_id'] ?? 0);
-                $ancienPleine = (int) ($ligne['ancien_caisses_pleine'] ?? 0);
-                $ancienVide = (int) ($ligne['ancien_caisses_vide'] ?? 0);
-                $caissesPleines = $mode === 'emballage' ? $ancienPleine : (int) ($ligne['caisses_pleine'] ?? 0);
-                $caissesVides = $mode === 'emballage' ? (int) ($ligne['caisses_vide'] ?? 0) : $ancienVide;
-                $stockExistant = $this->stockModel->getStock($produitId, $emplacementId);
 
                 if ($produitId <= 0) {
                     continue;
                 }
 
+                $produit = $this->produitModel->find($produitId);
+                if (!$produit) {
+                    throw new Exception('Produit #' . $produitId . ' non trouve');
+                }
+
+                $btlParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+                if ($btlParCaisse <= 0) {
+                    $btlParCaisse = 24;
+                }
+
+                $stockExistant = $this->stockModel->getStock($produitId, $emplacementId);
+                $ancienPleine = max(0, (int) round((float) ($stockExistant['caisses_pleine'] ?? 0)));
+                $ancienVide = max(0, (int) round((float) ($stockExistant['caisses_vide'] ?? 0)));
+                $caissesPleines = $mode === 'emballage' ? $ancienPleine : max(0, (int) ($ligne['caisses_pleine'] ?? 0));
+                $caissesVides = $mode === 'emballage' ? max(0, (int) ($ligne['caisses_vide'] ?? 0)) : $ancienVide;
+
                 if (!$stockExistant && $caissesPleines <= 0 && $caissesVides <= 0) {
                     continue;
+                }
+
+                $ecartPlein = $caissesPleines - $ancienPleine;
+                $ecartVide = $caissesVides - $ancienVide;
+
+                if (($ecartPlein !== 0 || $ecartVide !== 0) && $motifInventaire === '') {
+                    throw new Exception('Le motif de l\'inventaire est obligatoire lorsqu\'une quantite change.');
+                }
+
+                if ($ecartPlein !== 0) {
+                    $this->mouvementModel->create([
+                        'produit_id' => $produitId,
+                        'emplacement_id' => $emplacementId,
+                        'type_mouvement' => 'inventaire',
+                        'quantite' => $ecartPlein * $btlParCaisse,
+                        'reference_type' => 'inventaire_initial',
+                        'reference_id' => null,
+                        'motif' => 'Inventaire initial plein: ' . $motifInventaire,
+                        'created_by' => $_SESSION['user_id'] ?? null,
+                    ]);
+                    $totalEcarts++;
+                }
+
+                if ($ecartVide !== 0) {
+                    $this->mouvementModel->create([
+                        'produit_id' => $produitId,
+                        'emplacement_id' => $emplacementId,
+                        'type_mouvement' => 'inventaire',
+                        'quantite' => $ecartVide * $btlParCaisse,
+                        'reference_type' => 'inventaire_initial',
+                        'reference_id' => null,
+                        'motif' => 'Inventaire initial vide: ' . $motifInventaire,
+                        'created_by' => $_SESSION['user_id'] ?? null,
+                    ]);
+                    $totalEcarts++;
                 }
 
                 $this->stockModel->setInitialStock($produitId, $emplacementId, [
@@ -195,7 +243,7 @@ class StockController extends Controller
 
             return $this->success([
                 'total_produits' => $totalProduits,
-                'total_ecarts' => 0
+                'total_ecarts' => $totalEcarts
             ], 'Inventaire initial enregistre avec succes');
         } catch (Exception $e) {
             $this->db->rollBack();
