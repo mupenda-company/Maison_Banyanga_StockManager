@@ -1470,6 +1470,10 @@ video {
   grid-column: 1 / -1;
 }
 
+.-m-4 {
+  margin: -1rem;
+}
+
 .mx-1 {
   margin-left: 0.25rem;
   margin-right: 0.25rem;
@@ -1597,6 +1601,18 @@ video {
   margin-top: 2rem;
 }
 
+.-mb-4 {
+  margin-bottom: -1rem;
+}
+
+.-mb-8 {
+  margin-bottom: -2rem;
+}
+
+.-mb-10 {
+  margin-bottom: -2.5rem;
+}
+
 .block {
   display: block;
 }
@@ -1687,6 +1703,14 @@ video {
 
 .h-screen {
   height: 100vh;
+}
+
+.h-32 {
+  height: 8rem;
+}
+
+.h-24 {
+  height: 6rem;
 }
 
 .max-h-64 {
