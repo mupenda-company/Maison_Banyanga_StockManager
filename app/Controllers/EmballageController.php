@@ -147,7 +147,7 @@ class EmballageController extends Controller
              LEFT JOIN stocks s ON s.produit_id = p.id
              LEFT JOIN emplacements emp ON emp.id = s.emplacement_id
              WHERE p.actif = 1
-             GROUP BY p.id, p.nom, p.code
+             GROUP BY p.id, p.nom, p.code, p.position_affichage
              ORDER BY p.position_affichage ASC, p.nom ASC"
         );
 
@@ -234,6 +234,7 @@ class EmballageController extends Controller
                     'produit_id' => (int) $produit['produit_id'],
                     'produit_nom' => $produit['produit_nom'],
                     'produit_code' => $produit['produit_code'],
+                    'position_affichage' => (int) ($produit['position_affichage'] ?? 999),
                     'bouteilles_par_caisses' => (int) ($produit['bouteilles_par_caisses'] ?? 24),
                     'caisses_vendues' => (int) ($produit['caisses_vendues'] ?? 0),
                     'caisses_vides_recues' => (int) ($produit['caisses_vides_recues'] ?? 0),
@@ -249,7 +250,8 @@ class EmballageController extends Controller
         }
 
         usort($lignes, function ($a, $b) {
-            return $b['dette_caisses'] <=> $a['dette_caisses'];
+            return [$a['position_affichage'], $a['produit_nom'], $a['client_nom']]
+                <=> [$b['position_affichage'], $b['produit_nom'], $b['client_nom']];
         });
 
         return [

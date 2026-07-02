@@ -7,10 +7,47 @@ class Ristourne extends Model
 {
     protected $table = 'ristournes';
     protected $fillable = [
-        'client_id', 'periode_debut', 'periode_fin', 
+        'client_id', 'periode_debut', 'periode_fin', 'total_caisses',
         'ca_total', 'palier_id', 'taux_applique', 
-        'montant_ristourne', 'statut', 'date_paiement', 'notes'
+        'montant_ristourne', 'produits_ristourne', 'statut', 'date_paiement', 'notes'
     ];
+
+    private static bool $columnsChecked = false;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->ensureRistourneColumns();
+    }
+
+    private function ensureRistourneColumns(): void
+    {
+        if (self::$columnsChecked) {
+            return;
+        }
+
+        $columns = [
+            'total_caisses' => "ALTER TABLE ristournes ADD total_caisses INT NOT NULL DEFAULT 0 AFTER periode_fin",
+            'produits_ristourne' => "ALTER TABLE ristournes ADD produits_ristourne TEXT NULL AFTER montant_ristourne",
+        ];
+
+        foreach ($columns as $column => $sql) {
+            $exists = (bool) $this->db->fetchColumn(
+                "SELECT COUNT(*)
+                 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'ristournes'
+                   AND COLUMN_NAME = :column",
+                ['column' => $column]
+            );
+
+            if (!$exists) {
+                $this->db->query($sql);
+            }
+        }
+
+        self::$columnsChecked = true;
+    }
 
     /**
      * Récupérer les paliers de ristourne
@@ -134,7 +171,7 @@ class Ristourne extends Model
              JOIN clients c ON r.client_id = c.id
              LEFT JOIN zones z ON c.zone_id = z.id
              WHERE {$where}
-             ORDER BY r.id DESC",
+             ORDER BY z.nom ASC, c.nom ASC, r.id DESC",
             $params
         );
     }

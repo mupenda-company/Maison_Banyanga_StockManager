@@ -469,8 +469,8 @@ class Mission extends Model
                  LEFT JOIN produits p ON vd.produit_id = p.id
                  WHERE v.mission_id = ?
                    AND v.statut = 'validee'
-                 GROUP BY vd.produit_id, p.nom, p.code, p.bouteilles_par_caisses
-                 ORDER BY p.nom ASC",
+                 GROUP BY vd.produit_id, p.nom, p.code, p.position_affichage, p.bouteilles_par_caisses
+                 ORDER BY p.position_affichage ASC, p.nom ASC",
                 [$id]
             );
 

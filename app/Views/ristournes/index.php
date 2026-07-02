@@ -132,29 +132,81 @@ ob_start();
     </div>
 </div>
 
+<?php if (can('admin.voir')): ?>
+<div id="ristourneProductModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-black/50" onclick="closeRistourneProductModal()"></div>
+        <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-5xl w-full p-6">
+            <h3 class="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Calculer les ristournes</h3>
+            <p class="text-sm text-gray-500 mb-4">Choisissez la periode a calculer et les produits qui peuvent etre livres comme ristourne.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+                <div>
+                    <label class="label">Mois a calculer</label>
+                    <select id="ristourneCalcMonth" class="input">
+                        <?php for($i=1; $i<=12; $i++): ?>
+                            <option value="<?= $i ?>" <?= (int)($filters['mois'] ?? date('n')) === $i ? 'selected' : '' ?>>
+                                <?= date('F', mktime(0, 0, 0, $i, 1)) ?>
+                            </option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+                <div>
+                    <label class="label">Annee</label>
+                    <input type="number" id="ristourneCalcYear" class="input" value="<?= htmlspecialchars($filters['annee'] ?? date('Y')) ?>">
+                </div>
+            </div>
+            <div class="max-h-[60vh] overflow-y-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+                <?php foreach (($produits ?? []) as $produit): ?>
+                <label class="flex items-start gap-3 p-3 cursor-pointer border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/40">
+                    <input type="checkbox" class="ristourne-product-checkbox rounded border-gray-300" value="<?= (int) $produit['id'] ?>">
+                    <span class="min-w-0">
+                        <span class="block font-medium text-sm text-gray-900 dark:text-white leading-tight"><?= htmlspecialchars($produit['nom']) ?></span>
+                        <span class="block text-xs text-gray-500"><?= htmlspecialchars($produit['code'] ?? '') ?> - <?= format_money_converted($produit['prix_vente_caisses'] ?? 0) ?> / cs</span>
+                    </span>
+                </label>
+                <?php endforeach; ?>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button type="button" class="btn btn-secondary" onclick="closeRistourneProductModal()">Annuler</button>
+                <button type="button" class="btn btn-primary" onclick="confirmCalculRistournes()">Calculer</button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
+let ristourneCalculButton = null;
+
 async function calculerRistournes(btn) {
-    const mois = document.querySelector('select[name="mois"]').value;
-    const annee = document.querySelector('input[name="annee"]').value;
-    
-    const ok = await App.confirm({
-        title: 'Calculer les ristournes ?',
-        message: `Lancer le calcul des ristournes pour ${mois}/${annee} ?`,
-        confirmText: 'Calculer',
-        cancelText: 'Annuler',
-        type: 'info'
-    });
-    if (!ok) return;
-    
+    ristourneCalculButton = btn;
+    document.getElementById('ristourneProductModal')?.classList.remove('hidden');
+}
+
+function closeRistourneProductModal() {
+    document.getElementById('ristourneProductModal')?.classList.add('hidden');
+}
+
+async function confirmCalculRistournes() {
+    const mois = document.getElementById('ristourneCalcMonth')?.value || document.querySelector('select[name="mois"]').value;
+    const annee = document.getElementById('ristourneCalcYear')?.value || document.querySelector('input[name="annee"]').value;
+    const productIds = Array.from(document.querySelectorAll('.ristourne-product-checkbox:checked')).map(el => el.value);
+    if (productIds.length === 0) {
+        App.notify('Selectionnez au moins un produit a livrer comme ristourne', 'error');
+        return;
+    }
+
+    const btn = ristourneCalculButton;
     const loadingText = btn.querySelector('.loading-text');
     const normalText = btn.querySelector('.normal-text');
     
     try {
+        closeRistourneProductModal();
         btn.disabled = true;
         loadingText.classList.remove('hidden');
         normalText.classList.add('hidden');
         
-        const result = await App.api(`/ristournes/calculer?mois=${mois}&annee=${annee}`, 'GET');
+        const result = await App.api(`/ristournes/calculer?mois=${mois}&annee=${annee}&produit_ids=${productIds.join(',')}`, 'GET');
         App.notify(result.message || 'Calcul terminé avec succès', 'success');
         
         // Forcer le rafraîchissement immédiat

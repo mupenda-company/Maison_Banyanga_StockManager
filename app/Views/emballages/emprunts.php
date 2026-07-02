@@ -111,24 +111,102 @@ ob_start();
                             <td><?= htmlspecialchars($emprunt['emplacement_nom']) ?></td>
                             <td><?= $emprunt['statut'] === 'solde' ? '<span class="badge-success">Solde</span>' : '<span class="badge-warning">En cours</span>' ?></td>
                             <td class="text-right">
-                                <button type="button" class="btn btn-sm btn-secondary" onclick="openDetailsModal(<?= (int) $emprunt['id'] ?>)">Detail</button>
+                                <div class="flex justify-end gap-2">
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="openDetailsModal(<?= (int) $emprunt['id'] ?>)" title="Voir le detail">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                </button>
                                 <?php if (can('emballages.gerer') && $emprunt['statut'] === 'en_cours' && (int) $emprunt['quantite_utilisee'] === 0 && (int) $emprunt['quantite_retournee'] === 0): ?>
-                                <button type="button" class="btn btn-sm btn-primary" onclick='openEditEmpruntModal(<?= htmlspecialchars(json_encode($emprunt), ENT_QUOTES, 'UTF-8') ?>)'>Modifier</button>
-                                <button type="button" class="btn btn-sm btn-danger" onclick="deleteEmprunt(<?= (int) $emprunt['id'] ?>)">Supprimer</button>
+                                <button type="button" class="btn btn-sm btn-primary" onclick='openEditEmpruntModal(<?= htmlspecialchars(json_encode($emprunt), ENT_QUOTES, 'UTF-8') ?>)' title="Modifier">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-danger" onclick="deleteEmprunt(<?= (int) $emprunt['id'] ?>)" title="Supprimer">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                </button>
                                 <?php endif; ?>
                                 <?php if (can('emballages.gerer') && $emprunt['statut'] === 'en_cours' && (int) $emprunt['reste_caisses'] > 0): ?>
-                                <button type="button" class="btn btn-sm btn-secondary" onclick="openRemboursementModal(<?= (int) $emprunt['id'] ?>, <?= (int) $emprunt['reste_caisses'] ?>, '<?= htmlspecialchars($emprunt['source_type'] === 'client' ? ($emprunt['client_nom'] ?? 'Client') : ($emprunt['source_nom'] ?? 'Externe'), ENT_QUOTES, 'UTF-8') ?>')">
-                                    <?= ($emprunt['direction'] ?? 'recu') === 'donne' ? 'Retour recu' : 'Rembourser' ?>
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="openRemboursementModal(<?= (int) $emprunt['id'] ?>, <?= (int) $emprunt['reste_caisses'] ?>, '<?= htmlspecialchars($emprunt['source_type'] === 'client' ? ($emprunt['client_nom'] ?? 'Client') : ($emprunt['source_nom'] ?? 'Externe'), ENT_QUOTES, 'UTF-8') ?>')" title="<?= ($emprunt['direction'] ?? 'recu') === 'donne' ? 'Retour recu' : 'Rembourser' ?>">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a4 4 0 010 8H7m-4-8l4-4m-4 4l4 4"/></svg>
                                 </button>
-                                <?php else: ?>
-                                <span class="text-gray-400">-</span>
                                 <?php endif; ?>
+                                </div>
                             </td>
                         </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+
+<div x-data="detailsEmpruntModal" x-show="isOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-black/50" @click="close()"></div>
+        <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full p-6">
+            <div class="flex items-start justify-between gap-4 mb-5">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Detail de l'operation</h3>
+                    <p class="text-sm text-gray-500" x-text="operation.operation_ref || ''"></p>
+                </div>
+                <button type="button" @click="close()" class="btn btn-secondary btn-sm">Fermer</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5 text-sm">
+                <div>
+                    <div class="text-gray-500">Sens</div>
+                    <div class="font-semibold" x-text="labelDirection(operation.direction)"></div>
+                </div>
+                <div>
+                    <div class="text-gray-500">Type</div>
+                    <div class="font-semibold" x-text="operation.type_stock === 'plein' ? 'Produits pleins' : 'Emballages vides'"></div>
+                </div>
+                <div>
+                    <div class="text-gray-500">Date</div>
+                    <div class="font-semibold" x-text="formatDate(operation.date_emprunt)"></div>
+                </div>
+                <div>
+                    <div class="text-gray-500">Partenaire</div>
+                    <div class="font-semibold" x-text="partnerName(operation)"></div>
+                </div>
+                <div>
+                    <div class="text-gray-500">Contact</div>
+                    <div class="font-semibold" x-text="operation.source_contact || '-'"></div>
+                </div>
+                <div>
+                    <div class="text-gray-500">Emplacement</div>
+                    <div class="font-semibold" x-text="operation.emplacement_nom || '-'"></div>
+                </div>
+            </div>
+            <div class="table-container border border-gray-200 dark:border-gray-700 rounded-md">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Produit</th>
+                            <th class="text-right">Emprunte / prete</th>
+                            <th class="text-right">Utilise</th>
+                            <th class="text-right">Retourne</th>
+                            <th class="text-right">Reste</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="ligne in lignes" :key="ligne.id">
+                            <tr>
+                                <td>
+                                    <div class="font-medium" x-text="ligne.produit_nom"></div>
+                                    <div class="text-[10px] text-gray-500" x-text="ligne.produit_code"></div>
+                                </td>
+                                <td class="text-right font-semibold" x-text="formatCs(ligne.quantite_empruntee)"></td>
+                                <td class="text-right" x-text="formatCs(ligne.quantite_utilisee)"></td>
+                                <td class="text-right" x-text="formatCs(ligne.quantite_retournee)"></td>
+                                <td class="text-right font-bold text-orange-600" x-text="formatCs(ligne.reste_caisses)"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-4" x-show="operation.notes">
+                <div class="text-sm text-gray-500 mb-1">Notes</div>
+                <div class="text-sm bg-gray-50 dark:bg-gray-900/40 rounded-md p-3" x-text="operation.notes"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -159,6 +237,95 @@ ob_start();
                 <div class="flex justify-end gap-3 mt-6">
                     <button type="button" @click="close()" class="btn btn-secondary">Annuler</button>
                     <button type="submit" class="btn btn-primary" :disabled="loading">Valider</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div x-data="editEmpruntModal" x-show="isOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-black/50" @click="close()"></div>
+        <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6">
+            <h3 class="text-lg font-semibold mb-6 text-gray-900 dark:text-white">Modifier l'operation</h3>
+            <form @submit.prevent="save">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="label">Sens</label>
+                        <select x-model="form.direction" class="input" required>
+                            <option value="recu">On emprunte a</option>
+                            <option value="donne">On prete a</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label">Type</label>
+                        <select x-model="form.type_stock" class="input" required>
+                            <option value="vide">Emballages vides</option>
+                            <option value="plein">Produits pleins</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label">Partenaire</label>
+                        <select x-model="form.source_type" class="input" required>
+                            <option value="client">Client</option>
+                            <option value="externe">Distributeur / personne externe</option>
+                        </select>
+                    </div>
+                    <div x-show="form.source_type === 'client'">
+                        <label class="label">Client</label>
+                        <select x-model="form.client_id" class="input" :required="form.source_type === 'client'">
+                            <option value="">Selectionner</option>
+                            <?php foreach ($clients as $client): ?>
+                            <option value="<?= (int) $client['id'] ?>"><?= htmlspecialchars($client['nom']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div x-show="form.source_type === 'externe'">
+                        <label class="label">Nom externe</label>
+                        <input type="text" x-model="form.source_nom" class="input" :required="form.source_type === 'externe'">
+                    </div>
+                    <div>
+                        <label class="label">Contact</label>
+                        <input type="text" x-model="form.source_contact" class="input">
+                    </div>
+                    <div class="md:col-span-2">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="label mb-0">Produits de l'operation</label>
+                            <button type="button" class="btn btn-secondary btn-sm" @click="form.lignes.push({ produit_id: '', quantite_empruntee: 1 })">Ajouter produit</button>
+                        </div>
+                        <template x-for="(ligne, index) in form.lignes" :key="index">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2 items-center">
+                                <select x-model="ligne.produit_id" class="input" required>
+                                    <option value="">Selectionner</option>
+                                    <template x-for="produit in produits" :key="produit.id">
+                                        <option :value="String(produit.id)" x-text="produit.nom"></option>
+                                    </template>
+                                </select>
+                                <input type="number" x-model.number="ligne.quantite_empruntee" class="input" min="1" step="1" required>
+                                <button type="button" class="btn btn-danger btn-sm h-10 w-11 px-0" @click="form.lignes.splice(index, 1)" :disabled="form.lignes.length === 1">X</button>
+                            </div>
+                        </template>
+                    </div>
+                    <div>
+                        <label class="label">Emplacement</label>
+                        <select x-model="form.emplacement_id" class="input" required>
+                            <?php foreach ($emplacements as $emplacement): ?>
+                            <option value="<?= (int) $emplacement['id'] ?>"><?= htmlspecialchars($emplacement['nom']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label">Date</label>
+                        <input type="date" x-model="form.date_emprunt" class="input" required>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="label">Notes</label>
+                        <textarea x-model="form.notes" class="input" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" @click="close()" class="btn btn-secondary">Annuler</button>
+                    <button type="submit" class="btn btn-primary" :disabled="loading">Enregistrer</button>
                 </div>
             </form>
         </div>
@@ -210,34 +377,21 @@ ob_start();
                         <label class="label">Contact</label>
                         <input type="text" x-model="form.source_contact" class="input">
                     </div>
-                    <div>
-                        <label class="label">Produit</label>
-                        <select x-model="form.produit_id" class="input" required>
-                            <option value="">Selectionner</option>
-                            <?php foreach ($produits as $produit): ?>
-                            <option value="<?= (int) $produit['id'] ?>"><?= htmlspecialchars($produit['nom']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="label">Quantite (cs)</label>
-                        <input type="number" x-model.number="form.quantite_empruntee" class="input" min="1" step="1" required>
-                    </div>
                     <div class="md:col-span-2">
                         <div class="flex items-center justify-between mb-2">
-                            <label class="label mb-0">Autres produits dans la meme operation</label>
+                            <label class="label mb-0">Produits de l'operation</label>
                             <button type="button" class="btn btn-secondary btn-sm" @click="form.lignes.push({ produit_id: '', quantite_empruntee: 1 })">Ajouter produit</button>
                         </div>
                         <template x-for="(ligne, index) in form.lignes" :key="index">
-                            <div class="grid grid-cols-12 gap-2 mb-2">
-                                <select x-model="ligne.produit_id" class="input col-span-7">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2 items-center">
+                                <select x-model="ligne.produit_id" class="input" required>
                                     <option value="">Selectionner</option>
                                     <template x-for="produit in produits" :key="produit.id">
                                         <option :value="String(produit.id)" x-text="produit.nom"></option>
                                     </template>
                                 </select>
-                                <input type="number" x-model.number="ligne.quantite_empruntee" class="input col-span-4" min="1" step="1">
-                                <button type="button" class="btn btn-danger btn-sm col-span-1" @click="form.lignes.splice(index, 1)">X</button>
+                                <input type="number" x-model.number="ligne.quantite_empruntee" class="input" min="1" step="1">
+                                <button type="button" class="btn btn-danger btn-sm h-10 w-11 px-0" @click="form.lignes.splice(index, 1)" :disabled="form.lignes.length === 1">X</button>
                             </div>
                         </template>
                     </div>
@@ -267,8 +421,53 @@ ob_start();
     </div>
 </div>
 
+<?php endif; ?>
+
 <script>
 document.addEventListener('alpine:init', () => {
+    Alpine.data('detailsEmpruntModal', () => ({
+        isOpen: false,
+        loading: false,
+        operation: {},
+        lignes: [],
+        async open(id) {
+            this.loading = true;
+            this.operation = {};
+            this.lignes = [];
+            this.isOpen = true;
+            try {
+                const result = await App.api('/api/emballages/emprunts/' + id, 'GET');
+                this.lignes = result.data?.lignes || result.lignes || [];
+                this.operation = {
+                    operation_ref: result.data?.operation_ref || result.operation_ref || '',
+                    ...(this.lignes[0] || {})
+                };
+            } catch (e) {
+                this.close();
+                App.notify(e.message || 'Impossible de charger le detail', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+        close() { this.isOpen = false; },
+        formatCs(value) {
+            return (parseInt(value || 0, 10)).toLocaleString('fr-FR') + ' cs';
+        },
+        formatDate(value) {
+            if (!value) return '-';
+            return new Date(value + 'T00:00:00').toLocaleDateString('fr-FR');
+        },
+        labelDirection(direction) {
+            return direction === 'donne' ? 'On prete a' : 'On emprunte a';
+        },
+        partnerName(operation) {
+            if ((operation.source_type || 'client') === 'client') {
+                return operation.client_nom || 'Client';
+            }
+            return operation.source_nom || 'Externe';
+        }
+    }));
+
     Alpine.data('remboursementModal', () => ({
         isOpen: false,
         loading: false,
@@ -298,6 +497,80 @@ document.addEventListener('alpine:init', () => {
         }
     }));
 
+    Alpine.data('editEmpruntModal', () => ({
+        isOpen: false,
+        loading: false,
+        empruntId: null,
+        produits: <?= json_encode($produits, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+        form: {
+            direction: 'recu',
+            type_stock: 'vide',
+            source_type: 'client',
+            client_id: '',
+            source_nom: '',
+            lignes: [{ produit_id: '', quantite_empruntee: 1 }],
+            emplacement_id: '',
+            date_emprunt: '',
+            source_contact: '',
+            notes: ''
+        },
+        async open(emprunt) {
+            this.empruntId = emprunt.id;
+            this.form = {
+                direction: emprunt.direction || 'recu',
+                type_stock: emprunt.type_stock || 'vide',
+                source_type: emprunt.source_type || 'client',
+                client_id: emprunt.client_id ? String(emprunt.client_id) : '',
+                source_nom: emprunt.source_nom || '',
+                lignes: [{ produit_id: emprunt.produit_id ? String(emprunt.produit_id) : '', quantite_empruntee: parseInt(emprunt.quantite_empruntee || 1, 10) }],
+                emplacement_id: emprunt.emplacement_id ? String(emprunt.emplacement_id) : '<?= $emplacements[0]['id'] ?? '' ?>',
+                date_emprunt: emprunt.date_emprunt || new Date().toISOString().split('T')[0],
+                source_contact: emprunt.source_contact || '',
+                notes: emprunt.notes || ''
+            };
+            this.isOpen = true;
+            this.loading = true;
+            try {
+                const result = await App.api('/api/emballages/emprunts/' + emprunt.id, 'GET');
+                const lignes = result.data?.lignes || result.lignes || [];
+                if (lignes.length > 0) {
+                    const first = lignes[0];
+                    this.form.direction = first.direction || this.form.direction;
+                    this.form.type_stock = first.type_stock || this.form.type_stock;
+                    this.form.source_type = first.source_type || this.form.source_type;
+                    this.form.client_id = first.client_id ? String(first.client_id) : '';
+                    this.form.source_nom = first.source_nom || '';
+                    this.form.source_contact = first.source_contact || '';
+                    this.form.emplacement_id = first.emplacement_id ? String(first.emplacement_id) : this.form.emplacement_id;
+                    this.form.date_emprunt = first.date_emprunt || this.form.date_emprunt;
+                    this.form.notes = first.notes || '';
+                    this.form.lignes = lignes.map(ligne => ({
+                        produit_id: ligne.produit_id ? String(ligne.produit_id) : '',
+                        quantite_empruntee: parseInt(ligne.quantite_empruntee || 1, 10)
+                    }));
+                }
+            } catch (e) {
+                App.notify(e.message || 'Impossible de charger les produits de l\'operation', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+        close() { this.isOpen = false; },
+        async save() {
+            this.loading = true;
+            try {
+                const lignes = (this.form.lignes || []).filter(l => l.produit_id && parseInt(l.quantite_empruntee || 0, 10) > 0);
+                const result = await App.api('/api/emballages/emprunts/' + this.empruntId, 'PUT', { ...this.form, lignes });
+                App.notify(result.message || 'Operation modifiee', 'success');
+                setTimeout(() => location.reload(), 600);
+            } catch (e) {
+                App.notify(e.message || 'Modification impossible', 'error');
+            } finally {
+                this.loading = false;
+            }
+        }
+    }));
+
     Alpine.data('empruntModal', () => ({
         isOpen: false,
         loading: false,
@@ -311,9 +584,7 @@ document.addEventListener('alpine:init', () => {
                 client_id: '',
                 source_nom: '',
                 source_contact: '',
-                produit_id: '',
-                quantite_empruntee: 1,
-                lignes: [],
+                lignes: [{ produit_id: '', quantite_empruntee: 1 }],
                 emplacement_id: '<?= $emplacements[0]['id'] ?? '' ?>',
                 date_emprunt: new Date().toISOString().split('T')[0],
                 notes: ''
@@ -324,10 +595,7 @@ document.addEventListener('alpine:init', () => {
         async save() {
             this.loading = true;
             try {
-                const lignes = [
-                    { produit_id: this.form.produit_id, quantite_empruntee: this.form.quantite_empruntee },
-                    ...(this.form.lignes || [])
-                ].filter(l => l.produit_id && parseInt(l.quantite_empruntee || 0, 10) > 0);
+                const lignes = (this.form.lignes || []).filter(l => l.produit_id && parseInt(l.quantite_empruntee || 0, 10) > 0);
                 const payload = { ...this.form, lignes };
                 const result = await App.api('/api/emballages/emprunts', 'POST', payload);
                 App.notify(result.message || 'Operation enregistree', 'success');
@@ -349,37 +617,12 @@ function openRemboursementModal(id, reste, sourceLabel) {
     Alpine.$data(document.querySelector('[x-data="remboursementModal"]')).open(id, reste, sourceLabel);
 }
 
-async function openDetailsModal(id) {
-    try {
-        const result = await App.api('/api/emballages/emprunts/' + id, 'GET');
-        const lignes = (result.data?.lignes || result.lignes || []).map(l => `${l.produit_nom}: ${l.quantite_empruntee} cs, reste ${l.reste_caisses} cs`).join('\n');
-        await App.confirm({
-            title: 'Detail de l\'operation',
-            message: lignes || 'Aucun detail disponible',
-            confirmText: 'Fermer',
-            cancelText: 'Fermer',
-            type: 'info'
-        });
-    } catch (e) {
-        App.notify(e.message || 'Impossible de charger le detail', 'error');
-    }
+function openDetailsModal(id) {
+    Alpine.$data(document.querySelector('[x-data="detailsEmpruntModal"]')).open(id);
 }
 
-async function openEditEmpruntModal(emprunt) {
-    const value = prompt('Nouvelle quantite (cs)', emprunt.quantite_empruntee || 1);
-    if (value === null) return;
-    try {
-        await App.api('/api/emballages/emprunts/' + emprunt.id, 'PUT', {
-            quantite_empruntee: parseInt(value, 10) || emprunt.quantite_empruntee,
-            date_emprunt: emprunt.date_emprunt,
-            notes: emprunt.notes || '',
-            source_contact: emprunt.source_contact || ''
-        });
-        App.notify('Operation modifiee', 'success');
-        setTimeout(() => location.reload(), 500);
-    } catch (e) {
-        App.notify(e.message || 'Modification impossible', 'error');
-    }
+function openEditEmpruntModal(emprunt) {
+    Alpine.$data(document.querySelector('[x-data="editEmpruntModal"]')).open(emprunt);
 }
 
 async function deleteEmprunt(id) {
@@ -400,7 +643,6 @@ async function deleteEmprunt(id) {
     }
 }
 </script>
-<?php endif; ?>
 
 <?php
 $content = ob_get_clean();

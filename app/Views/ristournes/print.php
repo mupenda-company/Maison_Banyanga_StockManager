@@ -5,6 +5,23 @@
     <meta charset="UTF-8">
     <title>Ristournes</title>
     <?= print_report_css(true) ?>
+    <style>
+        .ristourne-table th,
+        .ristourne-table td {
+            font-size: 8px;
+            padding: 3px 4px;
+            line-height: 1.2;
+        }
+        .ristourne-table .num {
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: normal;
+        }
+        .ristourne-table .obs-cell,
+        .ristourne-table .sign-cell {
+            min-height: 24px;
+        }
+    </style>
 </head>
 <body>
 <div class="page">
@@ -35,41 +52,73 @@
         <div class="summary-item"><div class="summary-label">Payees</div><div class="summary-value"><?= $payees ?></div></div>
     </div>
 
-    <div class="section-title">Detail des ristournes</div>
-    <table>
+    <?php
+    $report = $report ?? ['produits' => [], 'rows' => $ristournes];
+    $produitsRistourne = $report['produits'] ?? [];
+    $rowsRistourne = $report['rows'] ?? [];
+    ?>
+    <div class="section-title">Liste de livraison des ristournes</div>
+    <?php
+    $nbProduits = count($produitsRistourne);
+    $productWidth = $nbProduits > 0 ? max(4, min(7, floor(18 / $nbProduits))) : 0;
+    ?>
+    <table class="ristourne-table">
+        <colgroup>
+            <col style="width: 8%">
+            <col style="width: 13%">
+            <col style="width: 6%">
+            <col style="width: 10%">
+            <col style="width: 9%">
+            <?php foreach ($produitsRistourne as $_): ?>
+                <col style="width: <?= $productWidth ?>%">
+            <?php endforeach; ?>
+            <col style="width: 9%">
+            <col style="width: 9%">
+            <col style="width: 12%">
+            <col style="width: 12%">
+        </colgroup>
         <thead>
             <tr>
-                <th style="width: 28%">Client</th>
-                <th style="width: 14%">Periode</th>
-                <th style="width: 18%">Chiffre affaires</th>
-                <th style="width: 10%">Taux</th>
-                <th style="width: 18%">Ristourne</th>
-                <th style="width: 12%">Statut</th>
-                <th style="width: 12%">Paiement</th>
+                <th>Zone</th>
+                <th>Client</th>
+                <th class="num">Total colis</th>
+                <th class="num">Chiffre affaires</th>
+                <th class="num">Ristourne</th>
+                <?php foreach ($produitsRistourne as $produit): ?>
+                    <th class="num"><?= htmlspecialchars($produit['nom'] ?? '') ?></th>
+                <?php endforeach; ?>
+                <th class="num">Montant restant</th>
+                <th class="num">Montant a<br>completer</th>
+                <th>Observation</th>
+                <th>Signature client</th>
             </tr>
         </thead>
         <tbody>
-            <?php if (empty($ristournes)): ?>
-                <tr><td colspan="7" class="center">Aucune ristourne calculee pour cette periode</td></tr>
-            <?php else: foreach ($ristournes as $row): ?>
+            <?php if (empty($rowsRistourne)): ?>
+                <tr><td colspan="<?= 9 + count($produitsRistourne) ?>" class="center">Aucune ristourne calculee pour cette periode</td></tr>
+            <?php else: foreach ($rowsRistourne as $row): ?>
                 <tr>
+                    <td><?= htmlspecialchars($row['zone_nom'] ?? '') ?></td>
                     <td><strong><?= htmlspecialchars($row['client_nom'] ?? '') ?></strong></td>
-                    <td class="center"><?= !empty($row['periode_debut']) ? date('m/Y', strtotime($row['periode_debut'])) : '' ?></td>
+                    <td class="num"><?= number_format((int) ($row['total_caisses'] ?? 0), 0, ',', ' ') ?></td>
                     <td class="num"><?= format_money_converted($row['ca_total'] ?? 0) ?></td>
-                    <td class="num"><?= number_format((float) ($row['taux_applique'] ?? 0), 2, ',', ' ') ?>%</td>
                     <td class="num"><?= format_money_converted($row['montant_ristourne'] ?? 0) ?></td>
-                    <td class="center"><?= htmlspecialchars($row['statut'] ?? '') ?></td>
-                    <td class="center"><?= !empty($row['date_paiement']) ? date('d/m/Y', strtotime($row['date_paiement'])) : '-' ?></td>
+                    <?php foreach ($produitsRistourne as $produit): ?>
+                        <td class="num"><?= number_format((int) ($row['produits'][(int) $produit['id']]['caisses'] ?? 0), 0, ',', ' ') ?></td>
+                    <?php endforeach; ?>
+                    <td class="num"><?= format_money_converted($row['montant_restant'] ?? 0) ?></td>
+                    <td class="num"><?= format_money_converted($row['montant_a_completer'] ?? 0) ?></td>
+                    <td class="obs-cell"></td>
+                    <td class="sign-cell"></td>
                 </tr>
             <?php endforeach; endif; ?>
         </tbody>
         <tfoot>
             <tr class="total-row">
-                <td colspan="2">TOTAL</td>
+                <td colspan="3">TOTAL</td>
                 <td class="num"><?= format_money_converted($totalCa) ?></td>
-                <td></td>
                 <td class="num"><?= format_money_converted($totalRistourne) ?></td>
-                <td colspan="2"></td>
+                <td colspan="<?= 4 + count($produitsRistourne) ?>"></td>
             </tr>
         </tfoot>
     </table>

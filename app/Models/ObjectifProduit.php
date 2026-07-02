@@ -109,7 +109,7 @@ class ObjectifProduit extends Model
                AND o.type_objectif = :type_objectif
              {$realiseJoin}
              WHERE p.actif = 1
-             ORDER BY p.nom",
+             ORDER BY p.position_affichage ASC, p.nom ASC",
             [
                 'objectif_annee' => $annee,
                 'objectif_mois' => $mois,

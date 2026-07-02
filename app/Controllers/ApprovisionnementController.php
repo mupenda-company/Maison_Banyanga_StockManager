@@ -226,7 +226,7 @@ class ApprovisionnementController extends Controller
                 GROUP BY ad.produit_id
              ) ap ON ap.produit_id = p.id
              WHERE p.actif = 1
-             ORDER BY p.nom",
+             ORDER BY p.position_affichage ASC, p.nom ASC",
             $params
         );
 

@@ -351,9 +351,9 @@ ob_start();
                 <div class="card-body">
                     <form @submit.prevent="save()">
                         <div class="space-y-4">
-                            <div>
+                            <div x-show="false" class="hidden">
                                 <label class="label">Produit *</label>
-                                <select x-model="form.produit_id" class="input" required>
+                                <select x-model="form.produit_id" class="input">
                                     <option value="">Sélectionner</option>
                                     <?php 
                                     // Utilisation des produits déjà chargés en PHP pour le contrôleur
@@ -384,26 +384,26 @@ ob_start();
                                     </select>
                                 </div>
                             </div>
-                            <div>
+                            <div x-show="false" class="hidden">
                                 <label class="label">Quantité (Caisses) *</label>
-                                <input type="number" x-model.number="form.caisses" class="input" min="0.01" step="0.01" required>
+                                <input type="number" x-model.number="form.caisses" class="input" min="0.01" step="0.01">
                                 <p class="text-[10px] text-gray-500 mt-1">Le transfert sera converti en bouteilles selon le produit.</p>
                             </div>
                             <div>
                                 <div class="flex items-center justify-between mb-2">
-                                    <label class="label mb-0">Autres produits</label>
-                                    <button type="button" class="btn btn-secondary btn-sm" @click="form.lignes.push({ produit_id: '', caisses: 1 })">Ajouter</button>
+                                    <label class="label mb-0">Produits a transferer</label>
+                                    <button type="button" class="btn btn-secondary btn-sm" @click="form.lignes.push({ produit_id: '', caisses: 1 })">Ajouter produit</button>
                                 </div>
                                 <template x-for="(ligne, index) in form.lignes" :key="index">
-                                    <div class="grid grid-cols-12 gap-2 mb-2">
-                                        <select x-model="ligne.produit_id" class="input col-span-7">
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2 items-center">
+                                        <select x-model="ligne.produit_id" class="input min-w-0" required>
                                             <option value="">Selectionner</option>
                                             <template x-for="p in produits" :key="p.id">
                                                 <option :value="String(p.id)" x-text="p.nom + ' (' + p.code + ')'"></option>
                                             </template>
                                         </select>
-                                        <input type="number" x-model.number="ligne.caisses" class="input col-span-4" min="0.01" step="0.01">
-                                        <button type="button" class="btn btn-danger btn-sm col-span-1" @click="form.lignes.splice(index, 1)">X</button>
+                                        <input type="number" x-model.number="ligne.caisses" class="input" min="0.01" step="0.01" required>
+                                        <button type="button" class="btn btn-danger btn-sm h-10 w-11 px-0" @click="form.lignes.splice(index, 1)" :disabled="form.lignes.length === 1">X</button>
                                     </div>
                                 </template>
                             </div>
@@ -434,22 +434,18 @@ document.addEventListener('alpine:init', () => {
         isOpen: false,
         produits: <?= json_encode($allProduits) ?>,
         form: {
-            produit_id: '',
             emplacement_source: '',
             emplacement_dest: '',
-            caisses: 1,
-            lignes: [],
+            lignes: [{ produit_id: '', caisses: 1 }],
             motif: ''
         },
         loading: false,
         
         open() {
             this.form = {
-                produit_id: '',
                 emplacement_source: '',
                 emplacement_dest: '',
-                caisses: 1,
-                lignes: [],
+                lignes: [{ produit_id: '', caisses: 1 }],
                 motif: ''
             };
             this.isOpen = true;
@@ -467,10 +463,7 @@ document.addEventListener('alpine:init', () => {
 
             this.loading = true;
             try {
-                const lignes = [
-                    { produit_id: this.form.produit_id, caisses: this.form.caisses },
-                    ...(this.form.lignes || [])
-                ].filter(l => l.produit_id && parseFloat(l.caisses || 0) > 0).map(l => {
+                const lignes = (this.form.lignes || []).filter(l => l.produit_id && parseFloat(l.caisses || 0) > 0).map(l => {
                     const product = this.produits.find(p => p.id == l.produit_id);
                     const btlParCaisse = product ? (parseInt(product.bouteilles_par_caisses) || 24) : 24;
                     return {
@@ -478,6 +471,12 @@ document.addEventListener('alpine:init', () => {
                         quantite: Math.round((parseFloat(l.caisses) || 0) * btlParCaisse)
                     };
                 });
+
+                if (lignes.length === 0) {
+                    App.notify('Ajoutez au moins un produit a transferer', 'error');
+                    this.loading = false;
+                    return;
+                }
                 
                 const data = {
                     emplacement_source: this.form.emplacement_source,

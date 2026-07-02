@@ -24,8 +24,9 @@ class ClientController extends Controller
         
         $search = trim((string) ($_GET['q'] ?? ''));
         $zoneId = $_GET['zone_id'] ?? null;
-        $activite = in_array(($_GET['activite'] ?? 'tous'), ['tous', 'actif', 'non_actif'], true)
-            ? $_GET['activite']
+        $activiteParam = $_GET['activite'] ?? 'tous';
+        $activite = in_array($activiteParam, ['tous', 'actif', 'non_actif'], true)
+            ? $activiteParam
             : 'tous';
 
         $filters = [

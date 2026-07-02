@@ -238,6 +238,7 @@ class Client extends Model
             "SELECT vd.produit_id,
                     p.nom as produit_nom,
                     p.code as produit_code,
+                    p.position_affichage,
                     COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24) as bouteilles_par_caisses,
                     COALESCE(SUM(COALESCE(vd.quantite_caisses, ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0))), 0) as caisses_vendues,
                     COALESCE(SUM(COALESCE(vd.caisses_vides_recues, 0)), 0) as caisses_vides_recues
@@ -245,8 +246,8 @@ class Client extends Model
              JOIN ventes v ON vd.vente_id = v.id
              JOIN produits p ON vd.produit_id = p.id
              WHERE {$saleWhere}
-             GROUP BY vd.produit_id, p.nom, p.code, p.bouteilles_par_caisses
-             ORDER BY p.nom",
+             GROUP BY vd.produit_id, p.nom, p.code, p.position_affichage, p.bouteilles_par_caisses
+             ORDER BY p.position_affichage ASC, p.nom ASC",
             $saleParams
         );
 

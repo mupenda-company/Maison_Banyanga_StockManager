@@ -43,7 +43,8 @@ class Approvisionnement extends Model
                         p.prix_vente_unitaire, p.prix_vente_caisses
                  FROM approvisionnement_details ad
                  JOIN produits p ON ad.produit_id = p.id
-                 WHERE ad.approvisionnement_id = :id",
+                 WHERE ad.approvisionnement_id = :id
+                 ORDER BY p.position_affichage ASC, p.nom ASC",
                 ['id' => $id]
             );
         }

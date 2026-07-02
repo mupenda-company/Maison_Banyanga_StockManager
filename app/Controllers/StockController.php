@@ -435,6 +435,14 @@ class StockController extends Controller
     {
         $products = [];
         $vehicles = [];
+        $productOrders = [];
+        foreach ($this->produitModel->getActive() as $produit) {
+            $productOrders[(int) $produit['id']] = [
+                'position' => (int) ($produit['position_affichage'] ?? 999),
+                'nom' => (string) ($produit['nom'] ?? ''),
+            ];
+        }
+
         foreach ($data as $item) {
             $productId = (int) ($item['produit_id'] ?? 0);
             if ($productId <= 0) {
@@ -447,6 +455,8 @@ class StockController extends Controller
                     'vehicles' => [],
                     'emballages' => 0.0,
                     'total' => 0.0,
+                    'position' => $productOrders[$productId]['position'] ?? 999,
+                    'nom_tri' => $productOrders[$productId]['nom'] ?? (string) ($item['produit_nom'] ?? ''),
                 ];
             }
 
@@ -472,7 +482,8 @@ class StockController extends Controller
         $vehicleLabels = array_keys($vehicles);
         sort($vehicleLabels, SORT_NATURAL | SORT_FLAG_CASE);
         uasort($products, static function ($a, $b) {
-            return strcmp((string) $a['produit'], (string) $b['produit']);
+            return [(int) ($a['position'] ?? 999), (string) ($a['nom_tri'] ?? $a['produit'] ?? '')]
+                <=> [(int) ($b['position'] ?? 999), (string) ($b['nom_tri'] ?? $b['produit'] ?? '')];
         });
 
         $totals = ['produit' => 'TOTAL', 'entrepot' => 0.0, 'vehicles' => [], 'emballages' => 0.0, 'total' => 0.0];

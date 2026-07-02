@@ -149,7 +149,7 @@ class EmpruntEmballageController extends Controller
              JOIN produits p ON p.id = e.produit_id
              JOIN emplacements emp ON emp.id = e.emplacement_id
              WHERE COALESCE(e.operation_ref, CONCAT('EMP-', e.id)) = :ref
-             ORDER BY p.nom",
+             ORDER BY p.position_affichage ASC, p.nom ASC",
             ['ref' => $operationRef]
         );
 
@@ -167,29 +167,95 @@ class EmpruntEmballageController extends Controller
         if ((int) ($emprunt['quantite_utilisee'] ?? 0) > 0 || (int) ($emprunt['quantite_retournee'] ?? 0) > 0) {
             return $this->error('Cette operation a deja ete utilisee ou remboursee. Modification bloquee.', 422);
         }
+        $operationRef = $emprunt['operation_ref'] ?: ('EMP-' . $emprunt['id']);
+        $operationRows = $this->getOperationRows($operationRef);
+        foreach ($operationRows as $row) {
+            if ((int) ($row['quantite_utilisee'] ?? 0) > 0 || (int) ($row['quantite_retournee'] ?? 0) > 0) {
+                return $this->error('Cette operation a deja ete utilisee ou remboursee. Modification bloquee.', 422);
+            }
+        }
 
-        $updateData = array_intersect_key($data, array_flip(['date_emprunt', 'notes', 'source_contact']));
+        $direction = $data['direction'] ?? ($emprunt['direction'] ?? 'recu');
+        $typeStock = $data['type_stock'] ?? ($emprunt['type_stock'] ?? 'vide');
+        $sourceType = $data['source_type'] ?? ($emprunt['source_type'] ?? 'client');
+        if (!in_array($direction, ['recu', 'donne'], true)) {
+            return $this->error('Type d\'emprunt invalide', 422);
+        }
+        if (!in_array($typeStock, ['vide', 'plein'], true)) {
+            return $this->error('Type de stock invalide', 422);
+        }
+        if (!in_array($sourceType, ['client', 'externe'], true)) {
+            return $this->error('Type de source invalide', 422);
+        }
+        if ($sourceType === 'client' && empty($data['client_id']) && empty($emprunt['client_id'])) {
+            return $this->error('Selectionnez le client preteur', 422);
+        }
+        if ($sourceType === 'externe' && empty($data['source_nom']) && empty($emprunt['source_nom'])) {
+            return $this->error('Indiquez le nom de la personne externe', 422);
+        }
+        $lignes = is_array($data['lignes'] ?? null) ? $data['lignes'] : null;
+        if ($lignes === null && empty($data['produit_id']) && empty($emprunt['produit_id'])) {
+            return $this->error('Selectionnez le produit', 422);
+        }
+        if (empty($data['emplacement_id']) && empty($emprunt['emplacement_id'])) {
+            return $this->error('Selectionnez l\'emplacement', 422);
+        }
+
+        $updateData = [
+            'direction' => $direction,
+            'type_stock' => $typeStock,
+            'source_type' => $sourceType,
+            'client_id' => $sourceType === 'client' ? ($data['client_id'] ?? $emprunt['client_id']) : null,
+            'source_nom' => $sourceType === 'externe' ? trim($data['source_nom'] ?? ($emprunt['source_nom'] ?? '')) : null,
+            'source_contact' => trim($data['source_contact'] ?? ($emprunt['source_contact'] ?? '')),
+            'produit_id' => isset($data['produit_id']) ? (int) $data['produit_id'] : (int) $emprunt['produit_id'],
+            'emplacement_id' => isset($data['emplacement_id']) ? (int) $data['emplacement_id'] : (int) $emprunt['emplacement_id'],
+            'date_emprunt' => $data['date_emprunt'] ?? $emprunt['date_emprunt'],
+            'notes' => trim($data['notes'] ?? ($emprunt['notes'] ?? '')),
+        ];
         $quantite = isset($data['quantite_empruntee']) ? max(1, (int) $data['quantite_empruntee']) : (int) $emprunt['quantite_empruntee'];
-        $diff = $quantite - (int) $emprunt['quantite_empruntee'];
+        $updateData['quantite_empruntee'] = $quantite;
 
         try {
             $this->db->beginTransaction();
 
-            if ($diff !== 0) {
-                $produit = $this->produitModel->find($emprunt['produit_id']);
-                $btl = max(1, (int) ($produit['bouteilles_par_caisses'] ?? 24));
-                $isPlein = ($emprunt['type_stock'] ?? 'vide') === 'plein';
-                $quantiteKey = $isPlein ? 'quantite_pleine' : 'quantite_vide';
-                $caissesKey = $isPlein ? 'caisses_pleine' : 'caisses_vide';
-                $factor = ($emprunt['direction'] ?? 'recu') === 'donne' ? -1 : 1;
-                (new Stock())->updateOrCreate($emprunt['produit_id'], $emprunt['emplacement_id'], [
-                    $quantiteKey => $factor * $diff * $btl,
-                    $caissesKey => $factor * $diff,
-                ]);
-                $updateData['quantite_empruntee'] = $quantite;
-            }
+            if ($lignes !== null) {
+                $validLignes = array_values(array_filter($lignes, function ($ligne) {
+                    return !empty($ligne['produit_id']) && (int) ($ligne['quantite_empruntee'] ?? 0) > 0;
+                }));
 
-            if (!empty($updateData)) {
+                if (empty($validLignes)) {
+                    throw new Exception('Ajoutez au moins un produit avec une quantite');
+                }
+
+                foreach ($operationRows as $row) {
+                    $oldFactor = ($row['direction'] ?? 'recu') === 'donne' ? -1 : 1;
+                    $this->adjustStockForEmprunt($row, -1 * $oldFactor * (int) $row['quantite_empruntee']);
+                    $this->empruntModel->delete($row['id']);
+                }
+
+                foreach ($validLignes as $ligne) {
+                    $newData = $updateData;
+                    $newData['operation_ref'] = $operationRef;
+                    $newData['produit_id'] = (int) $ligne['produit_id'];
+                    $newData['quantite_empruntee'] = max(1, (int) $ligne['quantite_empruntee']);
+                    $newData['quantite_utilisee'] = 0;
+                    $newData['quantite_retournee'] = 0;
+                    $newData['statut'] = 'en_cours';
+                    $newData['created_by'] = $_SESSION['user_id'] ?? ($emprunt['created_by'] ?? null);
+
+                    $newId = $this->empruntModel->create($newData);
+                    $newFactor = ($newData['direction'] ?? 'recu') === 'donne' ? -1 : 1;
+                    $this->adjustStockForEmprunt($newData, $newFactor * (int) $newData['quantite_empruntee']);
+                }
+            } else {
+                $oldFactor = ($emprunt['direction'] ?? 'recu') === 'donne' ? -1 : 1;
+                $this->adjustStockForEmprunt($emprunt, -1 * $oldFactor * (int) $emprunt['quantite_empruntee']);
+
+                $newEmprunt = array_merge($emprunt, $updateData);
+                $newFactor = ($newEmprunt['direction'] ?? 'recu') === 'donne' ? -1 : 1;
+                $this->adjustStockForEmprunt($newEmprunt, $newFactor * $quantite);
+
                 $this->empruntModel->update($id, $updateData);
             }
 
@@ -216,16 +282,8 @@ class EmpruntEmballageController extends Controller
 
         try {
             $this->db->beginTransaction();
-            $produit = $this->produitModel->find($emprunt['produit_id']);
-            $btl = max(1, (int) ($produit['bouteilles_par_caisses'] ?? 24));
-            $isPlein = ($emprunt['type_stock'] ?? 'vide') === 'plein';
-            $quantiteKey = $isPlein ? 'quantite_pleine' : 'quantite_vide';
-            $caissesKey = $isPlein ? 'caisses_pleine' : 'caisses_vide';
             $factor = ($emprunt['direction'] ?? 'recu') === 'donne' ? 1 : -1;
-            (new Stock())->updateOrCreate($emprunt['produit_id'], $emprunt['emplacement_id'], [
-                $quantiteKey => $factor * (int) $emprunt['quantite_empruntee'] * $btl,
-                $caissesKey => $factor * (int) $emprunt['quantite_empruntee'],
-            ]);
+            $this->adjustStockForEmprunt($emprunt, $factor * (int) $emprunt['quantite_empruntee']);
             $this->empruntModel->delete($id);
             $this->db->commit();
             return $this->success(null, 'Operation supprimee avec succes');
@@ -235,6 +293,43 @@ class EmpruntEmballageController extends Controller
             }
             return $this->error($e->getMessage(), 400);
         }
+    }
+
+    private function getOperationRows(string $operationRef): array
+    {
+        return $this->db->fetchAll(
+            "SELECT * FROM emprunts_emballages
+             WHERE COALESCE(operation_ref, CONCAT('EMP-', id)) = :ref
+             ORDER BY id ASC",
+            ['ref' => $operationRef]
+        );
+    }
+
+    private function adjustStockForEmprunt(array $emprunt, int $deltaCaisses): void
+    {
+        if ($deltaCaisses === 0) {
+            return;
+        }
+
+        $stockModel = new Stock();
+        $stock = $stockModel->getStock($emprunt['produit_id'], $emprunt['emplacement_id']) ?: [];
+        $isPlein = ($emprunt['type_stock'] ?? 'vide') === 'plein';
+        $caissesKey = $isPlein ? 'caisses_pleine' : 'caisses_vide';
+        $currentCaisses = (int) ($stock[$caissesKey] ?? 0);
+        $newCaisses = $currentCaisses + $deltaCaisses;
+
+        if ($newCaisses < 0) {
+            $emplacement = $this->emplacementModel->find($emprunt['emplacement_id']);
+            throw new Exception(
+                'Stock insuffisant dans ' . ($emplacement['nom'] ?? 'cet emplacement')
+                . ' : disponible ' . $currentCaisses . ' cs, demande ' . abs($deltaCaisses) . ' cs.'
+            );
+        }
+
+        $stockModel->setInitialStock($emprunt['produit_id'], $emprunt['emplacement_id'], [
+            'caisses_pleine' => $isPlein ? $newCaisses : (int) ($stock['caisses_pleine'] ?? 0),
+            'caisses_vide' => $isPlein ? (int) ($stock['caisses_vide'] ?? 0) : $newCaisses,
+        ]);
     }
 
     public function rembourser($id)

@@ -117,6 +117,7 @@ class Stock extends Model
         }
         $isVide = "(LOWER(COALESCE(m.motif, '')) LIKE '%vide%' OR m.reference_type IN ('retour_emballage', 'emprunt_emballage'))";
         $sql = "SELECT p.id AS produit_id, p.code AS produit_code, p.nom AS produit_nom,
+                       p.position_affichage,
                        p.prix_vente_caisses, p.prix_vente_unitaire, p.bouteilles_par_caisses, p.categorie, p.seuil_alerte,
                        e.id AS emplacement_id, e.nom AS emplacement_nom, e.type AS emplacement_type,
                        v.id AS vehicule_id, v.immatriculation AS vehicule, v.immatriculation AS vehicule_immatriculation,
@@ -130,7 +131,7 @@ class Stock extends Model
                 LEFT JOIN users u ON v.agent_responsable_id = u.id
                 WHERE {$where}
                 GROUP BY p.id, e.id, s.quantite_pleine, s.quantite_vide, v.id, u.id
-                ORDER BY e.type, e.nom, p.nom";
+                ORDER BY e.type, e.nom, p.position_affichage ASC, p.nom ASC";
         $rows = $this->db->fetchAll($sql, $params);
         foreach ($rows as &$row) {
             $btl = max(1, (int) ($row['bouteilles_par_caisses'] ?? 24));
@@ -182,7 +183,7 @@ class Stock extends Model
                      WHERE {$where}";
         $total = (int) $this->db->fetchColumn($countSql, $params);
         
-        $sql = "SELECT s.*, p.nom as produit_nom, p.code as produit_code, p.seuil_alerte,
+        $sql = "SELECT s.*, p.nom as produit_nom, p.code as produit_code, p.position_affichage, p.seuil_alerte,
                        e.nom as emplacement_nom, e.type as emplacement_type,
                        v.id as vehicule_id,
                        v.immatriculation as vehicule_immatriculation,
@@ -197,7 +198,7 @@ class Stock extends Model
                 JOIN emplacements e ON s.emplacement_id = e.id
                 LEFT JOIN vehicules v ON v.emplacement_id = e.id AND v.actif = 1
                 WHERE {$where}
-                ORDER BY e.type, e.nom, p.nom
+                ORDER BY e.type, e.nom, p.position_affichage ASC, p.nom ASC
                 LIMIT {$perPage} OFFSET {$offset}";
         
         $data = $this->db->fetchAll($sql, $params);
@@ -227,7 +228,7 @@ class Stock extends Model
              LEFT JOIN emplacements e ON s.emplacement_id = e.id
              WHERE p.actif = 1
              GROUP BY p.id
-             ORDER BY p.nom"
+             ORDER BY p.position_affichage ASC, p.nom ASC"
         );
     }
     
@@ -241,7 +242,7 @@ class Stock extends Model
              FROM {$this->table} s
              JOIN produits p ON s.produit_id = p.id
              WHERE s.emplacement_id = :emplacement_id AND p.actif = 1
-             ORDER BY p.nom",
+             ORDER BY p.position_affichage ASC, p.nom ASC",
             ['emplacement_id' => $emplacementId]
         );
     }
@@ -540,7 +541,7 @@ class Stock extends Model
         $total = (int) $this->db->fetchColumn($countSql, $params);
         
         $sql = "SELECT 
-                    p.id as produit_id, p.code as produit_code, p.nom as produit_nom, 
+                    p.id as produit_id, p.code as produit_code, p.nom as produit_nom, p.position_affichage,
                     p.prix_vente_caisses, p.prix_vente_unitaire, p.bouteilles_par_caisses, 
                     p.categorie, p.seuil_alerte,
                     e.id as emplacement_id, e.nom as emplacement_nom, e.type as emplacement_type,
@@ -563,7 +564,7 @@ class Stock extends Model
                 LEFT JOIN vehicules v ON v.emplacement_id = e.id AND v.actif = 1
                 LEFT JOIN users u ON v.agent_responsable_id = u.id
                 WHERE {$where}
-                ORDER BY p.nom, e.type, e.nom
+                ORDER BY p.position_affichage ASC, p.nom ASC, e.type, e.nom
                 LIMIT {$perPage} OFFSET {$offset}";
         
         $data = $this->db->fetchAll($sql, $params);
@@ -669,7 +670,7 @@ class Stock extends Model
                     COALESCE(s.caisses_pleine_physique, s.caisses_pleine, 0) <> COALESCE(s.caisses_pleine, 0)
                     OR COALESCE(s.caisses_vide_physique, s.caisses_vide, 0) <> COALESCE(s.caisses_vide, 0)
                   )
-                ORDER BY e.type, e.nom, p.nom";
+                ORDER BY e.type, e.nom, p.position_affichage ASC, p.nom ASC";
 
         return $this->db->fetchAll($sql, $params);
     }

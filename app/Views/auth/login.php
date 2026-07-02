@@ -180,6 +180,17 @@
                 <span x-show="$store.theme.dark">Mode clair</span>
             </button>
         </div>
+
+        <div class="text-center mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-center mb-3 min-h-[56px]">
+                <img x-cloak x-show="!$store.theme.dark" src="<?= asset('uploads/Mupenda Company.png') ?>" alt="Mupenda Company" class="h-14 w-auto max-w-[240px] object-contain">
+                <img x-cloak x-show="$store.theme.dark" src="<?= asset('uploads/White Mupenda Company.png') ?>" alt="Mupenda Company" class="h-14 w-auto max-w-[240px] object-contain">
+            </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+                &copy; <?= date('Y') ?> Mupenda Company.
+                <a href="https://mupenda.cd/" target="_blank" rel="noopener noreferrer" class="font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 underline underline-offset-2">mupenda.cd</a>
+            </p>
+        </div>
     </div>
 </body>
 </html>

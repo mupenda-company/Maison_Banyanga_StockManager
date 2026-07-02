@@ -1,4 +1,5 @@
 <?php
+require_once ROOT_PATH . '/app/Views/layouts/print_helpers.php';
 $filters = $filters ?? [];
 $stats = $stats ?? ['total' => 0, 'actifs' => 0, 'non_actifs' => 0];
 $categorie = $filters['activite'] ?? 'tous';
@@ -7,56 +8,57 @@ $categorie = $filters['activite'] ?? 'tous';
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Clients</title>
-    <style>
-        body { font-family: Arial, sans-serif; color: #111827; margin: 24px; }
-        h1 { margin: 0 0 4px; font-size: 22px; }
-        .muted { color: #6b7280; font-size: 12px; }
-        .summary { display: flex; gap: 12px; margin: 18px 0; }
-        .box { border: 1px solid #d1d5db; padding: 10px 12px; border-radius: 6px; }
-        .label { color: #6b7280; font-size: 11px; text-transform: uppercase; }
-        .value { font-size: 18px; font-weight: 700; }
-        table { width: 100%; border-collapse: collapse; font-size: 12px; }
-        th, td { border-bottom: 1px solid #e5e7eb; padding: 7px 6px; text-align: left; }
-        th { background: #f3f4f6; text-transform: uppercase; font-size: 10px; }
-        .right { text-align: right; }
-        @media print { button { display: none; } body { margin: 12mm; } }
-    </style>
+    <title>Liste des clients</title>
+    <?= print_report_css(true) ?>
 </head>
 <body>
-    <button onclick="window.print()">Imprimer</button>
-    <h1>Liste des clients</h1>
-    <p class="muted">Categorie: <?= htmlspecialchars($categorie) ?> - Genere le <?= date('d/m/Y H:i') ?></p>
-
-    <div class="summary">
-        <div class="box"><div class="label">Total</div><div class="value"><?= (int) $stats['total'] ?></div></div>
-        <div class="box"><div class="label">Actifs</div><div class="value"><?= (int) $stats['actifs'] ?></div></div>
-        <div class="box"><div class="label">Non actifs</div><div class="value"><?= (int) $stats['non_actifs'] ?></div></div>
+<div class="page">
+    <?php print_report_header('Liste des clients', 'Categorie: ' . $categorie); ?>
+    <div class="info-bar">
+        <div><strong>Recherche:</strong> <?= htmlspecialchars($filters['q'] ?? 'Tous') ?></div>
+        <div><strong>Zone:</strong> <?= htmlspecialchars($filters['zone_id'] ?? 'Toutes') ?></div>
+        <div><strong>Impression:</strong> <?= date('d/m/Y H:i') ?></div>
     </div>
 
+    <div class="summary-grid" style="grid-template-columns: repeat(3, 1fr);">
+        <div class="summary-item"><div class="summary-label">Total clients</div><div class="summary-value"><?= (int) $stats['total'] ?></div></div>
+        <div class="summary-item"><div class="summary-label">Clients actifs</div><div class="summary-value ok"><?= (int) $stats['actifs'] ?></div></div>
+        <div class="summary-item"><div class="summary-label">Clients non actifs</div><div class="summary-value warn"><?= (int) $stats['non_actifs'] ?></div></div>
+    </div>
+
+    <div class="section-title">Clients</div>
     <table>
         <thead>
             <tr>
-                <th>Nom</th>
-                <th>Numero</th>
-                <th>Telephone</th>
-                <th>Zone</th>
-                <th class="right">Ventes</th>
-                <th class="right">CA</th>
+                <th style="width: 24%;">Nom</th>
+                <th style="width: 12%;">Numero</th>
+                <th style="width: 13%;">Telephone</th>
+                <th style="width: 18%;">Zone</th>
+                <th class="num" style="width: 10%;">Ventes</th>
+                <th class="num" style="width: 13%;">CA</th>
+                <th style="width: 10%;">Statut</th>
             </tr>
         </thead>
         <tbody>
+            <?php if (empty($clients)): ?>
+                <tr><td colspan="7" class="center muted">Aucun client trouve</td></tr>
+            <?php endif; ?>
             <?php foreach ($clients as $client): ?>
+            <?php $isActive = (int) ($client['nb_ventes_validees'] ?? 0) > 0; ?>
             <tr>
-                <td><?= htmlspecialchars($client['nom'] ?? '') ?></td>
+                <td><strong><?= htmlspecialchars($client['nom'] ?? '') ?></strong></td>
                 <td><?= htmlspecialchars($client['numero_client'] ?? '-') ?></td>
                 <td><?= htmlspecialchars($client['telephone'] ?? '-') ?></td>
                 <td><?= htmlspecialchars($client['zone_nom'] ?? '-') ?></td>
-                <td class="right"><?= number_format((int) ($client['nb_ventes_validees'] ?? 0), 0, ',', ' ') ?></td>
-                <td class="right"><?= format_money_converted($client['ca_total'] ?? 0) ?></td>
+                <td class="num"><?= number_format((int) ($client['nb_ventes_validees'] ?? 0), 0, ',', ' ') ?></td>
+                <td class="num"><?= format_money_converted($client['ca_total'] ?? 0) ?></td>
+                <td class="center <?= $isActive ? 'ok' : 'warn' ?>"><?= $isActive ? 'Actif' : 'Non actif' ?></td>
             </tr>
             <?php endforeach; ?>
         </tbody>
     </table>
+
+    <?php print_report_scripts(); ?>
+</div>
 </body>
 </html>

@@ -540,7 +540,7 @@ class MobileController extends Controller {
                  WHERE mc.mission_id = :mission_id
                    AND COALESCE(mc.quantite_caisses, 0) > 0
                    AND COALESCE(mc.type_chargement, 'vente') = 'ristourne'
-                 ORDER BY p.nom ASC",
+                 ORDER BY p.position_affichage ASC, p.nom ASC",
                 ['mission_id' => $missionId]
             ),
             'chargement' => [

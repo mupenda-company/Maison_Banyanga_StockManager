@@ -65,7 +65,8 @@ class Vente extends Model
                 "SELECT vd.*, p.nom as produit_nom, p.code as produit_code, p.bouteilles_par_caisses
                  FROM vente_details vd
                  JOIN produits p ON vd.produit_id = p.id
-                 WHERE vd.vente_id = :id",
+                 WHERE vd.vente_id = :id
+                 ORDER BY p.position_affichage ASC, p.nom ASC",
                 ['id' => $id]
             );
 
@@ -73,7 +74,8 @@ class Vente extends Model
                 "SELECT ver.*, p.nom as produit_nom, p.code as produit_code, p.bouteilles_par_caisses
                  FROM vente_emballages_recus ver
                  JOIN produits p ON ver.produit_id = p.id
-                 WHERE ver.vente_id = :id",
+                 WHERE ver.vente_id = :id
+                 ORDER BY p.position_affichage ASC, p.nom ASC",
                 ['id' => $id]
             );
         }

@@ -389,7 +389,7 @@ class VenteController extends Controller
                     COALESCE(s.quantite_vide, 0) as quantite_vide
              FROM produits p
              LEFT JOIN stocks s ON s.produit_id = p.id AND s.emplacement_id = :emplacement_id
-             ORDER BY p.nom ASC",
+             ORDER BY p.position_affichage ASC, p.nom ASC",
             ['emplacement_id' => $emplacementId]
         );
     }
@@ -600,8 +600,8 @@ class VenteController extends Controller
                  WHERE m.vehicule_id = :vehicule_id
                  AND DATE(v.date_vente) BETWEEN :date_debut AND :date_fin
                  AND v.statut = 'validee'
-                 GROUP BY p.id, p.nom, p.code
-                 ORDER BY total_caisses DESC",
+                 GROUP BY p.id, p.nom, p.code, p.position_affichage
+                 ORDER BY p.position_affichage ASC, p.nom ASC",
                 [
                     'vehicule_id' => (int) $vehiculeId,
                     'date_debut' => $dateDebut,
@@ -677,7 +677,8 @@ class VenteController extends Controller
                         vd.sous_total
                  FROM vente_details vd
                  JOIN produits p ON vd.produit_id = p.id
-                 WHERE vd.vente_id = :vente_id",
+                 WHERE vd.vente_id = :vente_id
+                 ORDER BY p.position_affichage ASC, p.nom ASC",
                 ['vente_id' => $vente['id']]
             );
         }
@@ -767,7 +768,8 @@ class VenteController extends Controller
             $vente['details'] = $this->db->fetchAll(
                 "SELECT p.nom as produit_nom, vd.quantite_caisses, vd.caisses_vides_recues, vd.sous_total
                 FROM vente_details vd JOIN produits p ON vd.produit_id = p.id
-                WHERE vd.vente_id = :vente_id",
+                WHERE vd.vente_id = :vente_id
+                ORDER BY p.position_affichage ASC, p.nom ASC",
                 ['vente_id' => $vente['id']]
             );
         }
@@ -854,7 +856,7 @@ class VenteController extends Controller
         }
         
         // Récupérer tous les produits
-        $produits = $this->db->fetchAll("SELECT id, nom FROM produits ORDER BY nom");
+        $produits = $this->db->fetchAll("SELECT id, nom FROM produits ORDER BY position_affichage ASC, nom ASC");
         
         // Récupérer TOUS les clients
         $allClients = $this->db->fetchAll(
@@ -917,7 +919,8 @@ class VenteController extends Controller
              JOIN produits p ON vd.produit_id = p.id
              WHERE DATE(v.date_vente) BETWEEN :date_debut AND :date_fin
              AND v.statut = 'validee'" . $clientClause . $emplacementClause . "
-             GROUP BY v.client_id, p.nom",
+             GROUP BY v.client_id, p.nom, p.position_affichage
+             ORDER BY p.position_affichage ASC, p.nom ASC",
             $params
         );
         

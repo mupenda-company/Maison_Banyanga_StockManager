@@ -7,12 +7,14 @@ class RistourneController extends Controller
 {
     private $ristourneModel;
     private $clientModel;
+    private $produitModel;
 
     public function __construct()
     {
         parent::__construct();
         $this->ristourneModel = new Ristourne();
         $this->clientModel = new Client();
+        $this->produitModel = new Produit();
     }
 
     /**
@@ -29,17 +31,20 @@ class RistourneController extends Controller
         ];
 
         $ristournes = $this->ristourneModel->getAllWithDetails($filters);
+        $report = $this->buildLivraisonReport($ristournes);
         $clients = $this->clientModel->all();
+        $produits = $this->produitModel->getActive();
         $printMode = isset($_GET['print']) && (string) $_GET['print'] === '1';
 
         if (isset($_GET['export']) && $_GET['export'] === 'excel') {
-            $this->exportExcel($ristournes, $filters);
+            $this->exportExcel($report, $filters);
             return;
         }
 
         if ($printMode) {
             $this->view('ristournes/print', [
                 'ristournes' => $ristournes,
+                'report' => $report,
                 'filters' => $filters
             ]);
             return;
@@ -48,6 +53,8 @@ class RistourneController extends Controller
         $this->view('ristournes/index', [
             'ristournes' => $ristournes,
             'clients' => $clients,
+            'produits' => $produits,
+            'report' => $report,
             'filters' => $filters,
             'print_mode' => $printMode
         ]);
@@ -91,27 +98,37 @@ class RistourneController extends Controller
         exit;
     }
 
-    private function exportExcel($ristournes, $filters)
+    private function exportExcel($report, $filters)
     {
         $this->requireAuth();
 
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet()->setTitle('Ristournes');
 
-        $headers = ['Client', 'Periode', 'Chiffre affaires', 'Taux (%)', 'Montant ristourne', 'Statut', 'Date paiement'];
+        $headers = ['Zone', 'Client', 'Total colis', 'Chiffre affaires', 'Ristourne'];
+        foreach ($report['produits'] as $produit) {
+            $headers[] = $produit['nom'];
+        }
+        $headers = array_merge($headers, ['Montant restant', 'Montant a completer', 'Observation', 'Signature client']);
         $sheet->fromArray($headers, null, 'A1');
 
         $row = 2;
-        foreach ($ristournes as $r) {
-            $sheet->fromArray([
+        foreach ($report['rows'] as $r) {
+            $line = [
+                $r['zone_nom'] ?? '',
                 $r['client_nom'] ?? '',
-                !empty($r['periode_debut']) ? date('m/Y', strtotime($r['periode_debut'])) : '',
-                (float)($r['ca_total'] ?? 0),
-                (float)($r['taux_applique'] ?? 0),
-                (float)($r['montant_ristourne'] ?? 0),
-                $r['statut'] ?? '',
-                !empty($r['date_paiement']) ? date('d/m/Y H:i', strtotime($r['date_paiement'])) : '',
-            ], null, 'A' . $row++);
+                (int) ($r['total_caisses'] ?? 0),
+                (float) ($r['ca_total'] ?? 0),
+                (float) ($r['montant_ristourne'] ?? 0),
+            ];
+            foreach ($report['produits'] as $produit) {
+                $line[] = (int) ($r['produits'][$produit['id']]['caisses'] ?? 0);
+            }
+            $line[] = (float) ($r['montant_restant'] ?? 0);
+            $line[] = (float) ($r['montant_a_completer'] ?? 0);
+            $line[] = '';
+            $line[] = '';
+            $sheet->fromArray($line, null, 'A' . $row++);
         }
 
         $this->styleHeaderRow($sheet, count($headers));
@@ -119,6 +136,87 @@ class RistourneController extends Controller
         $mois = $filters['mois'] ?? date('n');
         $annee = $filters['annee'] ?? date('Y');
         $this->sendXlsx($spreadsheet, 'ristournes_' . $mois . '_' . $annee . '_' . date('Y-m-d_H-i') . '.xlsx');
+    }
+
+    private function buildLivraisonReport(array $ristournes): array
+    {
+        $productIds = [];
+        foreach ($ristournes as $row) {
+            $ids = json_decode((string) ($row['produits_ristourne'] ?? '[]'), true);
+            if (!is_array($ids)) {
+                $ids = [];
+            }
+            foreach ($ids as $id) {
+                $id = (int) $id;
+                if ($id > 0) {
+                    $productIds[$id] = true;
+                }
+            }
+        }
+
+        if (empty($productIds)) {
+            return ['produits' => [], 'rows' => $ristournes];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($productIds), '?'));
+        $produits = $this->db->fetchAll(
+            "SELECT id, nom, code, prix_vente_caisses, prix_vente_unitaire, bouteilles_par_caisses
+             FROM produits
+             WHERE id IN ({$placeholders})
+             ORDER BY position_affichage ASC, nom ASC",
+            array_keys($productIds)
+        );
+
+        $produitsById = [];
+        foreach ($produits as $produit) {
+            $btl = max(1, (int) ($produit['bouteilles_par_caisses'] ?? 24));
+            $prixCaisse = (float) ($produit['prix_vente_caisses'] ?? 0);
+            if ($prixCaisse <= 0) {
+                $prixCaisse = (float) ($produit['prix_vente_unitaire'] ?? 0) * $btl;
+            }
+            $produit['prix_caisse'] = max(0, $prixCaisse);
+            $produitsById[(int) $produit['id']] = $produit;
+        }
+
+        $rows = [];
+        foreach ($ristournes as $row) {
+            $selected = json_decode((string) ($row['produits_ristourne'] ?? '[]'), true);
+            if (!is_array($selected)) {
+                $selected = [];
+            }
+            $montant = (float) ($row['montant_ristourne'] ?? 0);
+            $row['produits'] = [];
+            $firstSelectedProduct = null;
+
+            foreach ($produits as $produit) {
+                $produitId = (int) $produit['id'];
+                $prixCaisse = (float) ($produitsById[$produitId]['prix_caisse'] ?? 0);
+                $isSelected = in_array($produitId, array_map('intval', $selected), true);
+                $caisses = ($isSelected && $prixCaisse > 0) ? (int) floor($montant / $prixCaisse) : 0;
+                $row['produits'][$produitId] = [
+                    'caisses' => $caisses,
+                    'prix_caisse' => $prixCaisse,
+                ];
+
+                if ($isSelected && $firstSelectedProduct === null && $prixCaisse > 0) {
+                    $firstSelectedProduct = ['caisses' => $caisses, 'prix_caisse' => $prixCaisse];
+                }
+            }
+
+            if ($firstSelectedProduct) {
+                $prix = (float) $firstSelectedProduct['prix_caisse'];
+                $caisses = (int) $firstSelectedProduct['caisses'];
+                $reste = max(0, $montant - ($caisses * $prix));
+                $row['montant_restant'] = $reste;
+                $row['montant_a_completer'] = $prix > 0 && $reste > 0 ? max(0, $prix - $reste) : 0;
+            } else {
+                $row['montant_restant'] = $montant;
+                $row['montant_a_completer'] = 0;
+            }
+            $rows[] = $row;
+        }
+
+        return ['produits' => $produits, 'rows' => $rows];
     }
 
     /**
@@ -130,6 +228,11 @@ class RistourneController extends Controller
         
         $mois = $_GET['mois'] ?? date('n');
         $annee = $_GET['annee'] ?? date('Y');
+        $produitIds = array_values(array_unique(array_filter(array_map('intval', explode(',', (string) ($_GET['produit_ids'] ?? ''))))));
+
+        if (empty($produitIds)) {
+            return $this->error('Selectionnez au moins un produit a livrer comme ristourne.', 422);
+        }
 
         $clients = $this->clientModel->all();
         $nbCrees = 0;
@@ -155,6 +258,8 @@ class RistourneController extends Controller
                 'palier_id' => $calcul['palier_id'],
                 'taux_applique' => $calcul['taux_applique'],
                 'montant_ristourne' => $calcul['montant_ristourne'],
+                'total_caisses' => $calcul['total_caisses'],
+                'produits_ristourne' => json_encode($produitIds),
             ];
 
             if (!$existe) {

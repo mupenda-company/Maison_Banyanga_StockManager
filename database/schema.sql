@@ -178,6 +178,7 @@ CREATE TABLE `emplacements` (
 
 CREATE TABLE `emprunts_emballages` (
   `id` int UNSIGNED NOT NULL,
+  `operation_ref` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `direction` enum('recu','donne') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'recu',
   `type_stock` enum('vide','plein') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'vide',
   `source_type` enum('client','externe') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'client',
@@ -483,10 +484,12 @@ CREATE TABLE `ristournes` (
   `client_id` int UNSIGNED NOT NULL,
   `periode_debut` date NOT NULL,
   `periode_fin` date NOT NULL,
+  `total_caisses` int NOT NULL DEFAULT '0',
   `ca_total` decimal(15,2) NOT NULL,
   `palier_id` int UNSIGNED DEFAULT NULL,
   `taux_applique` decimal(5,2) NOT NULL,
   `montant_ristourne` decimal(15,2) NOT NULL,
+  `produits_ristourne` text COLLATE utf8mb4_unicode_ci,
   `statut` enum('calculee','en_livraison','payee','annulee') COLLATE utf8mb4_unicode_ci DEFAULT 'calculee',
   `date_paiement` date DEFAULT NULL,
   `notes` text COLLATE utf8mb4_unicode_ci,
