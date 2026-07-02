@@ -6,11 +6,24 @@
     <title>Ristournes</title>
     <?= print_report_css(true) ?>
     <style>
+        body {
+            font-size: 15px;
+        }
+        .page {
+            overflow-x: visible;
+        }
         .ristourne-table th,
         .ristourne-table td {
-            font-size: 8px;
-            padding: 3px 4px;
-            line-height: 1.2;
+            font-size: 14px;
+            padding: 10px 11px;
+            line-height: 1.45;
+        }
+        .ristourne-table {
+            table-layout: auto;
+            min-width: 1200px;
+        }
+        .ristourne-table th {
+            font-size: 13px;
         }
         .ristourne-table .num {
             white-space: normal;
@@ -20,6 +33,9 @@
         .ristourne-table .obs-cell,
         .ristourne-table .sign-cell {
             min-height: 24px;
+        }
+        @media print {
+            @page { size: A3 landscape; margin: 10mm; }
         }
     </style>
 </head>
@@ -58,24 +74,20 @@
     $rowsRistourne = $report['rows'] ?? [];
     ?>
     <div class="section-title">Liste de livraison des ristournes</div>
-    <?php
-    $nbProduits = count($produitsRistourne);
-    $productWidth = $nbProduits > 0 ? max(4, min(7, floor(18 / $nbProduits))) : 0;
-    ?>
     <table class="ristourne-table">
         <colgroup>
-            <col style="width: 8%">
-            <col style="width: 13%">
-            <col style="width: 6%">
-            <col style="width: 10%">
-            <col style="width: 9%">
+            <col style="min-width: 95px">
+            <col style="min-width: 160px">
+            <col style="min-width: 80px">
+            <col style="min-width: 125px">
+            <col style="min-width: 115px">
             <?php foreach ($produitsRistourne as $_): ?>
-                <col style="width: <?= $productWidth ?>%">
+                <col style="min-width: 90px">
             <?php endforeach; ?>
-            <col style="width: 9%">
-            <col style="width: 9%">
-            <col style="width: 12%">
-            <col style="width: 12%">
+            <col style="min-width: 115px">
+            <col style="min-width: 125px">
+            <col style="min-width: 150px">
+            <col style="min-width: 150px">
         </colgroup>
         <thead>
             <tr>
