@@ -489,17 +489,19 @@ class Stock extends Model
         
         $this->db->query(
             "UPDATE {$this->table} SET 
-                quantite_vide = GREATEST(0, quantite_vide - :quantite_bouteilles),
-                caisses_vide = caisses_vide - :quantite,
-                quantite_vide_physique = CASE WHEN quantite_vide_physique IS NULL THEN NULL ELSE GREATEST(0, quantite_vide_physique - :quantite_bouteilles) END,
-                caisses_vide_physique = CASE WHEN caisses_vide_physique IS NULL THEN NULL ELSE caisses_vide_physique - :quantite END,
+                quantite_vide = GREATEST(0, quantite_vide - :quantite_bouteilles_stock),
+                caisses_vide = caisses_vide - :quantite_caisses_stock,
+                quantite_vide_physique = CASE WHEN quantite_vide_physique IS NULL THEN NULL ELSE GREATEST(0, quantite_vide_physique - :quantite_bouteilles_physique) END,
+                caisses_vide_physique = CASE WHEN caisses_vide_physique IS NULL THEN NULL ELSE caisses_vide_physique - :quantite_caisses_physique END,
                 updated_at = NOW()
              WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id",
             [
                 'produit_id' => $produitId,
                 'emplacement_id' => $emplacementId,
-                'quantite' => $quantiteCaisses,
-                'quantite_bouteilles' => $quantiteBouteilles
+                'quantite_caisses_stock' => $quantiteCaisses,
+                'quantite_bouteilles_stock' => $quantiteBouteilles,
+                'quantite_caisses_physique' => $quantiteCaisses,
+                'quantite_bouteilles_physique' => $quantiteBouteilles
             ]
         );
         
