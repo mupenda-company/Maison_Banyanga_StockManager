@@ -869,14 +869,24 @@ function terminerMission() {
     window.dispatchEvent(new CustomEvent('open-modal-terminer'));
 }
 
-function annulerMission() {
-    if (!confirm('Êtes-vous sûr de vouloir annuler cette mission ? Le stock sera réintégré dans l\'entrepôt principal.')) return;
-    App.api('/api/missions/<?= (int) $mission['id'] ?>', 'DELETE')
-        .then(() => {
-            App.notify('Mission annulée avec succès');
-            window.location.href = (window.BASE_URL || '') + '/missions';
-        })
-        .catch(e => App.notify(e.message || 'Erreur lors de l\'annulation', 'error'));
+async function annulerMission() {
+    const ok = await App.confirm({
+        title: 'Annuler la mission ?',
+        message: 'Le stock restant sera reintegre dans l\'entrepot principal et les ristournes liees seront remises en attente.',
+        confirmText: 'Annuler la mission',
+        cancelText: 'Retour',
+        type: 'danger'
+    });
+
+    if (!ok) return;
+
+    try {
+        await App.api('/api/missions/<?= (int) $mission['id'] ?>', 'DELETE');
+        App.notify('Mission annulee avec succes');
+        window.location.href = (window.BASE_URL || '') + '/missions';
+    } catch (e) {
+        App.notify(e.message || 'Erreur lors de l\'annulation', 'error');
+    }
 }
 
 <?php if (isset($_GET['terminer']) && (string)$_GET['terminer'] === '1' && ($mission['statut'] ?? null) === 'en_cours'): ?>
