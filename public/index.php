@@ -155,6 +155,7 @@ $routes = [
     'POST::/api/mobile/login' => ['MobileController', 'login'],
     'GET::/api/mobile/branding' => ['MobileController', 'branding'],
     'GET::/api/mobile/mission/(\d+)/stock' => ['MobileController', 'getStock'],
+    'GET::/api/mobile/mission/(\d+)/emballages' => ['MobileController', 'getEmballagesCompatibles'],
     'GET::/api/mobile/mission/(\d+)/stats' => ['MobileController', 'getMissionStats'],
     'POST::/api/mobile/vente' => ['MobileController', 'storeVente'],
     'GET::/api/mobile/vente/(\d+)/facture' => ['MobileController', 'getVenteFacture'],

@@ -128,6 +128,7 @@ class ProduitController extends Controller
             'prix_achat_deposer' => 'numeric',
             'prix_achat_enlever' => 'numeric',
             'prix_vente_caisses' => 'required|numeric',
+            'prix_emballage' => 'numeric',
             'bouteilles_par_caisses' => 'required|numeric',
             'caisses_par_palette' => 'numeric',
             'seuil_alerte' => 'numeric',
@@ -166,6 +167,7 @@ class ProduitController extends Controller
             'prix_achat_enlever' => $prixAchatEnlever ?? 0,
             'prix_vente_unitaire' => $prixVenteUnitaire,
             'prix_vente_caisses' => $prixVenteCaisses,
+            'prix_emballage' => isset($data['prix_emballage']) ? (float) $data['prix_emballage'] : 0,
             'seuil_alerte' => $data['seuil_alerte'] ?? DEFAULT_ALERT_THRESHOLD,
             'position_affichage' => $data['position_affichage'] ?? 999,
             'actif' => 1
@@ -212,6 +214,7 @@ class ProduitController extends Controller
             'prix_achat_deposer' => 'numeric',
             'prix_achat_enlever' => 'numeric',
             'prix_vente_caisses' => 'numeric',
+            'prix_emballage' => 'numeric',
             'caisses_par_palette' => 'numeric',
             'position_affichage' => 'numeric'
         ]);
@@ -230,7 +233,7 @@ class ProduitController extends Controller
         $updateData = array_intersect_key($data, array_flip([
             'code', 'nom', 'description', 'categorie', 'unite_base',
             'bouteilles_par_caisses', 'caisses_par_palette', 'prix_achat_deposer', 'prix_achat_enlever', 'prix_vente_unitaire',
-            'prix_vente_caisses', 'seuil_alerte', 'position_affichage'
+            'prix_vente_caisses', 'prix_emballage', 'seuil_alerte', 'position_affichage'
         ]));
         
         if (isset($data['prix_achat_enlever'])) {

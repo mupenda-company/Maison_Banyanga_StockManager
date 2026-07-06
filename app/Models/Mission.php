@@ -460,6 +460,7 @@ class Mission extends Model
                         p.nom as produit_nom,
                         p.code as produit_code,
                         p.bouteilles_par_caisses,
+                        p.prix_emballage,
                         COALESCE(SUM(COALESCE(vd.quantite_caisses, ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0))), 0) as caisses_vendues,
                         COALESCE(SUM(COALESCE(vd.caisses_vides_recues, 0)), 0) as caisses_vides_recues,
                         COALESCE(SUM(vd.quantite), 0) as bouteilles_vendues,
@@ -474,19 +475,45 @@ class Mission extends Model
                 [$id]
             );
 
+            $mission['emballages_recus_par_produit'] = $this->db->fetchAll(
+                "SELECT ver.produit_id,
+                        p.nom as produit_nom,
+                        p.code as produit_code,
+                        p.bouteilles_par_caisses,
+                        p.prix_emballage,
+                        COALESCE(SUM(ver.caisses_recues), 0) as caisses_recues
+                 FROM ventes v
+                 JOIN vente_emballages_recus ver ON ver.vente_id = v.id
+                 JOIN produits p ON p.id = ver.produit_id
+                 WHERE v.mission_id = ?
+                   AND v.statut = 'validee'
+                 GROUP BY ver.produit_id, p.nom, p.code, p.position_affichage, p.bouteilles_par_caisses, p.prix_emballage
+                 ORDER BY p.position_affichage ASC, p.nom ASC",
+                [$id]
+            );
+
             $ventesParProduitIndex = [];
             foreach ($mission['ventes_par_produit'] as $venteProduit) {
                 $ventesParProduitIndex[(int) ($venteProduit['produit_id'] ?? 0)] = $venteProduit;
             }
 
             $videsRecuesParProduit = [];
-            foreach ($ventesParProduitIndex as $produitId => $venteProduit) {
-                $videsRecuesParProduit[$produitId] = (int) ($venteProduit['caisses_vides_recues'] ?? 0);
+            foreach ($mission['emballages_recus_par_produit'] as $emballageProduit) {
+                $produitId = (int) ($emballageProduit['produit_id'] ?? 0);
+                if ($produitId > 0) {
+                    $videsRecuesParProduit[$produitId] = (int) ($emballageProduit['caisses_recues'] ?? 0);
+                }
+            }
+
+            if (empty($videsRecuesParProduit)) {
+                foreach ($ventesParProduitIndex as $produitId => $venteProduit) {
+                    $videsRecuesParProduit[$produitId] = (int) ($venteProduit['caisses_vides_recues'] ?? 0);
+                }
             }
 
             $mission['montant_attendu'] = (float) ($mission['ventes']['total'] ?? 0);
             $mission['caisses_vendues_total'] = (int) ($mission['ventes']['caisses_vendues'] ?? 0);
-            $mission['caisses_vides_recues_total'] = (int) ($mission['ventes']['caisses_vides_recues'] ?? 0);
+            $mission['caisses_vides_recues_total'] = array_sum($videsRecuesParProduit);
             $mission['caisses_vides_retournees'] = (int) ($mission['caisses_vides_retournees'] ?? 0);
             $mission['retours_vides_total'] = $mission['caisses_vides_retournees'];
             $mission['caisses_vides_attendues'] = $mission['caisses_vendues_total'];
@@ -1276,6 +1303,22 @@ class Mission extends Model
                 $ventesParProduit[$produitId] = $venteProduit;
             }
 
+            $videsReelsParProduit = [];
+            foreach (($mission['emballages_recus_par_produit'] ?? []) as $emballageProduit) {
+                $produitId = (int) ($emballageProduit['produit_id'] ?? 0);
+                if ($produitId <= 0) {
+                    continue;
+                }
+
+                $videsReelsParProduit[$produitId] = (int) ($emballageProduit['caisses_recues'] ?? 0);
+            }
+
+            if (empty($videsReelsParProduit)) {
+                foreach ($ventesParProduit as $produitId => $venteProduit) {
+                    $videsReelsParProduit[$produitId] = (int) ($venteProduit['caisses_vides_recues'] ?? 0);
+                }
+            }
+
             $totalVidesRetournes = 0;
             $totalCaissesVendues = 0;
             $totalCaissesRetournees = 0;
@@ -1286,6 +1329,7 @@ class Mission extends Model
             $totalValeurRetoursPleins = 0.0;
             $totalValeurChargement = 0.0;
             $emplacementVehicule = (int) ($mission['vehicule']['emplacement_id'] ?? 0);
+            $produitsVidesTraites = [];
 
             foreach ($chargements as $chargement) {
                 $produitId = (int) ($chargement['produit_id'] ?? 0);
@@ -1323,7 +1367,8 @@ class Mission extends Model
                     : $caissesRetourAttendues;
                 $caissesVidesRetournees = array_key_exists($produitId, $vides_retournes)
                     ? max(0, (int) $vides_retournes[$produitId])
-                    : $caissesVidesAttendues;
+                    : max(0, (int) ($videsReelsParProduit[$produitId] ?? 0));
+                $produitsVidesTraites[$produitId] = true;
 
                 if ($caissesRetournees > $caissesChargees) {
                     throw new Exception('Retour plein incoherent pour ' . ($produit['nom'] ?? 'produit #' . $produitId) . ' : retour superieur au chargement.');
@@ -1382,6 +1427,72 @@ class Mission extends Model
                         }
                     }
 
+                    $stockModel->updateOrCreate($produitId, $emplacementPrincipalId, [
+                        'quantite_vide' => $quantiteBouteillesVides,
+                        'caisses_vide' => $caissesVidesRetournees
+                    ]);
+                    $mouvementModel->create([
+                        'produit_id' => $produitId,
+                        'emplacement_id' => $emplacementPrincipalId,
+                        'type_mouvement' => 'entree',
+                        'quantite' => $quantiteBouteillesVides,
+                        'reference_type' => 'mission',
+                        'reference_id' => $id,
+                        'motif' => 'Retour emballages vides mission ' . $mission['numero_mission'],
+                        'created_by' => $_SESSION['user_id'] ?? ($mission['created_by'] ?? null)
+                    ]);
+                }
+            }
+
+            foreach ($videsReelsParProduit as $produitId => $caissesVidesRetournees) {
+                $produitId = (int) $produitId;
+                $caissesVidesRetournees = max(0, (int) $caissesVidesRetournees);
+                if ($produitId <= 0 || $caissesVidesRetournees <= 0 || isset($produitsVidesTraites[$produitId])) {
+                    continue;
+                }
+
+                $produit = (new Produit())->find($produitId);
+                if (!$produit) {
+                    continue;
+                }
+
+                $bouteillesParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
+                if ($bouteillesParCaisse <= 0) {
+                    $bouteillesParCaisse = 24;
+                }
+
+                $quantiteBouteillesVides = $caissesVidesRetournees * $bouteillesParCaisse;
+                $totalVidesRetournes += $caissesVidesRetournees;
+
+                if ($emplacementVehicule > 0) {
+                    $stockVideVehicule = $this->db->fetch(
+                        "SELECT COALESCE(caisses_vide, 0) as caisses_vide
+                         FROM stocks
+                         WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id
+                         LIMIT 1",
+                        ['produit_id' => $produitId, 'emplacement_id' => $emplacementVehicule]
+                    );
+                    $caissesVidesVehicule = max(0, (int) ($stockVideVehicule['caisses_vide'] ?? 0));
+                    $caissesVidesASortirVehicule = min($caissesVidesRetournees, $caissesVidesVehicule);
+                    if ($caissesVidesASortirVehicule > 0) {
+                        $stockModel->updateOrCreate($produitId, $emplacementVehicule, [
+                            'quantite_vide' => -($caissesVidesASortirVehicule * $bouteillesParCaisse),
+                            'caisses_vide' => -$caissesVidesASortirVehicule
+                        ]);
+                        $mouvementModel->create([
+                            'produit_id' => $produitId,
+                            'emplacement_id' => $emplacementVehicule,
+                            'type_mouvement' => 'sortie',
+                            'quantite' => -($caissesVidesASortirVehicule * $bouteillesParCaisse),
+                            'reference_type' => 'mission',
+                            'reference_id' => $id,
+                            'motif' => 'Sortie emballages vides mission ' . $mission['numero_mission'],
+                            'created_by' => $_SESSION['user_id'] ?? ($mission['created_by'] ?? null)
+                        ]);
+                    }
+                }
+
+                if ($emplacementPrincipalId > 0) {
                     $stockModel->updateOrCreate($produitId, $emplacementPrincipalId, [
                         'quantite_vide' => $quantiteBouteillesVides,
                         'caisses_vide' => $caissesVidesRetournees
@@ -1704,7 +1815,10 @@ class Mission extends Model
                 $bouteillesParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
                 if ($bouteillesParCaisse <= 0) $bouteillesParCaisse = 24;
 
-                $caissesDansVehicule = max(0, (int) ($chargement['caisses_total'] ?? $chargement['quantite_caisses'] ?? 0));
+                $caissesChargees = max(0, (int) ($chargement['caisses_total'] ?? $chargement['quantite_caisses'] ?? 0));
+                $bouteillesDejaSorties = max(0, (int) ($chargement['quantite_vendue'] ?? 0));
+                $caissesDejaSorties = (int) floor($bouteillesDejaSorties / $bouteillesParCaisse);
+                $caissesDansVehicule = max(0, $caissesChargees - $caissesDejaSorties);
                 $quantiteBouteilles = $caissesDansVehicule * $bouteillesParCaisse;
 
                 if ($caissesDansVehicule <= 0) continue;

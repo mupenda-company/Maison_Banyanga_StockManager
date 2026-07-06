@@ -39,6 +39,7 @@ ob_start();
                         <th>Prix achat Déposer</th>
                         <th>Prix achat Enlever</th>
                         <th>Prix vente caisse</th>
+                        <th>Prix emballage</th>
                         <th>Stock (Caisses)</th>
                         <th>Caisses/palette</th>
                         <th>Seuil</th>
@@ -49,7 +50,7 @@ ob_start();
                 <tbody>
                     <?php if (empty($produits)): ?>
                     <tr>
-                        <td colspan="12" class="text-center py-8 text-gray-500 dark:text-gray-400">
+                        <td colspan="13" class="text-center py-8 text-gray-500 dark:text-gray-400">
                             Aucun produit trouvé
                         </td>
                     </tr>
@@ -84,6 +85,11 @@ ob_start();
                                         $prixCaisse = !empty($produit['prix_vente_caisses']) ? $produit['prix_vente_caisses'] : (($produit['prix_vente_unitaire'] ?? 0) * $btl);
                                         echo format_money_converted($prixCaisse);
                                     ?>
+                                </span>
+                            </td>
+                            <td>
+                                <span class="font-medium text-purple-600">
+                                    <?= format_money_converted($produit['prix_emballage'] ?? 0) ?>
                                 </span>
                             </td>
                             <td>
@@ -221,6 +227,10 @@ ob_start();
                                 <input type="number" x-model.number="form.prix_vente_caisses" class="input border-green-300 focus:border-green-500" required step="0.01" min="0">
                             </div>
                             <div>
+                                <label class="label text-purple-600 font-bold">Prix emballage / Caisse (<span x-text="window.DEVISE"></span>)</label>
+                                <input type="number" x-model.number="form.prix_emballage" class="input border-purple-300 focus:border-purple-500" step="0.01" min="0">
+                            </div>
+                            <div>
                                 <label class="label">Caisses par palette</label>
                                 <input type="number" x-model.number="form.caisses_par_palette" class="input" min="0">
                             </div>
@@ -266,6 +276,7 @@ document.addEventListener('alpine:init', () => {
             prix_achat_deposer: '',
             prix_achat_enlever: '',
             prix_vente_caisses: '',
+            prix_emballage: '',
             seuil_alerte: 10,
             position_affichage: 999
         },
@@ -285,6 +296,7 @@ document.addEventListener('alpine:init', () => {
                 prix_achat_deposer: '',
                 prix_achat_enlever: '',
                 prix_vente_caisses: '',
+                prix_emballage: '',
                 seuil_alerte: 10,
                 position_affichage: 999
             };
@@ -317,12 +329,14 @@ document.addEventListener('alpine:init', () => {
             const prixAchatDeposerCaisse = App.convertMoney(parseFloat(produit.prix_achat_deposer || 0), baseDevise, devise);
             const prixAchatEnleverCaisse = App.convertMoney(parseFloat(produit.prix_achat_enlever || 0), baseDevise, devise);
             const prixVenteCaisse = App.convertMoney(parseFloat(produit.prix_vente_caisses || produit.prix_vente_unitaire * btl || 0), baseDevise, devise);
+            const prixEmballage = App.convertMoney(parseFloat(produit.prix_emballage || 0), baseDevise, devise);
 
             this.form = {
                 ...produit,
                 prix_achat_deposer: prixAchatDeposerCaisse,
                 prix_achat_enlever: prixAchatEnleverCaisse,
-                prix_vente_caisses: prixVenteCaisse
+                prix_vente_caisses: prixVenteCaisse,
+                prix_emballage: prixEmballage
             };
             this.errors = {};
             this.isOpen = true;
@@ -370,10 +384,12 @@ document.addEventListener('alpine:init', () => {
                 const prixAchatDeposerCaisseDevise = parseFloat(this.form.prix_achat_deposer) || 0;
                 const prixAchatEnleverCaisseDevise = parseFloat(this.form.prix_achat_enlever) || 0;
                 const prixVenteCaisseDevise = parseFloat(this.form.prix_vente_caisses) || 0;
+                const prixEmballageDevise = parseFloat(this.form.prix_emballage) || 0;
 
                 const prixAchatDeposerCaisseBase = App.convertMoney(prixAchatDeposerCaisseDevise, devise, baseDevise);
                 const prixAchatEnleverCaisseBase = App.convertMoney(prixAchatEnleverCaisseDevise, devise, baseDevise);
                 const prixVenteCaisseBase = App.convertMoney(prixVenteCaisseDevise, devise, baseDevise);
+                const prixEmballageBase = App.convertMoney(prixEmballageDevise, devise, baseDevise);
 
                 const payload = { ...this.form };
                 // Keep the price-per-case as provided and send it to the server as source of truth.
@@ -381,6 +397,7 @@ document.addEventListener('alpine:init', () => {
                 payload.prix_achat_deposer = parseFloat(prixAchatDeposerCaisseBase.toFixed(2));
                 payload.prix_achat_enlever = parseFloat(prixAchatEnleverCaisseBase.toFixed(2));
                 payload.prix_vente_caisses = parseFloat(prixVenteCaisseBase.toFixed(2));
+                payload.prix_emballage = parseFloat(prixEmballageBase.toFixed(2));
 
                 const result = await App.api(url, method, payload);
                 

@@ -182,7 +182,7 @@
         </div>
 
         <div class="text-center border-t mt-10 border-gray-200 dark:border-gray-700">
-            <div class="flex items-center justify-center mb-1 min-h-[56px] -mb-10">
+            <div class="flex items-center justify-center min-h-[56px] -mb-10">
                 <img x-cloak x-show="!$store.theme.dark" src="<?= asset('uploads/Mupenda Company.png') ?>" alt="Mupenda Company" class="h-32 w-auto">
                 <img x-cloak x-show="$store.theme.dark" src="<?= asset('uploads/White Mupenda Company.png') ?>" alt="Mupenda Company" class="h-32 w-auto">
             </div>

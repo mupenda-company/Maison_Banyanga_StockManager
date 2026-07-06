@@ -171,6 +171,7 @@ class MobileController extends Controller {
     public function getStock($missionId) {
 
         new Mission();
+        new Produit();
 
 
 
@@ -240,7 +241,7 @@ class MobileController extends Controller {
 
         $sql = "SELECT p.id, p.nom, p.code, p.bouteilles_par_caisses,
 
-                       p.prix_vente_unitaire, p.prix_vente_caisses,
+                       p.prix_vente_unitaire, p.prix_vente_caisses, p.prix_emballage,
 
                        {$stockInitialCaissesExpr} as caisses_deja_dans_vehicule,
 
@@ -272,6 +273,37 @@ class MobileController extends Controller {
 
         return $this->success($stock);
 
+    }
+
+    /**
+     * Produits dont l'emballage peut etre recu depuis le mobile.
+     */
+    public function getEmballagesCompatibles($missionId)
+    {
+        $missionId = (int) $missionId;
+        new Produit();
+
+        $mission = $this->db->fetch(
+            "SELECT id, statut FROM missions WHERE id = :id LIMIT 1",
+            ['id' => $missionId]
+        );
+
+        if (!$mission) {
+            return $this->error('Mission non trouvee', 404);
+        }
+
+        if (($mission['statut'] ?? null) !== 'en_cours') {
+            return $this->error('Mission cloturee', 409);
+        }
+
+        $produits = $this->db->fetchAll(
+            "SELECT id, nom, code, bouteilles_par_caisses, prix_emballage
+             FROM produits
+             WHERE actif = 1
+             ORDER BY position_affichage ASC, nom ASC"
+        );
+
+        return $this->success($produits);
     }
 
 
@@ -1738,6 +1770,11 @@ class MobileController extends Controller {
 
             }
 
+            $compatibilite = $this->validerCompatibiliteEmballages($details, $emballagesRecus);
+            if (!$compatibilite['success']) {
+                throw new Exception($compatibilite['message']);
+            }
+
 
 
             $totalTva = $totalHt * ($tva / 100);
@@ -2062,6 +2099,63 @@ class MobileController extends Controller {
         }
 
         return $result;
+    }
+
+    private function validerCompatibiliteEmballages(array $detailsVendus, array $emballagesRecus): array
+    {
+        if (empty($emballagesRecus)) {
+            return ['success' => true];
+        }
+
+        $produitModel = new Produit();
+        $produitsVendus = [];
+        foreach ($detailsVendus as $detail) {
+            $produitId = (int) ($detail['produit_id'] ?? 0);
+            if ($produitId <= 0) {
+                continue;
+            }
+
+            $produit = $produitModel->find($produitId);
+            if ($produit) {
+                $produitsVendus[] = $produit;
+            }
+        }
+
+        foreach ($emballagesRecus as $produitEmballageId => $caissesRecues) {
+            if ((int) $caissesRecues <= 0) {
+                continue;
+            }
+
+            $emballage = $produitModel->find((int) $produitEmballageId);
+            if (!$emballage) {
+                return ['success' => false, 'message' => 'Produit emballage introuvable'];
+            }
+
+            $compatible = false;
+            $emballageBouteilles = (int) ($emballage['bouteilles_par_caisses'] ?? 0);
+            $emballagePrix = (float) ($emballage['prix_emballage'] ?? 0);
+
+            foreach ($produitsVendus as $produitVendu) {
+                $memeFormat = $emballageBouteilles > 0
+                    && $emballageBouteilles === (int) ($produitVendu['bouteilles_par_caisses'] ?? 0);
+                $memePrix = $emballagePrix > 0
+                    && abs($emballagePrix - (float) ($produitVendu['prix_emballage'] ?? 0)) < 0.01;
+
+                if ($memeFormat || $memePrix) {
+                    $compatible = true;
+                    break;
+                }
+            }
+
+            if (!$compatible) {
+                return [
+                    'success' => false,
+                    'message' => 'L emballage ' . ($emballage['nom'] ?? ('#' . $produitEmballageId)) . ' n est pas compatible avec les produits vendus.'
+                ];
+            }
+        }
+
+        return ['success' => true];
     }
 }
 

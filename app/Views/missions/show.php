@@ -658,6 +658,40 @@ ob_start();
                                 <?php endif; ?>
                             </div>
 
+                            <?php if (!$isRestourne && !empty($mission['emballages_recus_par_produit'])): ?>
+                            <div class="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <div class="px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+                                    <p class="text-sm font-semibold text-gray-900 dark:text-white">Emballages réellement reçus</p>
+                                    <p class="text-xs text-gray-500 mt-1">Inclut les emballages compatibles ajoutés depuis le mobile, même s'ils n'étaient pas dans le chargement initial.</p>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full text-sm">
+                                        <thead class="bg-white dark:bg-gray-800">
+                                            <tr class="text-left text-[11px] uppercase tracking-wide text-gray-500">
+                                                <th class="px-4 py-3">Produit emballage</th>
+                                                <th class="px-4 py-3 text-right">Format</th>
+                                                <th class="px-4 py-3 text-right">Prix emballage</th>
+                                                <th class="px-4 py-3 text-right">Caisses reçues</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
+                                            <?php foreach ($mission['emballages_recus_par_produit'] as $emballage): ?>
+                                            <tr>
+                                                <td class="px-4 py-3">
+                                                    <div class="font-medium text-gray-900 dark:text-white"><?= htmlspecialchars($emballage['produit_nom'] ?? 'Produit') ?></div>
+                                                    <div class="text-xs text-gray-500"><?= htmlspecialchars($emballage['produit_code'] ?? '') ?></div>
+                                                </td>
+                                                <td class="px-4 py-3 text-right"><?= (int) ($emballage['bouteilles_par_caisses'] ?? 0) ?> btl/cs</td>
+                                                <td class="px-4 py-3 text-right"><?= format_money_converted($emballage['prix_emballage'] ?? 0) ?></td>
+                                                <td class="px-4 py-3 text-right font-semibold text-purple-600"><?= (int) ($emballage['caisses_recues'] ?? 0) ?> cs</td>
+                                            </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+
                             <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
                                 <div class="flex items-center justify-between mb-3">
                                     <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">Billetage</p>

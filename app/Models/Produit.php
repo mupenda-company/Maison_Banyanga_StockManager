@@ -10,15 +10,18 @@ class Produit extends Model
         'code', 'nom', 'description', 'categorie', 'unite_base',
         'bouteilles_par_caisses', 'caisses_par_palette',
         'prix_achat_unitaire', 'prix_achat_deposer', 'prix_achat_enlever',
-        'prix_vente_unitaire', 'prix_vente_caisses', 'seuil_alerte', 'position_affichage', 'actif'
+        'prix_vente_unitaire', 'prix_vente_caisses', 'prix_emballage',
+        'seuil_alerte', 'position_affichage', 'actif'
     ];
 
     private static bool $positionColumnChecked = false;
+    private static bool $prixEmballageColumnChecked = false;
 
     public function __construct()
     {
         parent::__construct();
         $this->ensurePositionAffichageColumn();
+        $this->ensurePrixEmballageColumn();
     }
 
     private function ensurePositionAffichageColumn(): void
@@ -40,6 +43,27 @@ class Produit extends Model
         }
 
         self::$positionColumnChecked = true;
+    }
+
+    private function ensurePrixEmballageColumn(): void
+    {
+        if (self::$prixEmballageColumnChecked) {
+            return;
+        }
+
+        $exists = (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*)
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'produits'
+               AND COLUMN_NAME = 'prix_emballage'"
+        );
+
+        if (!$exists) {
+            $this->db->query("ALTER TABLE produits ADD prix_emballage DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER prix_vente_caisses");
+        }
+
+        self::$prixEmballageColumnChecked = true;
     }
     
     /**
