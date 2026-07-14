@@ -13,19 +13,21 @@ class MouvementStock extends Model
      */
     public function create($data)
     {
-        // Récupérer le stock actuel (Plein ou Vide selon le motif/type)
-        $stockModel = new Stock();
-        $stock = $stockModel->getByProduitAndEmplacement($data['produit_id'], $data['emplacement_id']);
-        
-        // Déterminer quelle quantité suivre (Pleine par défaut, sauf si spécifié "vide" dans le motif)
-        $isVide = (isset($data['motif']) && stripos($data['motif'], 'vide') !== false) || 
-                  (isset($data['reference_type']) && $data['reference_type'] === 'retour_emballage');
-        
-        $quantiteAvant = $isVide ? ($stock['quantite_vide'] ?? 0) : ($stock['quantite_pleine'] ?? 0);
-        
-        $data['quantite_avant'] = $quantiteAvant;
-        $data['quantite_apres'] = $quantiteAvant + $data['quantite'];
-        
+        if (!array_key_exists('quantite_avant', $data) || !array_key_exists('quantite_apres', $data)) {
+            // Récupérer le stock actuel (Plein ou Vide selon le motif/type)
+            $stockModel = new Stock();
+            $stock = $stockModel->getByProduitAndEmplacement($data['produit_id'], $data['emplacement_id']);
+
+            // Déterminer quelle quantité suivre (Pleine par défaut, sauf si spécifié "vide" dans le motif)
+            $isVide = (isset($data['motif']) && stripos($data['motif'], 'vide') !== false) ||
+                      (isset($data['reference_type']) && $data['reference_type'] === 'retour_emballage');
+
+            $quantiteAvant = $isVide ? ($stock['quantite_vide'] ?? 0) : ($stock['quantite_pleine'] ?? 0);
+
+            $data['quantite_avant'] = $quantiteAvant;
+            $data['quantite_apres'] = $quantiteAvant + $data['quantite'];
+        }
+
         return parent::create($data);
     }
 

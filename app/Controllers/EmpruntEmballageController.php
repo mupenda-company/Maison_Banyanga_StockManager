@@ -29,8 +29,30 @@ class EmpruntEmballageController extends Controller
             'date_fin' => $_GET['date_fin'] ?? null,
         ];
 
+        $emprunts = $this->empruntModel->getAllWithDetails($filters);
+
+        if (isset($_GET['export']) && $_GET['export'] === 'excel') {
+            $this->exportExcel($emprunts);
+            return;
+        }
+
+        if (isset($_GET['print']) && (string) $_GET['print'] === '1') {
+            foreach ($emprunts as &$emprunt) {
+                $emprunt['lignes'] = $this->empruntModel->getOperationDetails(
+                    $emprunt['operation_ref_label'] ?? ('EMP-' . $emprunt['id'])
+                );
+            }
+            unset($emprunt);
+
+            $this->view('emballages/print-emprunts', [
+                'emprunts' => $emprunts,
+                'filters' => $filters,
+            ]);
+            return;
+        }
+
         $this->view('emballages/emprunts', [
-            'emprunts' => $this->empruntModel->getAllWithDetails($filters),
+            'emprunts' => $emprunts,
             'clients' => $this->clientModel->all('nom'),
             'produits' => $this->produitModel->getActive(),
             'emplacements' => $this->emplacementModel->getFixes(),
@@ -43,8 +65,29 @@ class EmpruntEmballageController extends Controller
         $this->requirePermission('emballages.gerer');
         $data = $this->getJsonInput();
 
+        $sourceType = $data['source_type'] ?? '';
+        $data['client_id'] = $sourceType === 'client' && !empty($data['client_id'])
+            ? (int) $data['client_id']
+            : null;
+        $data['source_nom'] = $sourceType === 'externe'
+            ? trim((string) ($data['source_nom'] ?? ''))
+            : null;
+
         $lignes = $data['lignes'] ?? null;
         if (is_array($lignes)) {
+            if (!in_array($sourceType, ['client', 'externe'], true)) {
+                return $this->error('Type de source invalide', 422);
+            }
+            if ($sourceType === 'client' && $data['client_id'] === null) {
+                return $this->error('Selectionnez le client partenaire', 422);
+            }
+            if ($sourceType === 'externe' && $data['source_nom'] === '') {
+                return $this->error('Indiquez le nom de la personne externe', 422);
+            }
+            if (empty($data['emplacement_id']) || empty($data['date_emprunt'])) {
+                return $this->error('Selectionnez l\'emplacement et la date', 422);
+            }
+
             $operationRef = 'EMP-' . date('YmdHis') . '-' . random_int(100, 999);
             $createdIds = [];
 
@@ -101,7 +144,7 @@ class EmpruntEmballageController extends Controller
         }
 
         if ($data['source_type'] === 'client' && empty($data['client_id'])) {
-            return $this->error('Selectionnez le client preteur', 422);
+            return $this->error('Selectionnez le client partenaire', 422);
         }
 
         if ($data['source_type'] === 'externe' && empty($data['source_nom'])) {
@@ -112,8 +155,8 @@ class EmpruntEmballageController extends Controller
             'direction' => $direction,
             'type_stock' => $typeStock,
             'source_type' => $data['source_type'],
-            'client_id' => $data['source_type'] === 'client' ? $data['client_id'] : null,
-            'source_nom' => $data['source_type'] === 'externe' ? trim($data['source_nom']) : null,
+            'client_id' => $data['client_id'],
+            'source_nom' => $data['source_nom'],
             'source_contact' => trim($data['source_contact'] ?? ''),
             'produit_id' => $data['produit_id'],
             'quantite_empruntee' => $data['quantite_empruntee'],
@@ -187,8 +230,11 @@ class EmpruntEmballageController extends Controller
         if (!in_array($sourceType, ['client', 'externe'], true)) {
             return $this->error('Type de source invalide', 422);
         }
-        if ($sourceType === 'client' && empty($data['client_id']) && empty($emprunt['client_id'])) {
-            return $this->error('Selectionnez le client preteur', 422);
+        $clientId = !empty($data['client_id'])
+            ? (int) $data['client_id']
+            : (!empty($emprunt['client_id']) ? (int) $emprunt['client_id'] : null);
+        if ($sourceType === 'client' && $clientId === null) {
+            return $this->error('Selectionnez le client partenaire', 422);
         }
         if ($sourceType === 'externe' && empty($data['source_nom']) && empty($emprunt['source_nom'])) {
             return $this->error('Indiquez le nom de la personne externe', 422);
@@ -205,7 +251,7 @@ class EmpruntEmballageController extends Controller
             'direction' => $direction,
             'type_stock' => $typeStock,
             'source_type' => $sourceType,
-            'client_id' => $sourceType === 'client' ? ($data['client_id'] ?? $emprunt['client_id']) : null,
+            'client_id' => $sourceType === 'client' ? $clientId : null,
             'source_nom' => $sourceType === 'externe' ? trim($data['source_nom'] ?? ($emprunt['source_nom'] ?? '')) : null,
             'source_contact' => trim($data['source_contact'] ?? ($emprunt['source_contact'] ?? '')),
             'produit_id' => isset($data['produit_id']) ? (int) $data['produit_id'] : (int) $emprunt['produit_id'],
@@ -245,6 +291,7 @@ class EmpruntEmballageController extends Controller
                     $newData['created_by'] = $_SESSION['user_id'] ?? ($emprunt['created_by'] ?? null);
 
                     $newId = $this->empruntModel->create($newData);
+                    $newData['id'] = $newId;
                     $newFactor = ($newData['direction'] ?? 'recu') === 'donne' ? -1 : 1;
                     $this->adjustStockForEmprunt($newData, $newFactor * (int) $newData['quantite_empruntee']);
                 }
@@ -276,15 +323,21 @@ class EmpruntEmballageController extends Controller
         if (!$emprunt) {
             return $this->error('Operation non trouvee', 404);
         }
-        if ((int) ($emprunt['quantite_utilisee'] ?? 0) > 0 || (int) ($emprunt['quantite_retournee'] ?? 0) > 0) {
-            return $this->error('Cette operation a deja ete utilisee ou remboursee. Suppression bloquee.', 422);
+        $operationRef = $emprunt['operation_ref'] ?: ('EMP-' . $emprunt['id']);
+        $operationRows = $this->getOperationRows($operationRef);
+        foreach ($operationRows as $row) {
+            if ((int) ($row['quantite_utilisee'] ?? 0) > 0 || (int) ($row['quantite_retournee'] ?? 0) > 0) {
+                return $this->error('Cette operation a deja ete utilisee ou remboursee. Suppression bloquee.', 422);
+            }
         }
 
         try {
             $this->db->beginTransaction();
-            $factor = ($emprunt['direction'] ?? 'recu') === 'donne' ? 1 : -1;
-            $this->adjustStockForEmprunt($emprunt, $factor * (int) $emprunt['quantite_empruntee']);
-            $this->empruntModel->delete($id);
+            foreach ($operationRows as $row) {
+                $factor = ($row['direction'] ?? 'recu') === 'donne' ? 1 : -1;
+                $this->adjustStockForEmprunt($row, $factor * (int) $row['quantite_empruntee']);
+                $this->empruntModel->delete($row['id']);
+            }
             $this->db->commit();
             return $this->success(null, 'Operation supprimee avec succes');
         } catch (Exception $e) {
@@ -330,6 +383,104 @@ class EmpruntEmballageController extends Controller
             'caisses_pleine' => $isPlein ? $newCaisses : (int) ($stock['caisses_pleine'] ?? 0),
             'caisses_vide' => $isPlein ? (int) ($stock['caisses_vide'] ?? 0) : $newCaisses,
         ]);
+
+        $produit = $this->produitModel->find($emprunt['produit_id']);
+        $btlParCaisse = max(1, (int) ($produit['bouteilles_par_caisses'] ?? 24));
+        $deltaBouteilles = $deltaCaisses * $btlParCaisse;
+        $quantiteKey = $isPlein ? 'quantite_pleine' : 'quantite_vide';
+        $quantiteAvant = (int) ($stock[$quantiteKey] ?? 0);
+        (new MouvementStock())->create([
+            'produit_id' => $emprunt['produit_id'],
+            'emplacement_id' => $emprunt['emplacement_id'],
+            'type_mouvement' => $deltaBouteilles > 0 ? 'entree' : 'sortie',
+            'quantite' => $deltaBouteilles,
+            'quantite_avant' => $quantiteAvant,
+            'quantite_apres' => $quantiteAvant + $deltaBouteilles,
+            'reference_type' => 'emprunt_emballage_ajustement',
+            'reference_id' => (int) ($emprunt['id'] ?? 0),
+            'motif' => 'Ajustement opération emprunt/prêt - ' . ($isPlein ? 'produits pleins' : 'emballages vides'),
+            'created_by' => $_SESSION['user_id'] ?? null,
+        ]);
+    }
+
+    private function exportExcel(array $emprunts): void
+    {
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet()->setTitle('Emprunts et prets');
+        $sheet->fromArray([
+            'Date', 'Reference', 'Sens', 'Type', 'Partenaire', 'Produit', 'Code produit',
+            'Quantite empruntee / pretee (cs)', 'Utilise (cs)', 'Retourne (cs)',
+            'Reste (cs)', 'Emplacement', 'Statut'
+        ], null, 'A1');
+
+        $rowNumber = 2;
+        $totalRows = [];
+        foreach ($emprunts as $emprunt) {
+            $partenaire = ($emprunt['source_type'] ?? 'client') === 'client'
+                ? ($emprunt['client_nom'] ?? 'Client')
+                : ($emprunt['source_nom'] ?? 'Externe');
+            $sens = ($emprunt['direction'] ?? 'recu') === 'donne' ? 'Prêter' : 'Emprunter';
+            $type = ($emprunt['type_stock'] ?? 'vide') === 'plein' ? 'Produits pleins' : 'Emballages vides';
+            $reference = $emprunt['operation_ref_label'] ?? ('EMP-' . ($emprunt['id'] ?? ''));
+            $lignes = $this->empruntModel->getOperationDetails($reference);
+
+            foreach ($lignes as $ligne) {
+                $sheet->fromArray([
+                    $ligne['date_emprunt'] ?? ($emprunt['date_emprunt'] ?? ''),
+                    $reference,
+                    $sens,
+                    $type,
+                    $partenaire,
+                    $ligne['produit_nom'] ?? '',
+                    $ligne['produit_code'] ?? '',
+                    (int) ($ligne['quantite_empruntee'] ?? 0),
+                    (int) ($ligne['quantite_utilisee'] ?? 0),
+                    (int) ($ligne['quantite_retournee'] ?? 0),
+                    (int) ($ligne['reste_caisses'] ?? 0),
+                    $ligne['emplacement_nom'] ?? ($emprunt['emplacement_nom'] ?? ''),
+                    ($ligne['statut'] ?? 'en_cours') === 'solde' ? 'Soldé' : 'En cours',
+                ], null, 'A' . $rowNumber++);
+            }
+
+            if (count($lignes) > 1) {
+                $sheet->fromArray([
+                    $emprunt['date_emprunt'] ?? '',
+                    $reference,
+                    $sens,
+                    $type,
+                    $partenaire,
+                    'TOTAL DE L\'OPERATION',
+                    '',
+                    (int) ($emprunt['quantite_empruntee'] ?? 0),
+                    (int) ($emprunt['quantite_utilisee'] ?? 0),
+                    (int) ($emprunt['quantite_retournee'] ?? 0),
+                    (int) ($emprunt['reste_caisses'] ?? 0),
+                    $emprunt['emplacement_nom'] ?? '',
+                    ($emprunt['statut'] ?? 'en_cours') === 'solde' ? 'Soldé' : 'En cours',
+                ], null, 'A' . $rowNumber);
+                $totalRows[] = $rowNumber++;
+            }
+        }
+
+        $sheet->getStyle('A1:M1')->getFont()->setBold(true);
+        foreach ($totalRows as $totalRow) {
+            $sheet->getStyle('A' . $totalRow . ':M' . $totalRow)->getFont()->setBold(true);
+        }
+        $sheet->setAutoFilter('A1:M' . max(1, $rowNumber - 1));
+        foreach (range('A', 'M') as $column) {
+            $sheet->getColumnDimension($column)->setAutoSize(true);
+        }
+
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="emprunts_prets_' . date('Y-m-d_H-i') . '.xlsx"');
+        header('Cache-Control: max-age=0, must-revalidate');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->setPreCalculateFormulas(false);
+        $writer->save('php://output');
+        exit;
     }
 
     public function rembourser($id)

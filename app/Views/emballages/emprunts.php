@@ -1,5 +1,10 @@
 <?php
 $pageTitle = 'Emprunts / prets';
+$activeFilters = array_filter($filters ?? [], function ($value) {
+    return $value !== null && $value !== '';
+});
+$printUrl = '?' . http_build_query(array_merge($activeFilters, ['print' => 1]));
+$exportUrl = '?' . http_build_query(array_merge($activeFilters, ['export' => 'excel']));
 ob_start();
 ?>
 
@@ -8,9 +13,13 @@ ob_start();
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Emprunts / prets</h1>
         <p class="text-gray-500 dark:text-gray-400">Produits pleins et emballages vides empruntes ou pretes avec un client, distributeur ou personne externe</p>
     </div>
-    <?php if (can('emballages.gerer')): ?>
-    <button type="button" onclick="openEmpruntModal()" class="btn btn-primary">Nouvelle operation</button>
-    <?php endif; ?>
+    <div class="flex flex-wrap gap-2 justify-end">
+        <a href="<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" class="btn btn-secondary">Imprimer</a>
+        <a href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary">Exporter Excel</a>
+        <?php if (can('emballages.gerer')): ?>
+        <button type="button" onclick="openEmpruntModal()" class="btn btn-primary">Nouvelle operation</button>
+        <?php endif; ?>
+    </div>
 </div>
 
 <div class="card mb-6">
@@ -20,8 +29,8 @@ ob_start();
                 <label class="label">Sens</label>
                 <select name="direction" class="input">
                     <option value="">Tous</option>
-                    <option value="recu" <?= ($filters['direction'] ?? '') === 'recu' ? 'selected' : '' ?>>On emprunte a</option>
-                    <option value="donne" <?= ($filters['direction'] ?? '') === 'donne' ? 'selected' : '' ?>>On prete a</option>
+                    <option value="recu" <?= ($filters['direction'] ?? '') === 'recu' ? 'selected' : '' ?>>Emprunter</option>
+                    <option value="donne" <?= ($filters['direction'] ?? '') === 'donne' ? 'selected' : '' ?>>Prêter</option>
                 </select>
             </div>
             <div>
@@ -102,8 +111,13 @@ ob_start();
                                 <div class="text-[10px] text-gray-500"><?= $emprunt['source_type'] === 'client' ? 'Client' : htmlspecialchars($emprunt['source_contact'] ?? 'Externe') ?></div>
                             </td>
                             <td>
+                                <?php if ((int) ($emprunt['nombre_produits'] ?? 1) > 1): ?>
+                                <div class="font-medium"><?= (int) $emprunt['nombre_produits'] ?> produits</div>
+                                <div class="text-[10px] text-gray-500">Voir le détail</div>
+                                <?php else: ?>
                                 <div class="font-medium"><?= htmlspecialchars($emprunt['produit_nom']) ?></div>
                                 <div class="text-[10px] text-gray-500"><?= htmlspecialchars($emprunt['produit_code']) ?></div>
+                                <?php endif; ?>
                             </td>
                             <td class="text-right font-bold"><?= number_format((int) $emprunt['quantite_empruntee'], 0, ',', ' ') ?> cs</td>
                             <td class="text-right"><?= number_format((int) $emprunt['quantite_utilisee'], 0, ',', ' ') ?> cs</td>
@@ -123,7 +137,7 @@ ob_start();
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                 </button>
                                 <?php endif; ?>
-                                <?php if (can('emballages.gerer') && $emprunt['statut'] === 'en_cours' && (int) $emprunt['reste_caisses'] > 0): ?>
+                                <?php if (can('emballages.gerer') && (int) ($emprunt['nombre_produits'] ?? 1) === 1 && $emprunt['statut'] === 'en_cours' && (int) $emprunt['reste_caisses'] > 0): ?>
                                 <button type="button" class="btn btn-sm btn-secondary" onclick="openRemboursementModal(<?= (int) $emprunt['id'] ?>, <?= (int) $emprunt['reste_caisses'] ?>, '<?= htmlspecialchars($emprunt['source_type'] === 'client' ? ($emprunt['client_nom'] ?? 'Client') : ($emprunt['source_nom'] ?? 'Externe'), ENT_QUOTES, 'UTF-8') ?>')" title="<?= ($emprunt['direction'] ?? 'recu') === 'donne' ? 'Retour recu' : 'Rembourser' ?>">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a4 4 0 010 8H7m-4-8l4-4m-4 4l4 4"/></svg>
                                 </button>
@@ -185,6 +199,7 @@ ob_start();
                             <th class="text-right">Utilise</th>
                             <th class="text-right">Retourne</th>
                             <th class="text-right">Reste</th>
+                            <?php if (can('emballages.gerer')): ?><th class="text-right">Action</th><?php endif; ?>
                         </tr>
                     </thead>
                     <tbody>
@@ -198,6 +213,15 @@ ob_start();
                                 <td class="text-right" x-text="formatCs(ligne.quantite_utilisee)"></td>
                                 <td class="text-right" x-text="formatCs(ligne.quantite_retournee)"></td>
                                 <td class="text-right font-bold text-orange-600" x-text="formatCs(ligne.reste_caisses)"></td>
+                                <?php if (can('emballages.gerer')): ?>
+                                <td class="text-right">
+                                    <button type="button" class="btn btn-sm btn-secondary"
+                                            x-show="ligne.statut === 'en_cours' && parseInt(ligne.reste_caisses || 0, 10) > 0"
+                                            @click="openRemboursementModal(parseInt(ligne.id, 10), parseInt(ligne.reste_caisses, 10), partnerName(operation))">
+                                        Traiter
+                                    </button>
+                                </td>
+                                <?php endif; ?>
                             </tr>
                         </template>
                     </tbody>
@@ -253,8 +277,8 @@ ob_start();
                     <div>
                         <label class="label">Sens</label>
                         <select x-model="form.direction" class="input" required>
-                            <option value="recu">On emprunte a</option>
-                            <option value="donne">On prete a</option>
+                            <option value="recu">Emprunter</option>
+                            <option value="donne">Prêter</option>
                         </select>
                     </div>
                     <div>
@@ -342,8 +366,8 @@ ob_start();
                     <div>
                         <label class="label">Sens</label>
                         <select x-model="form.direction" class="input" required>
-                            <option value="recu">On emprunte a</option>
-                            <option value="donne">On prete a</option>
+                            <option value="recu">Emprunter</option>
+                            <option value="donne">Prêter</option>
                         </select>
                     </div>
                     <div>
@@ -458,7 +482,7 @@ document.addEventListener('alpine:init', () => {
             return new Date(value + 'T00:00:00').toLocaleDateString('fr-FR');
         },
         labelDirection(direction) {
-            return direction === 'donne' ? 'On prete a' : 'On emprunte a';
+            return direction === 'donne' ? 'Prêter' : 'Emprunter';
         },
         partnerName(operation) {
             if ((operation.source_type || 'client') === 'client') {

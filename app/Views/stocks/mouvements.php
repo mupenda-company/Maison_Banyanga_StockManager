@@ -221,11 +221,19 @@ ob_start();
                                 'ventes' => 'ventes',
                             ];
                             $route = (!empty($refType) && isset($refRoutes[$refType])) ? $refRoutes[$refType] : null;
+                            $isEmpruntMovement = in_array($refType, [
+                                'emprunt_emballage',
+                                'emprunt_emballage_rembourse',
+                                'emprunt_emballage_ajustement',
+                            ], true);
+                            $referenceUrl = $isEmpruntMovement
+                                ? url('emballages/emprunts')
+                                : ($route && !empty($refId) ? url($route . '/' . $refId) : null);
                             ?>
-                            <?php if ($route && !empty($refId)): ?>
-                                <a href="<?= url($route . '/' . $refId) ?>" class="text-primary-600 hover:underline flex items-center gap-1">
+                            <?php if ($referenceUrl): ?>
+                                <a href="<?= htmlspecialchars($referenceUrl, ENT_QUOTES, 'UTF-8') ?>" class="text-primary-600 hover:underline flex items-center gap-1">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                                    <?= htmlspecialchars($mvt['reference_numero'] ?? 'Voir') ?>
+                                    <?= htmlspecialchars($isEmpruntMovement ? ('Emprunt/prêt #' . $refId) : ($mvt['reference_numero'] ?? 'Voir')) ?>
                                 </a>
                             <?php else: ?>
                                 <span class="text-gray-300">-</span>

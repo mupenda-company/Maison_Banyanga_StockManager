@@ -63,11 +63,6 @@ class EmpruntEmballage extends Model
         $where = '1=1';
         $params = [];
 
-        if (!empty($filters['statut'])) {
-            $where .= ' AND e.statut = :statut';
-            $params['statut'] = $filters['statut'];
-        }
-
         if (!empty($filters['source_type'])) {
             $where .= ' AND e.source_type = :source_type';
             $params['source_type'] = $filters['source_type'];
@@ -93,7 +88,7 @@ class EmpruntEmballage extends Model
             $params['date_fin'] = $filters['date_fin'];
         }
 
-        return $this->db->fetchAll(
+        $rows = $this->db->fetchAll(
             "SELECT e.*, COALESCE(e.operation_ref, CONCAT('EMP-', e.id)) as operation_ref_label,
                     c.nom as client_nom, p.nom as produit_nom, p.code as produit_code,
                     p.bouteilles_par_caisses, emp.nom as emplacement_nom,
@@ -106,12 +101,79 @@ class EmpruntEmballage extends Model
              ORDER BY e.date_emprunt DESC, e.id DESC, p.position_affichage ASC, p.nom ASC",
             $params
         );
+
+        $operations = [];
+        foreach ($rows as $row) {
+            $key = $row['operation_ref_label'];
+            if (!isset($operations[$key])) {
+                $operations[$key] = $row;
+                $operations[$key]['nombre_produits'] = 0;
+                $operations[$key]['quantite_empruntee'] = 0;
+                $operations[$key]['quantite_utilisee'] = 0;
+                $operations[$key]['quantite_retournee'] = 0;
+                $operations[$key]['reste_caisses'] = 0;
+                $operations[$key]['_produit_ids'] = [];
+                $operations[$key]['_statuts'] = [];
+            }
+
+            $operations[$key]['_produit_ids'][(int) $row['produit_id']] = true;
+            $operations[$key]['quantite_empruntee'] += (int) $row['quantite_empruntee'];
+            $operations[$key]['quantite_utilisee'] += (int) $row['quantite_utilisee'];
+            $operations[$key]['quantite_retournee'] += (int) $row['quantite_retournee'];
+            $operations[$key]['reste_caisses'] += (int) $row['reste_caisses'];
+            $operations[$key]['_statuts'][$row['statut']] = true;
+        }
+
+        foreach ($operations as &$operation) {
+            $operation['nombre_produits'] = count($operation['_produit_ids']);
+            if (count($operation['_statuts']) === 1 && isset($operation['_statuts']['solde'])) {
+                $operation['statut'] = 'solde';
+            } elseif (count($operation['_statuts']) === 1 && isset($operation['_statuts']['annule'])) {
+                $operation['statut'] = 'annule';
+            } else {
+                $operation['statut'] = 'en_cours';
+            }
+            unset($operation['_produit_ids'], $operation['_statuts']);
+        }
+        unset($operation);
+
+        if (!empty($filters['statut'])) {
+            $operations = array_filter($operations, function ($operation) use ($filters) {
+                return $operation['statut'] === $filters['statut'];
+            });
+        }
+
+        return array_values($operations);
+    }
+
+    public function getOperationDetails(string $operationRef): array
+    {
+        return $this->db->fetchAll(
+            "SELECT e.*, COALESCE(e.operation_ref, CONCAT('EMP-', e.id)) as operation_ref_label,
+                    c.nom as client_nom, p.nom as produit_nom, p.code as produit_code,
+                    p.bouteilles_par_caisses, emp.nom as emplacement_nom,
+                    (e.quantite_empruntee - e.quantite_utilisee - e.quantite_retournee) as reste_caisses
+             FROM {$this->table} e
+             LEFT JOIN clients c ON e.client_id = c.id
+             JOIN produits p ON e.produit_id = p.id
+             JOIN emplacements emp ON e.emplacement_id = emp.id
+             WHERE COALESCE(e.operation_ref, CONCAT('EMP-', e.id)) = :operation_ref
+             ORDER BY p.position_affichage ASC, p.nom ASC",
+            ['operation_ref' => $operationRef]
+        );
     }
 
     public function createWithStock($data)
     {
         try {
             $this->db->beginTransaction();
+
+            $data['source_type'] = in_array(($data['source_type'] ?? ''), ['client', 'externe'], true)
+                ? $data['source_type']
+                : 'externe';
+            $data['client_id'] = $data['source_type'] === 'client' && !empty($data['client_id'])
+                ? (int) $data['client_id']
+                : null;
 
             $produit = (new Produit())->find($data['produit_id']);
             $btlParCaisse = (int) ($produit['bouteilles_par_caisses'] ?? 24);
@@ -137,9 +199,11 @@ class EmpruntEmballage extends Model
             $quantiteKey = $isPlein ? 'quantite_pleine' : 'quantite_vide';
             $caissesKey = $isPlein ? 'caisses_pleine' : 'caisses_vide';
             $labelStock = $isPlein ? 'produits pleins' : 'emballages vides';
+            $stockAvant = $stockModel->getStock($data['produit_id'], $data['emplacement_id']) ?: [];
+            $quantiteAvant = (int) ($stockAvant[$quantiteKey] ?? 0);
 
             if ($data['direction'] === 'donne') {
-                $stock = $stockModel->getStock($data['produit_id'], $data['emplacement_id']);
+                $stock = $stockAvant;
                 if (!$stock || (int) ($stock[$caissesKey] ?? 0) < $data['quantite_empruntee']) {
                     throw new Exception('Stock ' . $labelStock . ' insuffisant : disponible ' . (int) ($stock[$caissesKey] ?? 0) . ' cs, demandé ' . $data['quantite_empruntee'] . ' cs');
                 }
@@ -157,6 +221,8 @@ class EmpruntEmballage extends Model
                     'reference_type' => 'emprunt_emballage',
                     'reference_id' => $id,
                     'motif' => ucfirst($labelStock) . ' prêtés',
+                    'quantite_avant' => $quantiteAvant,
+                    'quantite_apres' => $quantiteAvant - $quantiteBouteilles,
                     'created_by' => $data['created_by']
                 ]);
             } else {
@@ -173,6 +239,8 @@ class EmpruntEmballage extends Model
                     'reference_type' => 'emprunt_emballage',
                     'reference_id' => $id,
                     'motif' => 'Emprunt ' . $labelStock,
+                    'quantite_avant' => $quantiteAvant,
+                    'quantite_apres' => $quantiteAvant + $quantiteBouteilles,
                     'created_by' => $data['created_by']
                 ]);
             }
@@ -272,6 +340,8 @@ class EmpruntEmballage extends Model
             $quantiteKey = $isPlein ? 'quantite_pleine' : 'quantite_vide';
             $caissesKey = $isPlein ? 'caisses_pleine' : 'caisses_vide';
             $labelStock = $isPlein ? 'produits pleins' : 'emballages vides';
+            $stockAvant = $stockModel->getStock($emprunt['produit_id'], $emplacementId) ?: [];
+            $quantiteAvant = (int) ($stockAvant[$quantiteKey] ?? 0);
 
             if ($direction === 'donne') {
                 $stockModel->updateOrCreate($emprunt['produit_id'], $emplacementId, [
@@ -279,7 +349,7 @@ class EmpruntEmballage extends Model
                     $caissesKey => $quantiteCaisses
                 ]);
             } else {
-                $stock = $stockModel->getStock($emprunt['produit_id'], $emplacementId);
+                $stock = $stockAvant;
                 if (!$stock || (int) ($stock[$caissesKey] ?? 0) < $quantiteCaisses) {
                     throw new Exception('Stock ' . $labelStock . ' insuffisant pour rembourser cet emprunt');
                 }
@@ -300,11 +370,13 @@ class EmpruntEmballage extends Model
             (new MouvementStock())->create([
                 'produit_id' => $emprunt['produit_id'],
                 'emplacement_id' => $emplacementId,
-                'type_mouvement' => 'sortie',
+                'type_mouvement' => $direction === 'donne' ? 'entree' : 'sortie',
                 'quantite' => ($direction === 'donne' ? 1 : -1) * ($quantiteCaisses * $btlParCaisse),
                 'reference_type' => 'emprunt_emballage_rembourse',
                 'reference_id' => $id,
                 'motif' => ($direction === 'donne' ? 'Retour ' : 'Remboursement ') . $labelStock,
+                'quantite_avant' => $quantiteAvant,
+                'quantite_apres' => $quantiteAvant + (($direction === 'donne' ? 1 : -1) * ($quantiteCaisses * $btlParCaisse)),
                 'created_by' => $userId
             ]);
 

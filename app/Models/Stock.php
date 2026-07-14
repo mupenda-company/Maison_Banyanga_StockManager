@@ -115,7 +115,7 @@ class Stock extends Model
                 $params[$key] = $filters[$key];
             }
         }
-        $isVide = "(LOWER(COALESCE(m.motif, '')) LIKE '%vide%' OR m.reference_type IN ('retour_emballage', 'emprunt_emballage'))";
+        $isVide = "(LOWER(COALESCE(m.motif, '')) LIKE '%vide%' OR m.reference_type = 'retour_emballage')";
         $sql = "SELECT p.id AS produit_id, p.code AS produit_code, p.nom AS produit_nom,
                        p.position_affichage,
                        p.prix_vente_caisses, p.prix_vente_unitaire, p.bouteilles_par_caisses, p.categorie, p.seuil_alerte,
