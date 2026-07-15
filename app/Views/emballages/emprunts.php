@@ -126,6 +126,9 @@ ob_start();
                             <td><?= $emprunt['statut'] === 'solde' ? '<span class="badge-success">Solde</span>' : '<span class="badge-warning">En cours</span>' ?></td>
                             <td class="text-right">
                                 <div class="flex justify-end gap-2">
+                                <a href="<?= url('emballages/emprunts/' . (int) $emprunt['id'] . '/print') ?>" target="_blank" class="btn btn-sm btn-secondary" title="Imprimer le bon signé">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2m-12-4h12v8H6v-8z"/></svg>
+                                </a>
                                 <button type="button" class="btn btn-sm btn-secondary" onclick="openDetailsModal(<?= (int) $emprunt['id'] ?>)" title="Voir le detail">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                 </button>
@@ -199,7 +202,7 @@ ob_start();
                             <th class="text-right">Utilise</th>
                             <th class="text-right">Retourne</th>
                             <th class="text-right">Reste</th>
-                            <?php if (can('emballages.gerer')): ?><th class="text-right">Action</th><?php endif; ?>
+                            <th class="text-right">Actions / bons</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -213,15 +216,22 @@ ob_start();
                                 <td class="text-right" x-text="formatCs(ligne.quantite_utilisee)"></td>
                                 <td class="text-right" x-text="formatCs(ligne.quantite_retournee)"></td>
                                 <td class="text-right font-bold text-orange-600" x-text="formatCs(ligne.reste_caisses)"></td>
-                                <?php if (can('emballages.gerer')): ?>
                                 <td class="text-right">
+                                    <div class="flex flex-col items-end gap-1">
+                                    <?php if (can('emballages.gerer')): ?>
                                     <button type="button" class="btn btn-sm btn-secondary"
                                             x-show="ligne.statut === 'en_cours' && parseInt(ligne.reste_caisses || 0, 10) > 0"
                                             @click="openRemboursementModal(parseInt(ligne.id, 10), parseInt(ligne.reste_caisses, 10), partnerName(operation))">
                                         Traiter
                                     </button>
+                                    <?php endif; ?>
+                                    <template x-for="remboursement in (ligne.remboursements || [])" :key="remboursement.id">
+                                        <a class="text-xs text-primary-600 hover:underline" target="_blank"
+                                           :href="<?= json_encode(url('emballages/emprunts/remboursements/')) ?> + remboursement.id + '/print'"
+                                           x-text="'Bon du ' + formatDateTime(remboursement.created_at)"></a>
+                                    </template>
+                                    </div>
                                 </td>
-                                <?php endif; ?>
                             </tr>
                         </template>
                     </tbody>
@@ -481,6 +491,10 @@ document.addEventListener('alpine:init', () => {
             if (!value) return '-';
             return new Date(value + 'T00:00:00').toLocaleDateString('fr-FR');
         },
+        formatDateTime(value) {
+            if (!value) return '-';
+            return new Date(String(value).replace(' ', 'T')).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+        },
         labelDirection(direction) {
             return direction === 'donne' ? 'Prêter' : 'Emprunter';
         },
@@ -509,11 +523,19 @@ document.addEventListener('alpine:init', () => {
         close() { this.isOpen = false; },
         async save() {
             this.loading = true;
+            const printWindow = window.open('about:blank', '_blank');
             try {
                 const result = await App.api(`/api/emballages/emprunts/${this.empruntId}/rembourser`, 'POST', this.form);
                 App.notify(result.message || 'Operation enregistree', 'success');
-                setTimeout(() => location.reload(), 800);
+                const movementId = result.data?.mouvement_id || result.mouvement_id;
+                if (printWindow && movementId) {
+                    printWindow.location.href = <?= json_encode(url('emballages/emprunts/remboursements/')) ?> + movementId + '/print';
+                } else if (printWindow) {
+                    printWindow.close();
+                }
+                setTimeout(() => location.reload(), 1200);
             } catch (e) {
+                if (printWindow) printWindow.close();
                 App.notify(e.message, 'error');
             } finally {
                 this.loading = false;

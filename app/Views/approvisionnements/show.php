@@ -85,6 +85,7 @@ ob_start();
                         <thead>
                             <tr>
                                 <th>Produit</th>
+                                <th>Nature</th>
                                 <th class="text-right">Type</th>
                                 <th class="text-right">Caisses</th>
                                 <th class="text-right">Bouteilles</th>
@@ -99,8 +100,17 @@ ob_start();
                                     <div class="font-medium"><?= htmlspecialchars($detail['produit_nom']) ?></div>
                                     <div class="text-xs text-gray-500"><?= htmlspecialchars($detail['produit_code']) ?></div>
                                 </td>
+                                <td>
+                                    <?php if (($detail['type_chargement'] ?? 'vente') === 'emballage'): ?>
+                                        <span class="badge-warning">Emballages vides</span>
+                                    <?php else: ?>
+                                        <span class="badge-info">Produits pleins</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td class="text-right">
-                                    <?php if (($detail['type_achat'] ?? 'deposer') === 'enlever'): ?>
+                                    <?php if (($detail['type_chargement'] ?? 'vente') === 'emballage'): ?>
+                                        <span class="text-xs text-gray-500">Achat emballage</span>
+                                    <?php elseif (($detail['type_achat'] ?? 'deposer') === 'enlever'): ?>
                                         <span class="badge-info">Enlever</span>
                                     <?php else: ?>
                                         <span class="badge-success">Déposer</span>
@@ -108,7 +118,13 @@ ob_start();
                                 </td>
                                 <td class="text-right"><?= $detail['quantite_caisses'] ?></td>
                                 <td class="text-right"><?= ($detail['quantite_caisses'] * ($detail['bouteilles_par_caisses'] ?? 24)) ?></td>
-                                <td class="text-right"><?= format_money_converted($detail['prix_unitaire'] * ($detail['bouteilles_par_caisses'] ?? 24)) ?></td>
+                                <td class="text-right">
+                                    <?= format_money_converted($detail['prix_caisse'] ?? ($detail['prix_unitaire'] * ($detail['bouteilles_par_caisses'] ?? 24))) ?>
+                                    <?php if (($detail['type_chargement'] ?? 'vente') === 'emballage' && ($detail['devise_prix'] ?? '') === 'USD'): ?>
+                                        <div class="text-xs text-gray-500"><?= format_money($detail['prix_original'] ?? 0, 'USD') ?></div>
+                                        <div class="text-xs text-gray-400">Taux : <?= number_format((float) ($detail['taux_change'] ?? 0), 2, ',', ' ') ?></div>
+                                    <?php endif; ?>
+                                </td>
                                 <td class="text-right font-medium"><?= format_money_converted($detail['sous_total']) ?></td>
                             </tr>
                             <?php endforeach; ?>
@@ -121,7 +137,7 @@ ob_start();
                                 }
                             ?>
                             <tr>
-                                <td colspan="4" class="text-right font-bold">Total Général</td>
+                                <td colspan="6" class="text-right font-bold">Total Général</td>
                                 <td class="text-right font-bold text-primary-600">
                                     <?= format_money_converted($totalGeneral) ?>
                                 </td>
@@ -148,7 +164,7 @@ ob_start();
                 <p class="text-3xl font-bold text-primary-600">
                     <?= $totalCaisses ?>
                 </p>
-                <p class="text-sm text-gray-500">caisses pleines</p>
+                <p class="text-sm text-gray-500">caisses approvisionnées</p>
             </div>
         </div>
         

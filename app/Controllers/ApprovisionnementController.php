@@ -223,6 +223,7 @@ class ApprovisionnementController extends Controller
                 FROM approvisionnement_details ad
                 JOIN approvisionnements a ON a.id = ad.approvisionnement_id
                 WHERE {$whereSql}
+                  AND COALESCE(ad.type_chargement, 'vente') <> 'emballage'
                 GROUP BY ad.produit_id
              ) ap ON ap.produit_id = p.id
              WHERE p.actif = 1
@@ -334,32 +335,59 @@ class ApprovisionnementController extends Controller
         
         foreach ($data['details'] as $detail) {
             $produit = $this->produitModel->find($detail['produit_id']);
+            if (!$produit) {
+                return $this->error('Produit introuvable', 422);
+            }
+            $typeChargement = ($detail['type_chargement'] ?? 'vente') === 'emballage' ? 'emballage' : 'vente';
             $typeAchat = $detail['type_achat'] ?? 'deposer';
-            
-            // Determine case price (prix_caisse) based on product fields. These are stored as price per case.
-            if ($typeAchat === 'enlever' && $produit['prix_achat_enlever'] > 0) {
+
+            if ($typeChargement === 'emballage') {
+                $prixOriginal = (float) ($detail['prix_emballage_usd'] ?? 0);
+                if ($prixOriginal <= 0) {
+                    return $this->error('Indiquez le prix en USD pour chaque emballage', 422);
+                }
+                $prixCaisse = round(convert_money($prixOriginal, 'USD', get_base_devise()), 2);
+                $devisePrix = 'USD';
+            } elseif ($typeAchat === 'enlever' && $produit['prix_achat_enlever'] > 0) {
                 $prixCaisse = $produit['prix_achat_enlever'];
+                $prixOriginal = $prixCaisse;
+                $devisePrix = get_base_devise();
             } elseif ($typeAchat === 'deposer' && $produit['prix_achat_deposer'] > 0) {
                 $prixCaisse = $produit['prix_achat_deposer'];
+                $prixOriginal = $prixCaisse;
+                $devisePrix = get_base_devise();
             } else {
-                // Fallback: compute case price from unit price
                 $prixCaisse = $produit['prix_achat_unitaire'] * $produit['bouteilles_par_caisses'];
+                $prixOriginal = $prixCaisse;
+                $devisePrix = get_base_devise();
             }
 
-            $sousTotal = $detail['quantite_caisses'] * $prixCaisse;
+            $quantiteCaisses = max(0, (int) ($detail['quantite_caisses'] ?? 0));
+            if ($quantiteCaisses <= 0) {
+                continue;
+            }
+            $sousTotal = $quantiteCaisses * $prixCaisse;
             $totalHt += $sousTotal;
 
             $details[] = [
                 'produit_id' => $detail['produit_id'],
-                'quantite_caisses' => $detail['quantite_caisses'],
-                'quantite_bouteilles' => $detail['quantite_caisses'] * $produit['bouteilles_par_caisses'],
+                'type_chargement' => $typeChargement,
+                'quantite_caisses' => $quantiteCaisses,
+                'quantite_bouteilles' => $quantiteCaisses * $produit['bouteilles_par_caisses'],
                 'prix_unitaire' => $prixCaisse / max(1, $produit['bouteilles_par_caisses']),
                 'prix_caisse' => $prixCaisse,
+                'prix_original' => $prixOriginal,
+                'devise_prix' => $devisePrix,
+                'taux_change' => get_taux_change(),
                 'type_achat' => $typeAchat,
                 'sous_total' => $sousTotal
             ];
         }
-        
+
+        if (empty($details)) {
+            return $this->error('Ajoutez au moins un produit ou un emballage', 422);
+        }
+
         $approvisionnementData['total_ht'] = $totalHt;
         
         $result = $this->approvisionnementModel->createWithDetails(
@@ -455,14 +483,28 @@ class ApprovisionnementController extends Controller
                 return $this->error('Produit introuvable', 422);
             }
 
+            $typeChargement = ($detail['type_chargement'] ?? 'vente') === 'emballage' ? 'emballage' : 'vente';
             $typeAchat = $detail['type_achat'] ?? 'deposer';
 
-            if ($typeAchat === 'enlever' && $produit['prix_achat_enlever'] > 0) {
+            if ($typeChargement === 'emballage') {
+                $prixOriginal = (float) ($detail['prix_emballage_usd'] ?? 0);
+                if ($prixOriginal <= 0) {
+                    return $this->error('Indiquez le prix en USD pour chaque emballage', 422);
+                }
+                $prixCaisse = round(convert_money($prixOriginal, 'USD', get_base_devise()), 2);
+                $devisePrix = 'USD';
+            } elseif ($typeAchat === 'enlever' && $produit['prix_achat_enlever'] > 0) {
                 $prixCaisse = $produit['prix_achat_enlever'];
+                $prixOriginal = $prixCaisse;
+                $devisePrix = get_base_devise();
             } elseif ($typeAchat === 'deposer' && $produit['prix_achat_deposer'] > 0) {
                 $prixCaisse = $produit['prix_achat_deposer'];
+                $prixOriginal = $prixCaisse;
+                $devisePrix = get_base_devise();
             } else {
                 $prixCaisse = $produit['prix_achat_unitaire'] * $produit['bouteilles_par_caisses'];
+                $prixOriginal = $prixCaisse;
+                $devisePrix = get_base_devise();
             }
 
             $quantiteCaisses = max(0, (int)($detail['quantite_caisses'] ?? 0));
@@ -476,10 +518,14 @@ class ApprovisionnementController extends Controller
 
             $details[] = [
                 'produit_id' => (int)$detail['produit_id'],
+                'type_chargement' => $typeChargement,
                 'quantite_caisses' => $quantiteCaisses,
                 'quantite_bouteilles' => $quantiteCaisses * (int)$produit['bouteilles_par_caisses'],
                 'prix_unitaire' => $prixCaisse / max(1, (int)$produit['bouteilles_par_caisses']),
                 'prix_caisse' => $prixCaisse,
+                'prix_original' => $prixOriginal,
+                'devise_prix' => $devisePrix,
+                'taux_change' => get_taux_change(),
                 'type_achat' => $typeAchat,
                 'sous_total' => $sousTotal
             ];
@@ -602,6 +648,7 @@ class ApprovisionnementController extends Controller
         ];
 
         foreach ($approvisionnement['details'] ?? [] as $detail) {
+            $isEmballage = ($detail['type_chargement'] ?? 'vente') === 'emballage';
             $achat = (float) ($detail['quantite_caisses'] ?? 0);
             $np = (int) ($detail['caisses_par_palette'] ?? 0);
             $plt = $np > 0 ? ($achat / $np) : 0;
@@ -613,9 +660,17 @@ class ApprovisionnementController extends Controller
                 $pvu = (float) ($detail['prix_vente_unitaire'] ?? 0) * $btl;
             }
 
-            $prixAchatChoisi = (($detail['type_achat'] ?? 'deposer') === 'enlever') ? $paae : $paad;
+            $prixAchatChoisi = $isEmballage
+                ? (float) ($detail['prix_caisse'] ?? 0)
+                : ((($detail['type_achat'] ?? 'deposer') === 'enlever') ? $paae : $paad);
             if ($prixAchatChoisi <= 0) {
                 $prixAchatChoisi = (float)($detail['prix_caisse'] ?? (($detail['prix_unitaire'] ?? 0) * $btl));
+            }
+
+            if ($isEmballage) {
+                $paad = $prixAchatChoisi;
+                $paae = $prixAchatChoisi;
+                $pvu = $prixAchatChoisi;
             }
 
             $pt = $achat * $prixAchatChoisi;
@@ -626,7 +681,7 @@ class ApprovisionnementController extends Controller
             $totalAEnl = $ecartAEn * $achat;
 
             $items[] = [
-                'produit' => $detail['produit_nom'] ?? '',
+                'produit' => ($detail['produit_nom'] ?? '') . ($isEmballage ? ' — Emballages vides' : ' — Produits pleins'),
                 'np' => $np,
                 'achat' => $achat,
                 'plt' => $plt,

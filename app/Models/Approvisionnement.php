@@ -7,6 +7,41 @@ class Approvisionnement extends Model
 {
     protected $table = 'approvisionnements';
     protected $fillable = ['numero_bon', 'date_approvisionnement', 'fournisseur', 'notes', 'total_ht', 'statut', 'created_by'];
+
+    private static bool $detailMoneyColumnsChecked = false;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->ensureDetailMoneyColumns();
+    }
+
+    private function ensureDetailMoneyColumns(): void
+    {
+        if (self::$detailMoneyColumnsChecked) {
+            return;
+        }
+
+        $columns = [
+            'prix_original' => "DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER prix_unitaire",
+            'devise_prix' => "VARCHAR(3) NOT NULL DEFAULT 'CDF' AFTER prix_original",
+            'taux_change' => "DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER devise_prix",
+        ];
+        foreach ($columns as $column => $definition) {
+            $exists = (bool) $this->db->fetchColumn(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'approvisionnement_details'
+                   AND COLUMN_NAME = :column_name",
+                ['column_name' => $column]
+            );
+            if (!$exists) {
+                $this->db->query("ALTER TABLE approvisionnement_details ADD {$column} {$definition}");
+            }
+        }
+
+        self::$detailMoneyColumnsChecked = true;
+    }
     
     /**
      * Générer un numéro de bon unique
@@ -115,7 +150,13 @@ class Approvisionnement extends Model
             $mouvementModel = new MouvementStock();
 
             $besoinsEmballages = [];
+            $apportsEmballages = [];
             foreach ($details as $detail) {
+                if (($detail['type_chargement'] ?? 'vente') === 'emballage') {
+                    $produitId = (int) ($detail['produit_id'] ?? 0);
+                    $apportsEmballages[$produitId] = ($apportsEmballages[$produitId] ?? 0) + (int) ($detail['quantite_caisses'] ?? 0);
+                    continue;
+                }
                 $produitId = (int) ($detail['produit_id'] ?? 0);
                 $besoinsEmballages[$produitId] = ($besoinsEmballages[$produitId] ?? 0) + (int) ($detail['quantite_caisses'] ?? 0);
             }
@@ -127,53 +168,79 @@ class Approvisionnement extends Model
 
                 $stockVide = $stockModel->getStock($produitId, $emplacementPrincipalId);
                 $disponible = (int) ($stockVide['caisses_vide'] ?? 0);
-                if ($disponible < $caissesNecessaires) {
+                $disponibleAvecAchat = $disponible + (int) ($apportsEmballages[$produitId] ?? 0);
+                if ($disponibleAvecAchat < $caissesNecessaires) {
                     $produit = (new Produit())->find($produitId);
                     $nomProduit = $produit['nom'] ?? ('Produit #' . $produitId);
-                    throw new Exception('Emballages insuffisants pour ' . $nomProduit . ' : disponible ' . $disponible . ' cs, demandé ' . $caissesNecessaires . ' cs. Enregistrez un emprunt d\'emballages avant de valider cet approvisionnement.');
+                    throw new Exception('Emballages insuffisants pour ' . $nomProduit . ' : disponible avec cet achat ' . $disponibleAvecAchat . ' cs, demandé ' . $caissesNecessaires . ' cs.');
                 }
             }
-            
+
+            // Les emballages achetés sont enregistrés avant les produits pleins
+            // afin de pouvoir être utilisés dans la même opération.
+            usort($details, function ($a, $b) {
+                return (($a['type_chargement'] ?? 'vente') === 'emballage' ? 0 : 1)
+                    <=> (($b['type_chargement'] ?? 'vente') === 'emballage' ? 0 : 1);
+            });
+
             foreach ($details as $detail) {
                 $detail['approvisionnement_id'] = $approvisionnementId;
                 $this->db->insert('approvisionnement_details', $detail);
-                
-                // Mettre à jour le stock (entrée de pleins)
-                $stockModel->updateOrCreate(
-                    $detail['produit_id'],
-                    $emplacementPrincipalId,
-                    [
-                        'quantite_pleine' => $detail['quantite_bouteilles'],
-                        'caisses_pleine' => $detail['quantite_caisses']
-                    ]
-                );
-                
-                // Déduire les caisses vides
+
                 $produit = (new Produit())->find($detail['produit_id']);
-                $caissesNecessaires = $detail['quantite_caisses'];
-                
-                $resultDeduction = $stockModel->deduireVide(
-                    $detail['produit_id'],
-                    $emplacementPrincipalId,
-                    $caissesNecessaires
-                );
-                
-                if (!$resultDeduction['success']) {
-                    $disponible = (int) ($resultDeduction['disponible'] ?? 0);
-                    throw new Exception('Emballages insuffisants pour ' . ($produit['nom'] ?? 'Produit') . ' : disponible ' . $disponible . ' cs, demande ' . $caissesNecessaires . ' cs. Enregistrez d\'abord un emprunt d\'emballages avant de valider cet achat.');
+                $isEmballage = ($detail['type_chargement'] ?? 'vente') === 'emballage';
+                $stockAvant = $stockModel->getStock($detail['produit_id'], $emplacementPrincipalId) ?: [];
+                $quantiteKey = $isEmballage ? 'quantite_vide' : 'quantite_pleine';
+                $quantiteAvant = (int) ($stockAvant[$quantiteKey] ?? 0);
+
+                if ($isEmballage) {
+                    $stockModel->updateOrCreate(
+                        $detail['produit_id'],
+                        $emplacementPrincipalId,
+                        [
+                            'quantite_vide' => $detail['quantite_bouteilles'],
+                            'caisses_vide' => $detail['quantite_caisses'],
+                        ]
+                    );
+
+                    $nouveauPrix = (float) ($detail['prix_caisse'] ?? 0);
+                    if (abs($nouveauPrix - (float) ($produit['prix_emballage'] ?? 0)) >= 0.01) {
+                        (new Produit())->update($detail['produit_id'], ['prix_emballage' => $nouveauPrix]);
+                    }
+                } else {
+                    // Entrée des produits pleins.
+                    $stockModel->updateOrCreate(
+                        $detail['produit_id'],
+                        $emplacementPrincipalId,
+                        [
+                            'quantite_pleine' => $detail['quantite_bouteilles'],
+                            'caisses_pleine' => $detail['quantite_caisses'],
+                        ]
+                    );
+
+                    // Les produits pleins reçus consomment les caisses vides disponibles.
+                    $resultDeduction = $stockModel->deduireVide(
+                        $detail['produit_id'],
+                        $emplacementPrincipalId,
+                        $detail['quantite_caisses']
+                    );
+                    if (!$resultDeduction['success']) {
+                        $disponible = (int) ($resultDeduction['disponible'] ?? 0);
+                        throw new Exception('Emballages insuffisants pour ' . ($produit['nom'] ?? 'Produit') . ' : disponible ' . $disponible . ' cs, demande ' . $detail['quantite_caisses'] . ' cs. Enregistrez d\'abord un emprunt d\'emballages avant de valider cet achat.');
+                    }
                 }
-                
+
                 // Enregistrer le mouvement
                 $mouvementModel->create([
                     'produit_id' => $detail['produit_id'],
                     'emplacement_id' => $emplacementPrincipalId,
                     'type_mouvement' => 'entree',
                     'quantite' => $detail['quantite_bouteilles'],
-                    'quantite_avant' => 0, // Sera calculé
-                    'quantite_apres' => 0, // Sera calculé
+                    'quantite_avant' => $quantiteAvant,
+                    'quantite_apres' => $quantiteAvant + $detail['quantite_bouteilles'],
                     'reference_type' => 'approvisionnement',
                     'reference_id' => $approvisionnementId,
-                    'motif' => 'Approvisionnement du ' . $data['date_approvisionnement'],
+                    'motif' => ($isEmballage ? 'Approvisionnement emballages vides du ' : 'Approvisionnement produits pleins du ') . $data['date_approvisionnement'],
                     'created_by' => $data['created_by']
                 ]);
             }
@@ -217,42 +284,64 @@ class Approvisionnement extends Model
 
             $ancien = [];
             foreach ($ancienAppro['details'] as $d) {
-                $ancien[(int)$d['produit_id']] = [
-                    'caisses' => (int)$d['quantite_caisses'],
-                    'bouteilles' => (int)$d['quantite_bouteilles']
+                $key = (($d['type_chargement'] ?? 'vente') === 'emballage' ? 'emballage' : 'vente') . ':' . (int) $d['produit_id'];
+                $ancien[$key] = $ancien[$key] ?? [
+                    'produit_id' => (int) $d['produit_id'],
+                    'type_chargement' => $d['type_chargement'] ?? 'vente',
+                    'caisses' => 0,
+                    'bouteilles' => 0,
                 ];
+                $ancien[$key]['caisses'] += (int) $d['quantite_caisses'];
+                $ancien[$key]['bouteilles'] += (int) $d['quantite_bouteilles'];
             }
 
             $nouveau = [];
             foreach ($details as $d) {
-                $nouveau[(int)$d['produit_id']] = [
-                    'caisses' => (int)$d['quantite_caisses'],
-                    'bouteilles' => (int)$d['quantite_bouteilles']
+                $key = (($d['type_chargement'] ?? 'vente') === 'emballage' ? 'emballage' : 'vente') . ':' . (int) $d['produit_id'];
+                $nouveau[$key] = $nouveau[$key] ?? [
+                    'produit_id' => (int) $d['produit_id'],
+                    'type_chargement' => $d['type_chargement'] ?? 'vente',
+                    'caisses' => 0,
+                    'bouteilles' => 0,
                 ];
+                $nouveau[$key]['caisses'] += (int) $d['quantite_caisses'];
+                $nouveau[$key]['bouteilles'] += (int) $d['quantite_bouteilles'];
             }
 
-            $produitsIds = array_unique(array_merge(array_keys($ancien), array_keys($nouveau)));
+            $detailKeys = array_unique(array_merge(array_keys($ancien), array_keys($nouveau)));
+            $stockDeltas = [];
+            foreach ($detailKeys as $key) {
+                $ligneReference = $nouveau[$key] ?? $ancien[$key];
+                $produitId = (int) $ligneReference['produit_id'];
+                $isEmballage = ($ligneReference['type_chargement'] ?? 'vente') === 'emballage';
+                $ancienneCaisses = $ancien[$key]['caisses'] ?? 0;
+                $nouvelleCaisses = $nouveau[$key]['caisses'] ?? 0;
 
-            foreach ($produitsIds as $produitId) {
-                $ancienneCaisses = $ancien[$produitId]['caisses'] ?? 0;
-                $nouvelleCaisses = $nouveau[$produitId]['caisses'] ?? 0;
-
-                $ancienneBouteilles = $ancien[$produitId]['bouteilles'] ?? 0;
-                $nouvelleBouteilles = $nouveau[$produitId]['bouteilles'] ?? 0;
+                $ancienneBouteilles = $ancien[$key]['bouteilles'] ?? 0;
+                $nouvelleBouteilles = $nouveau[$key]['bouteilles'] ?? 0;
 
                 $diffCaisses = $nouvelleCaisses - $ancienneCaisses;
                 $diffBouteilles = $nouvelleBouteilles - $ancienneBouteilles;
 
-                if ($diffCaisses != 0 || $diffBouteilles != 0) {
-                    $stockModel->updateOrCreate(
-                        $produitId,
-                        $emplacementPrincipalId,
-                        [
-                            'quantite_pleine' => $diffBouteilles,
-                            'caisses_pleine' => $diffCaisses
-                        ]
-                    );
+                $stockDeltas[$produitId] = $stockDeltas[$produitId] ?? [
+                    'quantite_pleine' => 0,
+                    'caisses_pleine' => 0,
+                    'quantite_vide' => 0,
+                    'caisses_vide' => 0,
+                ];
+                if ($isEmballage) {
+                    $stockDeltas[$produitId]['quantite_vide'] += $diffBouteilles;
+                    $stockDeltas[$produitId]['caisses_vide'] += $diffCaisses;
+                } else {
+                    $stockDeltas[$produitId]['quantite_pleine'] += $diffBouteilles;
+                    $stockDeltas[$produitId]['caisses_pleine'] += $diffCaisses;
+                    $stockDeltas[$produitId]['quantite_vide'] -= $diffBouteilles;
+                    $stockDeltas[$produitId]['caisses_vide'] -= $diffCaisses;
                 }
+            }
+
+            foreach ($stockDeltas as $produitId => $delta) {
+                $stockModel->updateOrCreate($produitId, $emplacementPrincipalId, $delta);
             }
 
             $this->update($id, [
@@ -270,6 +359,13 @@ class Approvisionnement extends Model
             foreach ($details as $detail) {
                 $detail['approvisionnement_id'] = $id;
                 $this->db->insert('approvisionnement_details', $detail);
+                if (($detail['type_chargement'] ?? 'vente') === 'emballage') {
+                    $produit = (new Produit())->find($detail['produit_id']);
+                    $nouveauPrix = (float) ($detail['prix_caisse'] ?? 0);
+                    if (abs($nouveauPrix - (float) ($produit['prix_emballage'] ?? 0)) >= 0.01) {
+                        (new Produit())->update($detail['produit_id'], ['prix_emballage' => $nouveauPrix]);
+                    }
+                }
             }
 
             (new Alerte())->checkStockAlerts();
@@ -304,15 +400,29 @@ class Approvisionnement extends Model
             
             // Reverser le stock
             $stockModel = new Stock();
+            $stockDeltas = [];
             foreach ($approvisionnement['details'] as $detail) {
-                $stockModel->updateOrCreate(
-                    $detail['produit_id'],
-                    $emplacementPrincipalId,
-                    [
-                        'quantite_pleine' => -$detail['quantite_bouteilles'],
-                        'caisses_pleine' => -$detail['quantite_caisses']
-                    ]
-                );
+                $isEmballage = ($detail['type_chargement'] ?? 'vente') === 'emballage';
+                $produitId = (int) $detail['produit_id'];
+                $stockDeltas[$produitId] = $stockDeltas[$produitId] ?? [
+                    'quantite_pleine' => 0,
+                    'caisses_pleine' => 0,
+                    'quantite_vide' => 0,
+                    'caisses_vide' => 0,
+                ];
+                if ($isEmballage) {
+                    $stockDeltas[$produitId]['quantite_vide'] -= (int) $detail['quantite_bouteilles'];
+                    $stockDeltas[$produitId]['caisses_vide'] -= (int) $detail['quantite_caisses'];
+                } else {
+                    $stockDeltas[$produitId]['quantite_pleine'] -= (int) $detail['quantite_bouteilles'];
+                    $stockDeltas[$produitId]['caisses_pleine'] -= (int) $detail['quantite_caisses'];
+                    $stockDeltas[$produitId]['quantite_vide'] += (int) $detail['quantite_bouteilles'];
+                    $stockDeltas[$produitId]['caisses_vide'] += (int) $detail['quantite_caisses'];
+                }
+            }
+
+            foreach ($stockDeltas as $produitId => $delta) {
+                $stockModel->updateOrCreate($produitId, $emplacementPrincipalId, $delta);
             }
             
             $this->db->commit();

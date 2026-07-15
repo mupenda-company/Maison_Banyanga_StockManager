@@ -367,7 +367,7 @@ class EmpruntEmballage extends Model
                 'statut' => $nouveauReste <= 0 ? 'solde' : 'en_cours'
             ]);
 
-            (new MouvementStock())->create([
+            $mouvementId = (new MouvementStock())->create([
                 'produit_id' => $emprunt['produit_id'],
                 'emplacement_id' => $emplacementId,
                 'type_mouvement' => $direction === 'donne' ? 'entree' : 'sortie',
@@ -381,7 +381,7 @@ class EmpruntEmballage extends Model
             ]);
 
             $this->db->commit();
-            return ['success' => true, 'solde' => $nouveauReste <= 0];
+            return ['success' => true, 'solde' => $nouveauReste <= 0, 'mouvement_id' => $mouvementId];
         } catch (Exception $e) {
             $this->db->rollBack();
             return ['success' => false, 'message' => $e->getMessage()];

@@ -74,6 +74,9 @@ CREATE TABLE `approvisionnement_details` (
   `quantite_bouteilles` int NOT NULL,
   `prix_caisse` decimal(12,2) NOT NULL DEFAULT '0.00',
   `prix_unitaire` decimal(12,2) NOT NULL,
+  `prix_original` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `devise_prix` varchar(3) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'CDF',
+  `taux_change` decimal(12,2) NOT NULL DEFAULT '0.00',
   `type_achat` enum('deposer','enlever') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'deposer',
   `sous_total` decimal(12,2) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -27,6 +27,12 @@ $approvisionnementsUrl = url('approvisionnements');
             }
             return quantite;
         }
+        function getPrixLigne(ligne, produit, typeAchat) {
+            if ((ligne.type_chargement || 'vente') === 'emballage') {
+                return App.convertMoney(parseFloat(ligne.prix_emballage_usd || 0), 'USD', (window.BASE_DEVISE || 'CDF'));
+            }
+            return getPrixCaisse(produit, typeAchat);
+        }
         function approEditForm() {
             return {
                 date: '<?= $approvisionnement['date_approvisionnement'] ?>',
@@ -36,8 +42,12 @@ $approvisionnementsUrl = url('approvisionnements');
                 lignes: <?= json_encode(array_map(function($d) {
                     return [
                         'produit_id' => (int)$d['produit_id'],
+                        'type_chargement' => $d['type_chargement'] ?? 'vente',
                         'quantite_achat' => (int)$d['quantite_caisses'],
-                        'unite_achat' => 'caisse'
+                        'unite_achat' => 'caisse',
+                        'prix_emballage_usd' => (($d['type_chargement'] ?? 'vente') === 'emballage')
+                            ? (float) (($d['devise_prix'] ?? '') === 'USD' ? ($d['prix_original'] ?? 0) : convert_money($d['prix_caisse'] ?? 0, get_base_devise(), 'USD'))
+                            : ''
                     ];
                 }, $approvisionnement['details'] ?? [])) ?>,
                 produits: [],
@@ -58,7 +68,7 @@ $approvisionnementsUrl = url('approvisionnements');
                     this.lignes.forEach(l => {
                         const p = this.produits.find(p => p.id == l.produit_id);
                         if (p) {
-                            this.total += getQuantiteCaisses(l, p) * getPrixCaisse(p, this.type_achat);
+                            this.total += getQuantiteCaisses(l, p) * getPrixLigne(l, p, this.type_achat);
                         }
                     });
                 },
@@ -76,6 +86,8 @@ $approvisionnementsUrl = url('approvisionnements');
                                 return {
                                     produit_id: parseInt(l.produit_id),
                                     quantite_caisses: getQuantiteCaisses(l, p),
+                                    type_chargement: l.type_chargement || 'vente',
+                                    prix_emballage_usd: (l.type_chargement || 'vente') === 'emballage' ? parseFloat(l.prix_emballage_usd || 0) : 0,
                                     type_achat: this.type_achat
                                 };
                             });
@@ -107,7 +119,7 @@ $approvisionnementsUrl = url('approvisionnements');
         <div class="card-header">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Modifier l'approvisionnement <?= htmlspecialchars($approvisionnement['numero_bon']) ?></h2>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Choisissez pour chaque produit un achat par caisse ou par palette. Le stock est enregistre en caisses.
+                Modifiez les produits pleins ou les emballages vides. Le prix des emballages est saisi en USD puis converti dans la devise de base du système.
             </p>
         </div>
         <div class="card-body">
@@ -139,7 +151,7 @@ $approvisionnementsUrl = url('approvisionnements');
                         <label class="label mb-0">Produits</label>
                         <button
                             type="button"
-                            @click="lignes.push({ produit_id: '', quantite_achat: 0, unite_achat: 'caisse' })"
+                            @click="lignes.push({ produit_id: '', type_chargement: 'vente', quantite_achat: 0, unite_achat: 'caisse', prix_emballage_usd: '' })"
                             class="btn-secondary btn-sm"
                         >
                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -154,10 +166,12 @@ $approvisionnementsUrl = url('approvisionnements');
                             <thead class="bg-gray-50 dark:bg-gray-700">
                                 <tr>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Produit</th>
+                                    <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Nature</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Btl/Caisse</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">NP</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Achat</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Unite</th>
+                                    <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Prix emballage USD/cs</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Caisses</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Prix caisse</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Sous-total</th>
@@ -177,6 +191,12 @@ $approvisionnementsUrl = url('approvisionnements');
                                                 <?php endforeach; ?>
                                             </select>
                                         </td>
+                                        <td class="px-3 py-2 min-w-40">
+                                            <select x-model="ligne.type_chargement" class="input" @change="if (ligne.type_chargement === 'emballage') ligne.unite_achat = 'caisse'; recalc()">
+                                                <option value="vente">Produits pleins</option>
+                                                <option value="emballage">Emballages vides</option>
+                                            </select>
+                                        </td>
                                         <td class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
                                             <span x-text="produits.find(p => p.id == ligne.produit_id)?.bouteilles_par_caisses || '-'"></span>
                                         </td>
@@ -187,19 +207,24 @@ $approvisionnementsUrl = url('approvisionnements');
                                             <input type="number" x-model.number="ligne.quantite_achat" class="input w-24" min="1" required>
                                         </td>
                                         <td class="px-3 py-2">
-                                            <select x-model="ligne.unite_achat" class="input w-28">
+                                            <select x-model="ligne.unite_achat" class="input w-28" :disabled="ligne.type_chargement === 'emballage'">
                                                 <option value="caisse">Caisse</option>
                                                 <option value="palette">Palette</option>
                                             </select>
+                                        </td>
+                                        <td class="px-3 py-2">
+                                            <input x-show="ligne.type_chargement === 'emballage'" type="number" x-model.number="ligne.prix_emballage_usd"
+                                                   class="input w-32" min="0.01" step="0.01" :required="ligne.type_chargement === 'emballage'">
+                                            <span x-show="ligne.type_chargement !== 'emballage'">—</span>
                                         </td>
                                         <td class="px-3 py-2 text-sm font-semibold">
                                             <span x-text="getQuantiteCaisses(ligne, produits.find(p => p.id == ligne.produit_id))"></span>
                                         </td>
                                         <td class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
-                                            <span x-text="App.formatMoneyConverted(getPrixCaisse(produits.find(p => p.id == ligne.produit_id), type_achat) || 0, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></span>
+                                            <span x-text="App.formatMoneyConverted(getPrixLigne(ligne, produits.find(p => p.id == ligne.produit_id), type_achat) || 0, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></span>
                                         </td>
                                         <td class="px-3 py-2 text-sm font-medium">
-                                            <span x-text="App.formatMoneyConverted(getQuantiteCaisses(ligne, produits.find(p => p.id == ligne.produit_id)) * getPrixCaisse(produits.find(p => p.id == ligne.produit_id), type_achat) || 0, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></span>
+                                            <span x-text="App.formatMoneyConverted(getQuantiteCaisses(ligne, produits.find(p => p.id == ligne.produit_id)) * getPrixLigne(ligne, produits.find(p => p.id == ligne.produit_id), type_achat) || 0, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></span>
                                         </td>
                                         <td class="px-3 py-2">
                                             <button
@@ -218,7 +243,7 @@ $approvisionnementsUrl = url('approvisionnements');
                             </tbody>
                             <tfoot class="bg-gray-50 dark:bg-gray-700">
                                 <tr>
-                                    <td colspan="7" class="px-3 py-3 text-right font-medium text-gray-900 dark:text-white">Total HT:</td>
+                                    <td colspan="9" class="px-3 py-3 text-right font-medium text-gray-900 dark:text-white">Total HT:</td>
                                     <td class="px-3 py-3 font-bold text-gray-900 dark:text-white">
                                         <span x-text="App.formatMoneyConverted(total, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></span>
                                     </td>

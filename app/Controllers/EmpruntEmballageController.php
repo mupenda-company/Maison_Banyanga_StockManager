@@ -185,6 +185,7 @@ class EmpruntEmballageController extends Controller
         $operationRef = $emprunt['operation_ref'] ?: ('EMP-' . $emprunt['id']);
         $rows = $this->db->fetchAll(
             "SELECT e.*, c.nom as client_nom, p.nom as produit_nom, p.code as produit_code,
+                    p.bouteilles_par_caisses,
                     emp.nom as emplacement_nom,
                     (e.quantite_empruntee - e.quantite_utilisee - e.quantite_retournee) as reste_caisses
              FROM emprunts_emballages e
@@ -196,7 +197,85 @@ class EmpruntEmballageController extends Controller
             ['ref' => $operationRef]
         );
 
+        foreach ($rows as &$row) {
+            $row['remboursements'] = $this->db->fetchAll(
+                "SELECT id, created_at, ABS(quantite) / :btl_par_caisse AS quantite_caisses
+                 FROM mouvements_stock
+                 WHERE reference_type = 'emprunt_emballage_rembourse'
+                   AND reference_id = :emprunt_id
+                 ORDER BY created_at DESC, id DESC",
+                [
+                    'btl_par_caisse' => max(1, (int) ($row['bouteilles_par_caisses'] ?? 24)),
+                    'emprunt_id' => (int) $row['id'],
+                ]
+            );
+        }
+        unset($row);
+
         return $this->success(['operation_ref' => $operationRef, 'lignes' => $rows]);
+    }
+
+    public function printBon($id)
+    {
+        $this->requirePermission('emballages.voir');
+        $emprunt = $this->empruntModel->find($id);
+        if (!$emprunt) {
+            http_response_code(404);
+            exit('Operation non trouvee');
+        }
+
+        $operationRef = $emprunt['operation_ref'] ?: ('EMP-' . $emprunt['id']);
+        $lignes = $this->empruntModel->getOperationDetails($operationRef);
+        $operation = $lignes[0] ?? $emprunt;
+        $operation['operation_ref_label'] = $operationRef;
+        $auteur = !empty($operation['created_by'])
+            ? $this->db->fetch("SELECT nom, prenom FROM users WHERE id = :id", ['id' => $operation['created_by']])
+            : null;
+
+        $this->view('emballages/bon-emprunt', [
+            'mode' => 'operation',
+            'operation' => $operation,
+            'lignes' => $lignes,
+            'auteur' => $auteur,
+        ]);
+    }
+
+    public function printRemboursement($mouvementId)
+    {
+        $this->requirePermission('emballages.voir');
+        $mouvement = $this->db->fetch(
+            "SELECT m.*, e.operation_ref, e.direction, e.type_stock, e.source_type,
+                    e.source_nom, e.source_contact, e.client_id, e.date_emprunt,
+                    c.nom AS client_nom, p.nom AS produit_nom, p.code AS produit_code,
+                    p.bouteilles_par_caisses, emp.nom AS emplacement_nom,
+                    u.nom AS user_nom, u.prenom AS user_prenom
+             FROM mouvements_stock m
+             JOIN emprunts_emballages e ON e.id = m.reference_id
+             LEFT JOIN clients c ON c.id = e.client_id
+             JOIN produits p ON p.id = m.produit_id
+             JOIN emplacements emp ON emp.id = m.emplacement_id
+             LEFT JOIN users u ON u.id = m.created_by
+             WHERE m.id = :id AND m.reference_type = 'emprunt_emballage_rembourse'",
+            ['id' => $mouvementId]
+        );
+        if (!$mouvement) {
+            http_response_code(404);
+            exit('Remboursement non trouve');
+        }
+
+        $mouvement['operation_ref_label'] = $mouvement['operation_ref'] ?: ('EMP-' . $mouvement['reference_id']);
+        $mouvement['quantite_caisses'] = abs((float) $mouvement['quantite'])
+            / max(1, (int) ($mouvement['bouteilles_par_caisses'] ?? 24));
+
+        $this->view('emballages/bon-emprunt', [
+            'mode' => 'remboursement',
+            'operation' => $mouvement,
+            'lignes' => [$mouvement],
+            'auteur' => [
+                'nom' => $mouvement['user_nom'] ?? '',
+                'prenom' => $mouvement['user_prenom'] ?? '',
+            ],
+        ]);
     }
 
     public function update($id)
@@ -505,7 +584,10 @@ class EmpruntEmballageController extends Controller
         );
 
         if ($result['success']) {
-            return $this->success(['solde' => $result['solde']], $result['solde'] ? 'Emprunt rembourse et solde' : 'Remboursement enregistre');
+            return $this->success([
+                'solde' => $result['solde'],
+                'mouvement_id' => $result['mouvement_id'] ?? null,
+            ], $result['solde'] ? 'Emprunt rembourse et solde' : 'Remboursement enregistre');
         }
 
         return $this->error($result['message'], 400);
