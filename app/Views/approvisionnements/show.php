@@ -101,14 +101,17 @@ ob_start();
                                     <div class="text-xs text-gray-500"><?= htmlspecialchars($detail['produit_code']) ?></div>
                                 </td>
                                 <td>
-                                    <?php if (($detail['type_chargement'] ?? 'vente') === 'emballage'): ?>
+                                    <?php $nature = ($detail['type_chargement'] ?? 'produit') === 'vente' ? 'produit' : ($detail['type_chargement'] ?? 'produit'); ?>
+                                    <?php if ($nature === 'emballage'): ?>
                                         <span class="badge-warning">Emballages vides</span>
+                                    <?php elseif ($nature === 'injection'): ?>
+                                        <span class="badge-success">Injection</span>
                                     <?php else: ?>
-                                        <span class="badge-info">Produits pleins</span>
+                                        <span class="badge-info">Produit seulement</span>
                                     <?php endif; ?>
                                 </td>
                                 <td class="text-right">
-                                    <?php if (($detail['type_chargement'] ?? 'vente') === 'emballage'): ?>
+                                    <?php if ($nature === 'emballage'): ?>
                                         <span class="text-xs text-gray-500">Achat emballage</span>
                                     <?php elseif (($detail['type_achat'] ?? 'deposer') === 'enlever'): ?>
                                         <span class="badge-info">Enlever</span>
@@ -120,8 +123,12 @@ ob_start();
                                 <td class="text-right"><?= ($detail['quantite_caisses'] * ($detail['bouteilles_par_caisses'] ?? 24)) ?></td>
                                 <td class="text-right">
                                     <?= format_money_converted($detail['prix_caisse'] ?? ($detail['prix_unitaire'] * ($detail['bouteilles_par_caisses'] ?? 24))) ?>
-                                    <?php if (($detail['type_chargement'] ?? 'vente') === 'emballage' && ($detail['devise_prix'] ?? '') === 'USD'): ?>
-                                        <div class="text-xs text-gray-500"><?= format_money($detail['prix_original'] ?? 0, 'USD') ?></div>
+                                    <?php if ($nature === 'injection'): ?>
+                                        <div class="text-xs text-gray-500">Produit : <?= format_money_converted($detail['prix_produit'] ?? 0) ?></div>
+                                        <div class="text-xs text-gray-500">Emballage : <?= format_money_converted($detail['prix_emballage'] ?? 0) ?></div>
+                                    <?php endif; ?>
+                                    <?php if (in_array($nature, ['emballage', 'injection'], true) && ($detail['devise_prix'] ?? '') === 'USD'): ?>
+                                        <div class="text-xs text-gray-500">Prix emballage saisi : <?= format_money($detail['prix_original'] ?? 0, 'USD') ?></div>
                                         <div class="text-xs text-gray-400">Taux : <?= number_format((float) ($detail['taux_change'] ?? 0), 2, ',', ' ') ?></div>
                                     <?php endif; ?>
                                 </td>

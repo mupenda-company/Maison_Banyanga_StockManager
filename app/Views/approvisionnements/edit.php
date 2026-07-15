@@ -28,10 +28,15 @@ $approvisionnementsUrl = url('approvisionnements');
             return quantite;
         }
         function getPrixLigne(ligne, produit, typeAchat) {
-            if ((ligne.type_chargement || 'vente') === 'emballage') {
-                return App.convertMoney(parseFloat(ligne.prix_emballage_usd || 0), 'USD', (window.BASE_DEVISE || 'CDF'));
+            const type = ligne.type_chargement || 'produit';
+            const prixProduit = getPrixCaisse(produit, typeAchat);
+            const prixEmballage = parseFloat(ligne.prix_emballage_usd || 0) > 0
+                ? App.convertMoney(parseFloat(ligne.prix_emballage_usd), 'USD', (window.BASE_DEVISE || 'CDF'))
+                : parseFloat(produit?.prix_emballage || 0);
+            if (type === 'emballage') {
+                return parseFloat(ligne.prix_emballage_usd || 0) > 0 ? prixEmballage : 0;
             }
-            return getPrixCaisse(produit, typeAchat);
+            return type === 'injection' ? prixProduit + prixEmballage : prixProduit;
         }
         function approEditForm() {
             return {
@@ -42,11 +47,11 @@ $approvisionnementsUrl = url('approvisionnements');
                 lignes: <?= json_encode(array_map(function($d) {
                     return [
                         'produit_id' => (int)$d['produit_id'],
-                        'type_chargement' => $d['type_chargement'] ?? 'vente',
+                        'type_chargement' => (($d['type_chargement'] ?? 'produit') === 'vente' ? 'produit' : ($d['type_chargement'] ?? 'produit')),
                         'quantite_achat' => (int)$d['quantite_caisses'],
                         'unite_achat' => 'caisse',
-                        'prix_emballage_usd' => (($d['type_chargement'] ?? 'vente') === 'emballage')
-                            ? (float) (($d['devise_prix'] ?? '') === 'USD' ? ($d['prix_original'] ?? 0) : convert_money($d['prix_caisse'] ?? 0, get_base_devise(), 'USD'))
+                        'prix_emballage_usd' => in_array(($d['type_chargement'] ?? 'produit'), ['emballage', 'injection'], true)
+                            ? (float) (($d['devise_prix'] ?? '') === 'USD' ? ($d['prix_original'] ?? 0) : convert_money($d['prix_emballage'] ?? $d['prix_caisse'] ?? 0, get_base_devise(), 'USD'))
                             : ''
                     ];
                 }, $approvisionnement['details'] ?? [])) ?>,
@@ -86,8 +91,8 @@ $approvisionnementsUrl = url('approvisionnements');
                                 return {
                                     produit_id: parseInt(l.produit_id),
                                     quantite_caisses: getQuantiteCaisses(l, p),
-                                    type_chargement: l.type_chargement || 'vente',
-                                    prix_emballage_usd: (l.type_chargement || 'vente') === 'emballage' ? parseFloat(l.prix_emballage_usd || 0) : 0,
+                                    type_chargement: l.type_chargement || 'produit',
+                                    prix_emballage_usd: ['emballage', 'injection'].includes(l.type_chargement || 'produit') ? parseFloat(l.prix_emballage_usd || 0) : 0,
                                     type_achat: this.type_achat
                                 };
                             });
@@ -151,7 +156,7 @@ $approvisionnementsUrl = url('approvisionnements');
                         <label class="label mb-0">Produits</label>
                         <button
                             type="button"
-                            @click="lignes.push({ produit_id: '', type_chargement: 'vente', quantite_achat: 0, unite_achat: 'caisse', prix_emballage_usd: '' })"
+                            @click="lignes.push({ produit_id: '', type_chargement: 'produit', quantite_achat: 0, unite_achat: 'caisse', prix_emballage_usd: '' })"
                             class="btn-secondary btn-sm"
                         >
                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -171,7 +176,7 @@ $approvisionnementsUrl = url('approvisionnements');
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">NP</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Achat</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Unite</th>
-                                    <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Prix emballage USD/cs</th>
+                                    <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Nouveau prix emballage USD/cs (si changé)</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Caisses</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Prix caisse</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Sous-total</th>
@@ -193,8 +198,9 @@ $approvisionnementsUrl = url('approvisionnements');
                                         </td>
                                         <td class="px-3 py-2 min-w-40">
                                             <select x-model="ligne.type_chargement" class="input" @change="if (ligne.type_chargement === 'emballage') ligne.unite_achat = 'caisse'; recalc()">
-                                                <option value="vente">Produits pleins</option>
-                                                <option value="emballage">Emballages vides</option>
+                                                <option value="produit">Produit seulement</option>
+                                                <option value="injection">Injection (produit + emballage)</option>
+                                                <option value="emballage">Emballage seulement</option>
                                             </select>
                                         </td>
                                         <td class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
@@ -213,9 +219,9 @@ $approvisionnementsUrl = url('approvisionnements');
                                             </select>
                                         </td>
                                         <td class="px-3 py-2">
-                                            <input x-show="ligne.type_chargement === 'emballage'" type="number" x-model.number="ligne.prix_emballage_usd"
+                                            <input x-show="['emballage', 'injection'].includes(ligne.type_chargement)" type="number" x-model.number="ligne.prix_emballage_usd"
                                                    class="input w-32" min="0.01" step="0.01" :required="ligne.type_chargement === 'emballage'">
-                                            <span x-show="ligne.type_chargement !== 'emballage'">—</span>
+                                            <span x-show="!['emballage', 'injection'].includes(ligne.type_chargement)">—</span>
                                         </td>
                                         <td class="px-3 py-2 text-sm font-semibold">
                                             <span x-text="getQuantiteCaisses(ligne, produits.find(p => p.id == ligne.produit_id))"></span>

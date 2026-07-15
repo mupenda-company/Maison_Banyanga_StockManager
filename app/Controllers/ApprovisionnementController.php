@@ -338,26 +338,43 @@ class ApprovisionnementController extends Controller
             if (!$produit) {
                 return $this->error('Produit introuvable', 422);
             }
-            $typeChargement = ($detail['type_chargement'] ?? 'vente') === 'emballage' ? 'emballage' : 'vente';
+            $typeDemande = $detail['type_chargement'] ?? 'produit';
+            $typeChargement = in_array($typeDemande, ['emballage', 'injection'], true) ? $typeDemande : 'produit';
             $typeAchat = $detail['type_achat'] ?? 'deposer';
+
+            if ($typeAchat === 'enlever' && $produit['prix_achat_enlever'] > 0) {
+                $prixProduit = (float) $produit['prix_achat_enlever'];
+            } elseif ($typeAchat === 'deposer' && $produit['prix_achat_deposer'] > 0) {
+                $prixProduit = (float) $produit['prix_achat_deposer'];
+            } else {
+                $prixProduit = (float) $produit['prix_achat_unitaire'] * (int) $produit['bouteilles_par_caisses'];
+            }
+
+            $nouveauPrixEmballageUsd = (float) ($detail['prix_emballage_usd'] ?? 0);
+            $prixEmballage = 0.0;
 
             if ($typeChargement === 'emballage') {
                 $prixOriginal = (float) ($detail['prix_emballage_usd'] ?? 0);
                 if ($prixOriginal <= 0) {
                     return $this->error('Indiquez le prix en USD pour chaque emballage', 422);
                 }
-                $prixCaisse = round(convert_money($prixOriginal, 'USD', get_base_devise()), 2);
+                $prixEmballage = round(convert_money($prixOriginal, 'USD', get_base_devise()), 2);
+                $prixCaisse = $prixEmballage;
                 $devisePrix = 'USD';
-            } elseif ($typeAchat === 'enlever' && $produit['prix_achat_enlever'] > 0) {
-                $prixCaisse = $produit['prix_achat_enlever'];
-                $prixOriginal = $prixCaisse;
-                $devisePrix = get_base_devise();
-            } elseif ($typeAchat === 'deposer' && $produit['prix_achat_deposer'] > 0) {
-                $prixCaisse = $produit['prix_achat_deposer'];
-                $prixOriginal = $prixCaisse;
-                $devisePrix = get_base_devise();
+            } elseif ($typeChargement === 'injection') {
+                $prixEmballage = $nouveauPrixEmballageUsd > 0
+                    ? round(convert_money($nouveauPrixEmballageUsd, 'USD', get_base_devise()), 2)
+                    : (float) ($produit['prix_emballage'] ?? 0);
+                if ($prixEmballage <= 0) {
+                    return $this->error('Indiquez le nouveau prix d\'emballage en USD pour cette injection', 422);
+                }
+                $prixCaisse = $prixProduit + $prixEmballage;
+                $prixOriginal = $nouveauPrixEmballageUsd > 0
+                    ? $nouveauPrixEmballageUsd
+                    : round(convert_money($prixEmballage, get_base_devise(), 'USD'), 2);
+                $devisePrix = 'USD';
             } else {
-                $prixCaisse = $produit['prix_achat_unitaire'] * $produit['bouteilles_par_caisses'];
+                $prixCaisse = $prixProduit;
                 $prixOriginal = $prixCaisse;
                 $devisePrix = get_base_devise();
             }
@@ -376,6 +393,8 @@ class ApprovisionnementController extends Controller
                 'quantite_bouteilles' => $quantiteCaisses * $produit['bouteilles_par_caisses'],
                 'prix_unitaire' => $prixCaisse / max(1, $produit['bouteilles_par_caisses']),
                 'prix_caisse' => $prixCaisse,
+                'prix_produit' => $typeChargement === 'emballage' ? 0 : $prixProduit,
+                'prix_emballage' => $prixEmballage,
                 'prix_original' => $prixOriginal,
                 'devise_prix' => $devisePrix,
                 'taux_change' => get_taux_change(),
@@ -483,26 +502,43 @@ class ApprovisionnementController extends Controller
                 return $this->error('Produit introuvable', 422);
             }
 
-            $typeChargement = ($detail['type_chargement'] ?? 'vente') === 'emballage' ? 'emballage' : 'vente';
+            $typeDemande = $detail['type_chargement'] ?? 'produit';
+            $typeChargement = in_array($typeDemande, ['emballage', 'injection'], true) ? $typeDemande : 'produit';
             $typeAchat = $detail['type_achat'] ?? 'deposer';
+
+            if ($typeAchat === 'enlever' && $produit['prix_achat_enlever'] > 0) {
+                $prixProduit = (float) $produit['prix_achat_enlever'];
+            } elseif ($typeAchat === 'deposer' && $produit['prix_achat_deposer'] > 0) {
+                $prixProduit = (float) $produit['prix_achat_deposer'];
+            } else {
+                $prixProduit = (float) $produit['prix_achat_unitaire'] * (int) $produit['bouteilles_par_caisses'];
+            }
+
+            $nouveauPrixEmballageUsd = (float) ($detail['prix_emballage_usd'] ?? 0);
+            $prixEmballage = 0.0;
 
             if ($typeChargement === 'emballage') {
                 $prixOriginal = (float) ($detail['prix_emballage_usd'] ?? 0);
                 if ($prixOriginal <= 0) {
                     return $this->error('Indiquez le prix en USD pour chaque emballage', 422);
                 }
-                $prixCaisse = round(convert_money($prixOriginal, 'USD', get_base_devise()), 2);
+                $prixEmballage = round(convert_money($prixOriginal, 'USD', get_base_devise()), 2);
+                $prixCaisse = $prixEmballage;
                 $devisePrix = 'USD';
-            } elseif ($typeAchat === 'enlever' && $produit['prix_achat_enlever'] > 0) {
-                $prixCaisse = $produit['prix_achat_enlever'];
-                $prixOriginal = $prixCaisse;
-                $devisePrix = get_base_devise();
-            } elseif ($typeAchat === 'deposer' && $produit['prix_achat_deposer'] > 0) {
-                $prixCaisse = $produit['prix_achat_deposer'];
-                $prixOriginal = $prixCaisse;
-                $devisePrix = get_base_devise();
+            } elseif ($typeChargement === 'injection') {
+                $prixEmballage = $nouveauPrixEmballageUsd > 0
+                    ? round(convert_money($nouveauPrixEmballageUsd, 'USD', get_base_devise()), 2)
+                    : (float) ($produit['prix_emballage'] ?? 0);
+                if ($prixEmballage <= 0) {
+                    return $this->error('Indiquez le nouveau prix d\'emballage en USD pour cette injection', 422);
+                }
+                $prixCaisse = $prixProduit + $prixEmballage;
+                $prixOriginal = $nouveauPrixEmballageUsd > 0
+                    ? $nouveauPrixEmballageUsd
+                    : round(convert_money($prixEmballage, get_base_devise(), 'USD'), 2);
+                $devisePrix = 'USD';
             } else {
-                $prixCaisse = $produit['prix_achat_unitaire'] * $produit['bouteilles_par_caisses'];
+                $prixCaisse = $prixProduit;
                 $prixOriginal = $prixCaisse;
                 $devisePrix = get_base_devise();
             }
@@ -523,6 +559,8 @@ class ApprovisionnementController extends Controller
                 'quantite_bouteilles' => $quantiteCaisses * (int)$produit['bouteilles_par_caisses'],
                 'prix_unitaire' => $prixCaisse / max(1, (int)$produit['bouteilles_par_caisses']),
                 'prix_caisse' => $prixCaisse,
+                'prix_produit' => $typeChargement === 'emballage' ? 0 : $prixProduit,
+                'prix_emballage' => $prixEmballage,
                 'prix_original' => $prixOriginal,
                 'devise_prix' => $devisePrix,
                 'taux_change' => get_taux_change(),
@@ -648,7 +686,11 @@ class ApprovisionnementController extends Controller
         ];
 
         foreach ($approvisionnement['details'] ?? [] as $detail) {
-            $isEmballage = ($detail['type_chargement'] ?? 'vente') === 'emballage';
+            $typeChargement = ($detail['type_chargement'] ?? 'produit') === 'vente'
+                ? 'produit'
+                : ($detail['type_chargement'] ?? 'produit');
+            $isEmballage = $typeChargement === 'emballage';
+            $isInjection = $typeChargement === 'injection';
             $achat = (float) ($detail['quantite_caisses'] ?? 0);
             $np = (int) ($detail['caisses_par_palette'] ?? 0);
             $plt = $np > 0 ? ($achat / $np) : 0;
@@ -660,14 +702,14 @@ class ApprovisionnementController extends Controller
                 $pvu = (float) ($detail['prix_vente_unitaire'] ?? 0) * $btl;
             }
 
-            $prixAchatChoisi = $isEmballage
+            $prixAchatChoisi = ($isEmballage || $isInjection)
                 ? (float) ($detail['prix_caisse'] ?? 0)
                 : ((($detail['type_achat'] ?? 'deposer') === 'enlever') ? $paae : $paad);
             if ($prixAchatChoisi <= 0) {
                 $prixAchatChoisi = (float)($detail['prix_caisse'] ?? (($detail['prix_unitaire'] ?? 0) * $btl));
             }
 
-            if ($isEmballage) {
+            if ($isEmballage || $isInjection) {
                 $paad = $prixAchatChoisi;
                 $paae = $prixAchatChoisi;
                 $pvu = $prixAchatChoisi;
@@ -681,7 +723,9 @@ class ApprovisionnementController extends Controller
             $totalAEnl = $ecartAEn * $achat;
 
             $items[] = [
-                'produit' => ($detail['produit_nom'] ?? '') . ($isEmballage ? ' — Emballages vides' : ' — Produits pleins'),
+                'produit' => ($detail['produit_nom'] ?? '') . ($isEmballage
+                    ? ' — Emballages vides'
+                    : ($isInjection ? ' — Injection' : ' — Produit seulement')),
                 'np' => $np,
                 'achat' => $achat,
                 'plt' => $plt,

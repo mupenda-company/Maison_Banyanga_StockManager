@@ -23,6 +23,8 @@ class Approvisionnement extends Model
         }
 
         $columns = [
+            'prix_produit' => "DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER prix_unitaire",
+            'prix_emballage' => "DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER prix_produit",
             'prix_original' => "DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER prix_unitaire",
             'devise_prix' => "VARCHAR(3) NOT NULL DEFAULT 'CDF' AFTER prix_original",
             'taux_change' => "DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER devise_prix",
@@ -41,6 +43,17 @@ class Approvisionnement extends Model
         }
 
         self::$detailMoneyColumnsChecked = true;
+    }
+
+    private function normalizeDetailType($type): string
+    {
+        if ($type === 'emballage') {
+            return 'emballage';
+        }
+        if ($type === 'injection') {
+            return 'injection';
+        }
+        return 'produit';
     }
     
     /**
@@ -152,9 +165,13 @@ class Approvisionnement extends Model
             $besoinsEmballages = [];
             $apportsEmballages = [];
             foreach ($details as $detail) {
-                if (($detail['type_chargement'] ?? 'vente') === 'emballage') {
+                $detailType = $this->normalizeDetailType($detail['type_chargement'] ?? 'produit');
+                if ($detailType === 'emballage') {
                     $produitId = (int) ($detail['produit_id'] ?? 0);
                     $apportsEmballages[$produitId] = ($apportsEmballages[$produitId] ?? 0) + (int) ($detail['quantite_caisses'] ?? 0);
+                    continue;
+                }
+                if ($detailType === 'injection') {
                     continue;
                 }
                 $produitId = (int) ($detail['produit_id'] ?? 0);
@@ -179,8 +196,8 @@ class Approvisionnement extends Model
             // Les emballages achetés sont enregistrés avant les produits pleins
             // afin de pouvoir être utilisés dans la même opération.
             usort($details, function ($a, $b) {
-                return (($a['type_chargement'] ?? 'vente') === 'emballage' ? 0 : 1)
-                    <=> (($b['type_chargement'] ?? 'vente') === 'emballage' ? 0 : 1);
+                return ($this->normalizeDetailType($a['type_chargement'] ?? 'produit') === 'emballage' ? 0 : 1)
+                    <=> ($this->normalizeDetailType($b['type_chargement'] ?? 'produit') === 'emballage' ? 0 : 1);
             });
 
             foreach ($details as $detail) {
@@ -188,7 +205,9 @@ class Approvisionnement extends Model
                 $this->db->insert('approvisionnement_details', $detail);
 
                 $produit = (new Produit())->find($detail['produit_id']);
-                $isEmballage = ($detail['type_chargement'] ?? 'vente') === 'emballage';
+                $detailType = $this->normalizeDetailType($detail['type_chargement'] ?? 'produit');
+                $isEmballage = $detailType === 'emballage';
+                $isInjection = $detailType === 'injection';
                 $stockAvant = $stockModel->getStock($detail['produit_id'], $emplacementPrincipalId) ?: [];
                 $quantiteKey = $isEmballage ? 'quantite_vide' : 'quantite_pleine';
                 $quantiteAvant = (int) ($stockAvant[$quantiteKey] ?? 0);
@@ -203,7 +222,7 @@ class Approvisionnement extends Model
                         ]
                     );
 
-                    $nouveauPrix = (float) ($detail['prix_caisse'] ?? 0);
+                    $nouveauPrix = (float) ($detail['prix_emballage'] ?? $detail['prix_caisse'] ?? 0);
                     if (abs($nouveauPrix - (float) ($produit['prix_emballage'] ?? 0)) >= 0.01) {
                         (new Produit())->update($detail['produit_id'], ['prix_emballage' => $nouveauPrix]);
                     }
@@ -218,15 +237,19 @@ class Approvisionnement extends Model
                         ]
                     );
 
-                    // Les produits pleins reçus consomment les caisses vides disponibles.
-                    $resultDeduction = $stockModel->deduireVide(
-                        $detail['produit_id'],
-                        $emplacementPrincipalId,
-                        $detail['quantite_caisses']
-                    );
-                    if (!$resultDeduction['success']) {
-                        $disponible = (int) ($resultDeduction['disponible'] ?? 0);
-                        throw new Exception('Emballages insuffisants pour ' . ($produit['nom'] ?? 'Produit') . ' : disponible ' . $disponible . ' cs, demande ' . $detail['quantite_caisses'] . ' cs. Enregistrez d\'abord un emprunt d\'emballages avant de valider cet achat.');
+                    if (!$isInjection) {
+                        $resultDeduction = $stockModel->deduireVide(
+                            $detail['produit_id'],
+                            $emplacementPrincipalId,
+                            $detail['quantite_caisses']
+                        );
+                        if (!$resultDeduction['success']) {
+                            $disponible = (int) ($resultDeduction['disponible'] ?? 0);
+                            throw new Exception('Emballages insuffisants pour ' . ($produit['nom'] ?? 'Produit') . ' : disponible ' . $disponible . ' cs, demande ' . $detail['quantite_caisses'] . ' cs.');
+                        }
+                    } elseif ((float) ($detail['prix_emballage'] ?? 0) > 0
+                        && abs((float) $detail['prix_emballage'] - (float) ($produit['prix_emballage'] ?? 0)) >= 0.01) {
+                        (new Produit())->update($detail['produit_id'], ['prix_emballage' => (float) $detail['prix_emballage']]);
                     }
                 }
 
@@ -240,7 +263,9 @@ class Approvisionnement extends Model
                     'quantite_apres' => $quantiteAvant + $detail['quantite_bouteilles'],
                     'reference_type' => 'approvisionnement',
                     'reference_id' => $approvisionnementId,
-                    'motif' => ($isEmballage ? 'Approvisionnement emballages vides du ' : 'Approvisionnement produits pleins du ') . $data['date_approvisionnement'],
+                    'motif' => ($isEmballage
+                        ? 'Approvisionnement emballages vides du '
+                        : ($isInjection ? 'Approvisionnement par injection du ' : 'Approvisionnement produits seulement du ')) . $data['date_approvisionnement'],
                     'created_by' => $data['created_by']
                 ]);
             }
@@ -284,10 +309,11 @@ class Approvisionnement extends Model
 
             $ancien = [];
             foreach ($ancienAppro['details'] as $d) {
-                $key = (($d['type_chargement'] ?? 'vente') === 'emballage' ? 'emballage' : 'vente') . ':' . (int) $d['produit_id'];
+                $detailType = $this->normalizeDetailType($d['type_chargement'] ?? 'produit');
+                $key = $detailType . ':' . (int) $d['produit_id'];
                 $ancien[$key] = $ancien[$key] ?? [
                     'produit_id' => (int) $d['produit_id'],
-                    'type_chargement' => $d['type_chargement'] ?? 'vente',
+                    'type_chargement' => $detailType,
                     'caisses' => 0,
                     'bouteilles' => 0,
                 ];
@@ -297,10 +323,11 @@ class Approvisionnement extends Model
 
             $nouveau = [];
             foreach ($details as $d) {
-                $key = (($d['type_chargement'] ?? 'vente') === 'emballage' ? 'emballage' : 'vente') . ':' . (int) $d['produit_id'];
+                $detailType = $this->normalizeDetailType($d['type_chargement'] ?? 'produit');
+                $key = $detailType . ':' . (int) $d['produit_id'];
                 $nouveau[$key] = $nouveau[$key] ?? [
                     'produit_id' => (int) $d['produit_id'],
-                    'type_chargement' => $d['type_chargement'] ?? 'vente',
+                    'type_chargement' => $detailType,
                     'caisses' => 0,
                     'bouteilles' => 0,
                 ];
@@ -313,7 +340,9 @@ class Approvisionnement extends Model
             foreach ($detailKeys as $key) {
                 $ligneReference = $nouveau[$key] ?? $ancien[$key];
                 $produitId = (int) $ligneReference['produit_id'];
-                $isEmballage = ($ligneReference['type_chargement'] ?? 'vente') === 'emballage';
+                $detailType = $this->normalizeDetailType($ligneReference['type_chargement'] ?? 'produit');
+                $isEmballage = $detailType === 'emballage';
+                $isInjection = $detailType === 'injection';
                 $ancienneCaisses = $ancien[$key]['caisses'] ?? 0;
                 $nouvelleCaisses = $nouveau[$key]['caisses'] ?? 0;
 
@@ -335,8 +364,10 @@ class Approvisionnement extends Model
                 } else {
                     $stockDeltas[$produitId]['quantite_pleine'] += $diffBouteilles;
                     $stockDeltas[$produitId]['caisses_pleine'] += $diffCaisses;
-                    $stockDeltas[$produitId]['quantite_vide'] -= $diffBouteilles;
-                    $stockDeltas[$produitId]['caisses_vide'] -= $diffCaisses;
+                    if (!$isInjection) {
+                        $stockDeltas[$produitId]['quantite_vide'] -= $diffBouteilles;
+                        $stockDeltas[$produitId]['caisses_vide'] -= $diffCaisses;
+                    }
                 }
             }
 
@@ -359,9 +390,10 @@ class Approvisionnement extends Model
             foreach ($details as $detail) {
                 $detail['approvisionnement_id'] = $id;
                 $this->db->insert('approvisionnement_details', $detail);
-                if (($detail['type_chargement'] ?? 'vente') === 'emballage') {
+                $detailType = $this->normalizeDetailType($detail['type_chargement'] ?? 'produit');
+                if (in_array($detailType, ['emballage', 'injection'], true)) {
                     $produit = (new Produit())->find($detail['produit_id']);
-                    $nouveauPrix = (float) ($detail['prix_caisse'] ?? 0);
+                    $nouveauPrix = (float) ($detail['prix_emballage'] ?? 0);
                     if (abs($nouveauPrix - (float) ($produit['prix_emballage'] ?? 0)) >= 0.01) {
                         (new Produit())->update($detail['produit_id'], ['prix_emballage' => $nouveauPrix]);
                     }
@@ -402,7 +434,9 @@ class Approvisionnement extends Model
             $stockModel = new Stock();
             $stockDeltas = [];
             foreach ($approvisionnement['details'] as $detail) {
-                $isEmballage = ($detail['type_chargement'] ?? 'vente') === 'emballage';
+                $detailType = $this->normalizeDetailType($detail['type_chargement'] ?? 'produit');
+                $isEmballage = $detailType === 'emballage';
+                $isInjection = $detailType === 'injection';
                 $produitId = (int) $detail['produit_id'];
                 $stockDeltas[$produitId] = $stockDeltas[$produitId] ?? [
                     'quantite_pleine' => 0,
@@ -416,8 +450,10 @@ class Approvisionnement extends Model
                 } else {
                     $stockDeltas[$produitId]['quantite_pleine'] -= (int) $detail['quantite_bouteilles'];
                     $stockDeltas[$produitId]['caisses_pleine'] -= (int) $detail['quantite_caisses'];
-                    $stockDeltas[$produitId]['quantite_vide'] += (int) $detail['quantite_bouteilles'];
-                    $stockDeltas[$produitId]['caisses_vide'] += (int) $detail['quantite_caisses'];
+                    if (!$isInjection) {
+                        $stockDeltas[$produitId]['quantite_vide'] += (int) $detail['quantite_bouteilles'];
+                        $stockDeltas[$produitId]['caisses_vide'] += (int) $detail['quantite_caisses'];
+                    }
                 }
             }
 
