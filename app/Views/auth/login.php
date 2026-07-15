@@ -182,10 +182,10 @@
         </div>
 
         <div class="text-center border-t mt-10 border-gray-200 dark:border-gray-700">
-            <!-- <div class="flex items-center justify-center min-h-[56px] -mb-10">
+            <div class="flex items-center justify-center min-h-[56px] -mb-10">
                 <img x-cloak x-show="!$store.theme.dark" src="<?= asset('uploads/Mupenda Company.png') ?>" alt="Mupenda Company" class="h-32 w-auto">
                 <img x-cloak x-show="$store.theme.dark" src="<?= asset('uploads/White Mupenda Company.png') ?>" alt="Mupenda Company" class="h-32 w-auto">
-            </div> -->
+            </div>
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-10">
                 &copy; <?= date('Y') ?> Mupenda Company.
                 <a href="https://mupenda.cd/" target="_blank" rel="noopener noreferrer" class="font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 underline underline-offset-2">mupenda.cd</a>
