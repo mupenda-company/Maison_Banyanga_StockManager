@@ -4,12 +4,12 @@ ob_start();
 ?>
 
 <!-- Header -->
-<div class="flex items-center justify-between mb-6">
+<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
     <div>
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Dépenses</h1>
         <p class="text-gray-500 dark:text-gray-400">Gestion des dépenses opérationnelles</p>
     </div>
-    <div class="flex items-center gap-3">
+    <div class="flex flex-wrap items-center gap-3">
         <?php if (can('depenses.voir')): ?>
         <a href="<?= url('depenses/print') ?>?<?= http_build_query($filters ?? []) ?>" class="btn btn-secondary" target="_blank">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

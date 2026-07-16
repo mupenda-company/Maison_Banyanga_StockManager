@@ -197,11 +197,11 @@ ob_start();
                         </div>
                         <template x-for="v in vehicules" :key="v.id + '-summary'">
                             <div x-show="String(v.id) === String(vehicule_id)" class="grid grid-cols-1 md:grid-cols-4 gap-3">
-                                <div class="p-3 bg-white rounded-lg border">
+                                <div class="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                                     <p class="text-xs uppercase text-gray-500">Caisses pleines déjà dans le véhicule</p>
                                     <p class="text-lg font-bold text-green-700" x-text="Math.round(parseFloat(v.stock_caisses_pleine || 0)) + ' cs'"></p>
                                 </div>
-                                <div class="p-3 bg-white rounded-lg border">
+                                <div class="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                                     <p class="text-xs uppercase text-gray-500">Caisses vides déjà dans le véhicule</p>
                                     <p class="text-lg font-bold text-gray-700" x-text="Math.round(parseFloat(v.stock_caisses_vide || 0)) + ' cs'"></p>
                                 </div>

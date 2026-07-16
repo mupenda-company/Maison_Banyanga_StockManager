@@ -4,11 +4,11 @@ ob_start();
 ?>
 
 <div class="card">
-    <div class="card-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div class="card-header flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Liste des produits</h2>
-        <div class="flex items-center space-x-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full lg:flex lg:w-auto lg:items-center">
             <!-- Filtre catégorie -->
-            <select class="input w-auto" onchange="window.location.href='?categorie='+this.value">
+            <select class="input w-full lg:w-auto" onchange="window.location.href='?categorie='+this.value">
                 <option value="">Toutes les catégories</option>
                 <?php foreach ($categories as $cat): ?>
                 <option value="<?= htmlspecialchars($cat['categorie']) ?>" <?= ($_GET['categorie'] ?? '') === $cat['categorie'] ? 'selected' : '' ?>>
@@ -18,7 +18,7 @@ ob_start();
             </select>
             
             <?php if (can('produits.creer')): ?>
-            <button onclick="openProduitModal()" class="btn btn-primary">
+            <button onclick="openProduitModal()" class="btn btn-primary w-full lg:w-auto">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>

@@ -4,12 +4,12 @@ ob_start();
 ?>
 
 <!-- Header -->
-<div class="flex items-center justify-between mb-6">
+<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
     <div>
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Missions</h1>
         <p class="text-gray-500 dark:text-gray-400">Gestion des missions de livraison et de ristourne</p>
     </div>
-    <div class="flex gap-2 flex-wrap justify-end">
+    <div class="flex gap-2 flex-wrap lg:justify-end">
         <?php if (can('missions.voir')): ?>
         <a href="<?= url('missions/synthese') ?>" target="_blank" class="btn btn-secondary">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

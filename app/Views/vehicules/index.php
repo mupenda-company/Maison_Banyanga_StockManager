@@ -4,12 +4,12 @@ ob_start();
 ?>
 
 <!-- Header -->
-<div class="flex items-center justify-between mb-6">
+<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
     <div>
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Véhicules</h1>
         <p class="text-gray-500 dark:text-gray-400">Gestion du parc automobile</p>
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
         <a href="<?= url('vehicules/inventaire') ?>" class="btn btn-secondary">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2m-6 0a2 2 0 002 2h4a2 2 0 002-2m-6 0a2 2 0 012-2h2a2 2 0 012 2"/>

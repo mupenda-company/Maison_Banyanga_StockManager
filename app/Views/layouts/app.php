@@ -178,16 +178,16 @@
         }
     </style>
 </head>
-    <body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-200" x-data="{ sidebarOpen: false, alertsOpen: false, userMenuOpen: false, emballagesOpen: <?= strpos($_SERVER['REQUEST_URI'], '/emballages') !== false ? 'true' : 'false' ?> }">
+    <body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200" x-data="{ sidebarOpen: false, alertsOpen: false, userMenuOpen: false, emballagesOpen: <?= strpos($_SERVER['REQUEST_URI'], '/emballages') !== false ? 'true' : 'false' ?> }">
         <!-- Notifications Container -->
         <div class="notifications-container fixed top-20 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
             <template x-for="item in ($store.notifications?.items || [])" :key="item.id">
                 <div class="pointer-events-auto alert-animate flex items-start gap-3 rounded-md border px-4 py-3 shadow-lg"
                      :class="{
-                        'bg-green-50 border-green-200 text-green-900': item.type === 'success',
-                        'bg-red-50 border-red-200 text-red-900': item.type === 'error',
-                        'bg-yellow-50 border-yellow-200 text-yellow-900': item.type === 'warning',
-                        'bg-blue-50 border-blue-200 text-blue-900': item.type === 'info'
+                        'bg-green-50 border-green-200 text-green-900 dark:bg-green-900 dark:border-green-700 dark:text-green-100': item.type === 'success',
+                        'bg-red-50 border-red-200 text-red-900 dark:bg-red-900 dark:border-red-700 dark:text-red-100': item.type === 'error',
+                        'bg-yellow-50 border-yellow-200 text-yellow-900 dark:bg-yellow-900 dark:border-yellow-700 dark:text-yellow-100': item.type === 'warning',
+                        'bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-900 dark:border-blue-700 dark:text-blue-100': item.type === 'info'
                      }">
                     <div class="flex-1 text-sm" x-text="item.message"></div>
                     <button type="button" class="opacity-70 hover:opacity-100" @click="$store.notifications.remove(item.id)" aria-label="Fermer">
@@ -467,7 +467,7 @@
         </aside>
         
         <!-- Main Content -->
-        <div class="flex-1 flex flex-col overflow-hidden">
+        <div class="min-w-0 flex-1 flex flex-col overflow-hidden">
             <!-- Header -->
             <header class="bg-white dark:bg-gray-800 shadow-sm z-20">
                 <div class="flex items-center justify-between h-16 px-4 sm:px-6">
@@ -601,7 +601,7 @@
             </header>
             
             <!-- Main Content Area -->
-            <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+            <main class="min-w-0 w-full flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
                 <?= $content ?>
             </main>
         </div>

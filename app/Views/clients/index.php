@@ -24,17 +24,17 @@ ob_start();
     </div>
 
     <div class="card">
-        <div class="card-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div class="card-header flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Liste des clients</h2>
-            <form method="get" class="flex flex-col sm:flex-row sm:items-center gap-3">
+            <form method="get" class="grid w-full min-w-0 grid-cols-1 sm:grid-cols-2 xl:flex xl:w-auto xl:items-center gap-3">
                 <input
                     type="search"
                     name="q"
                     value="<?= htmlspecialchars($search ?? '') ?>"
                     placeholder="Rechercher un client..."
-                    class="input w-full sm:w-64"
+                    class="input w-full xl:w-64"
                 >
-                <select name="zone_id" class="input w-auto">
+                <select name="zone_id" class="input w-full xl:w-auto">
                     <option value="">Toutes les zones</option>
                     <?php foreach ($zones as $zone): ?>
                     <option value="<?= $zone['id'] ?>" <?= ($selectedZoneId ?? '') == $zone['id'] ? 'selected' : '' ?>>
@@ -42,16 +42,16 @@ ob_start();
                     </option>
                     <?php endforeach; ?>
                 </select>
-                <select name="activite" class="input w-auto">
+                <select name="activite" class="input w-full xl:w-auto">
                     <option value="tous" <?= $activite === 'tous' ? 'selected' : '' ?>>Tous</option>
                     <option value="actif" <?= $activite === 'actif' ? 'selected' : '' ?>>Actifs</option>
                     <option value="non_actif" <?= $activite === 'non_actif' ? 'selected' : '' ?>>Non actifs</option>
                 </select>
-                <button type="submit" class="btn btn-secondary">Rechercher</button>
-                <a href="?<?= http_build_query(array_merge($_GET, ['print' => 1])) ?>" target="_blank" class="btn btn-secondary">Imprimer</a>
-                <a href="?<?= http_build_query(array_merge($_GET, ['export' => 'excel'])) ?>" class="btn btn-secondary">Exporter</a>
+                <button type="submit" class="btn btn-secondary w-full xl:w-auto">Rechercher</button>
+                <a href="?<?= http_build_query(array_merge($_GET, ['print' => 1])) ?>" target="_blank" class="btn btn-secondary w-full xl:w-auto">Imprimer</a>
+                <a href="?<?= http_build_query(array_merge($_GET, ['export' => 'excel'])) ?>" class="btn btn-secondary w-full xl:w-auto">Exporter</a>
                 <?php if (can('clients.creer')): ?>
-                <button type="button" @click="openModal()" class="btn btn-primary">
+                <button type="button" @click="openModal()" class="btn btn-primary w-full xl:w-auto">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>

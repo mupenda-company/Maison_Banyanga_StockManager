@@ -4,12 +4,12 @@ ob_start();
 ?>
 
 <!-- Header -->
-<div class="flex items-center justify-between mb-6">
+<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
     <div>
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Ventes</h1>
         <p class="text-gray-500 dark:text-gray-400">Gestion des ventes et factures</p>
     </div>
-    <div class="flex gap-2">
+    <div class="flex flex-wrap gap-2">
         <a href="<?= url('ventes/export?' . http_build_query($filters)) ?>" class="btn btn-success">
             Exporter
         </a>

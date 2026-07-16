@@ -8,12 +8,12 @@ $exportUrl = '?' . http_build_query(array_merge($activeFilters, ['export' => 'ex
 ob_start();
 ?>
 
-<div class="flex items-center justify-between mb-6">
+<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
     <div>
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Emprunts / prets</h1>
         <p class="text-gray-500 dark:text-gray-400">Produits pleins et emballages vides empruntes ou pretes avec un client, distributeur ou personne externe</p>
     </div>
-    <div class="flex flex-wrap gap-2 justify-end">
+    <div class="flex flex-wrap gap-2 lg:justify-end">
         <a href="<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" class="btn btn-secondary">Imprimer</a>
         <a href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary">Exporter Excel</a>
         <?php if (can('emballages.gerer')): ?>

@@ -22,7 +22,7 @@ ob_start();
                     <option value="annule" <?= ($filters['statut'] ?? '') === 'annule' ? 'selected' : '' ?>>Annulé</option>
                 </select>
             </div>
-            <div class="flex gap-2 ml-auto">
+            <div class="flex flex-wrap gap-2 w-full lg:w-auto lg:ml-auto">
                 <button type="submit" class="btn-primary py-1.5 px-4 mr-2">Filtrer</button>
                 <a href="<?= url('approvisionnements') ?>" class="btn-secondary py-1.5 px-4">Réinitialiser</a>
             </div>
@@ -31,9 +31,9 @@ ob_start();
 </div>
 
 <div class="card">
-    <div class="card-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div class="card-header flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Liste des approvisionnements</h2>
-        <div class="flex items-center space-x-3">
+        <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
             <a href="?<?= http_build_query(array_merge($_GET, ['print' => '1'])) ?>" target="_blank" class="btn-secondary">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
@@ -68,7 +68,7 @@ ob_start();
         <div class="flex items-center justify-center min-h-screen px-4">
             <div class="fixed inset-0 bg-black bg-opacity-50" @click="isOpen = false"></div>
             <div class="relative w-full max-w-6xl bg-white dark:bg-gray-800 rounded-lg shadow-xl">
-                <div class="p-6 border-b flex justify-between items-center">
+                <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                     <h3 class="text-xl font-bold">Nouvel Approvisionnement (Plein contre Vide)</h3>
                     <button @click="isOpen = false" class="text-gray-400 hover:text-gray-600">&times;</button>
                 </div>
