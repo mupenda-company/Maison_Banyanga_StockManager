@@ -1251,9 +1251,9 @@ class MobileController extends Controller {
 
             "SELECT v.id, v.numero_facture, v.date_vente, v.total_ttc, v.total_ht, v.total_tva,
 
-                    c.nom as client_nom,
+                    COALESCE(NULLIF(c.nom, ''), 'Client sans fiche') as client_nom,
 
-                    c.telephone as client_telephone,
+                    COALESCE(c.telephone, '') as client_telephone,
 
                     u.prenom as agent_prenom,
 
@@ -1265,7 +1265,7 @@ class MobileController extends Controller {
 
              FROM ventes v
 
-             JOIN clients c ON v.client_id = c.id
+             LEFT JOIN clients c ON v.client_id = c.id
 
              LEFT JOIN users u ON v.created_by = u.id
 
@@ -1299,17 +1299,19 @@ class MobileController extends Controller {
 
             $details = $this->db->fetchAll(
 
-                "SELECT vd.vente_id, vd.produit_id, p.nom as produit_nom, p.code as produit_code,
+                "SELECT vd.vente_id, vd.produit_id,
+                        COALESCE(NULLIF(p.nom, ''), CONCAT('Produit #', vd.produit_id)) as produit_nom,
+                        COALESCE(p.code, '') as produit_code,
 
                         vd.quantite, vd.quantite_caisses, vd.caisses_vides_recues,
 
                         vd.prix_unitaire, vd.prix_caisse, vd.sous_total,
 
-                        p.bouteilles_par_caisses
+                        COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24) as bouteilles_par_caisses
 
                  FROM vente_details vd
 
-                 JOIN produits p ON vd.produit_id = p.id
+                 LEFT JOIN produits p ON vd.produit_id = p.id
 
                  WHERE vd.vente_id IN ($idList)
 
@@ -1320,6 +1322,16 @@ class MobileController extends Controller {
             $grouped = [];
 
             foreach ($details as $d) {
+
+                $d['vente_id'] = (int) $d['vente_id'];
+                $d['produit_id'] = (int) $d['produit_id'];
+                $d['quantite'] = (float) $d['quantite'];
+                $d['quantite_caisses'] = (float) $d['quantite_caisses'];
+                $d['caisses_vides_recues'] = (float) $d['caisses_vides_recues'];
+                $d['prix_unitaire'] = (float) $d['prix_unitaire'];
+                $d['prix_caisse'] = (float) $d['prix_caisse'];
+                $d['sous_total'] = (float) $d['sous_total'];
+                $d['bouteilles_par_caisses'] = (int) $d['bouteilles_par_caisses'];
 
                 $grouped[(int) $d['vente_id']][] = $d;
 
@@ -1334,6 +1346,17 @@ class MobileController extends Controller {
             unset($row);
 
         }
+
+        // Stabiliser aussi les types lorsque la vente ne contient aucun détail.
+        foreach ($rows as &$row) {
+            $row['id'] = (int) $row['id'];
+            $row['total_ttc'] = (float) $row['total_ttc'];
+            $row['total_ht'] = (float) $row['total_ht'];
+            $row['total_tva'] = (float) $row['total_tva'];
+            $row['caisses_vendues'] = (float) $row['caisses_vendues'];
+            $row['details'] = $row['details'] ?? [];
+        }
+        unset($row);
 
 
 
