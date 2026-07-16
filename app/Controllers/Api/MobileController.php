@@ -663,6 +663,9 @@ class MobileController extends Controller {
 
 
 
+        // Une journée précise doit être complète pour le résumé imprimé.
+        $limitClause = $dateClause !== '' ? '' : ' LIMIT 100';
+
         $rows = $this->db->fetchAll(
 
             "SELECT v.id, v.numero_facture, v.date_vente, v.total_ttc,
@@ -671,7 +674,15 @@ class MobileController extends Controller {
 
                     c.telephone as client_telephone,
 
-                    COALESCE(SUM(COALESCE(vd.quantite_caisses, ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0))), 0) as caisses_vendues
+                    COALESCE(SUM(COALESCE(vd.quantite_caisses, ROUND(vd.quantite / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24), 0))), 0) as caisses_vendues,
+
+                    COALESCE(
+                        NULLIF((SELECT SUM(ver.caisses_recues)
+                                FROM vente_emballages_recus ver
+                                WHERE ver.vente_id = v.id), 0),
+                        SUM(COALESCE(vd.caisses_vides_recues, 0)),
+                        0
+                    ) as emballages_recus
 
              FROM ventes v
 
@@ -687,7 +698,7 @@ class MobileController extends Controller {
 
              ORDER BY v.date_vente DESC
 
-             LIMIT 100",
+             " . $limitClause,
 
             $params
 
@@ -1370,6 +1381,10 @@ class MobileController extends Controller {
 
 
 
+        $dateFacture = new DateTime($vente['date_vente'] ?? 'now');
+        $debutMois = (clone $dateFacture)->modify('first day of this month')->setTime(0, 0, 0);
+        $debutMoisSuivant = (clone $debutMois)->modify('+1 month');
+
         $totalCaissesClient = (float) $this->db->fetchColumn(
 
             "SELECT COALESCE(SUM(vd.quantite / p.bouteilles_par_caisses), 0)
@@ -1380,9 +1395,16 @@ class MobileController extends Controller {
 
              JOIN produits p ON vd.produit_id = p.id
 
-             WHERE v.client_id = :client_id AND v.statut = 'validee'",
+             WHERE v.client_id = :client_id
+               AND v.statut = 'validee'
+               AND v.date_vente >= :date_debut
+               AND v.date_vente < :date_fin",
 
-            ['client_id' => (int) ($vente['client_id'] ?? 0)]
+            [
+                'client_id' => (int) ($vente['client_id'] ?? 0),
+                'date_debut' => $debutMois->format('Y-m-d H:i:s'),
+                'date_fin' => $debutMoisSuivant->format('Y-m-d H:i:s')
+            ]
 
         );
 
@@ -1403,6 +1425,11 @@ class MobileController extends Controller {
             'params' => $params,
 
             'totalCaissesClient' => $totalCaissesClient,
+
+            'periodeCumul' => [
+                'debut' => $debutMois->format('Y-m-d'),
+                'fin' => $debutMoisSuivant->modify('-1 day')->format('Y-m-d')
+            ],
 
             'ristourneInfo' => $ristourneInfo
 

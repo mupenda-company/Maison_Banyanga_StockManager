@@ -176,7 +176,7 @@ $approvisionnementsUrl = url('approvisionnements');
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">NP</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Achat</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Unite</th>
-                                    <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Nouveau prix emballage USD/cs (si changé)</th>
+                                    <th x-show="lignes.some(l => ['emballage', 'injection'].includes(l.type_chargement))" class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Nouveau prix emballage USD/cs (si changé)</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Caisses</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Prix caisse</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Sous-total</th>
@@ -218,7 +218,7 @@ $approvisionnementsUrl = url('approvisionnements');
                                                 <option value="palette">Palette</option>
                                             </select>
                                         </td>
-                                        <td class="px-3 py-2">
+                                        <td x-show="lignes.some(l => ['emballage', 'injection'].includes(l.type_chargement))" class="px-3 py-2">
                                             <input x-show="['emballage', 'injection'].includes(ligne.type_chargement)" type="number" x-model.number="ligne.prix_emballage_usd"
                                                    class="input w-32" min="0.01" step="0.01" :required="ligne.type_chargement === 'emballage'">
                                             <span x-show="!['emballage', 'injection'].includes(ligne.type_chargement)">—</span>
@@ -249,7 +249,7 @@ $approvisionnementsUrl = url('approvisionnements');
                             </tbody>
                             <tfoot class="bg-gray-50 dark:bg-gray-700">
                                 <tr>
-                                    <td colspan="9" class="px-3 py-3 text-right font-medium text-gray-900 dark:text-white">Total HT:</td>
+                                    <td :colspan="lignes.some(l => ['emballage', 'injection'].includes(l.type_chargement)) ? 9 : 8" class="px-3 py-3 text-right font-medium text-gray-900 dark:text-white">Total HT:</td>
                                     <td class="px-3 py-3 font-bold text-gray-900 dark:text-white">
                                         <span x-text="App.formatMoneyConverted(total, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></span>
                                     </td>
