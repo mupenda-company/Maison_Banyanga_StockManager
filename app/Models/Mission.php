@@ -654,6 +654,61 @@ class Mission extends Model
                 $quantiteChargee = (int) ($chargement['quantite_chargee'] ?? 0);
                 $deltaCaisses = $quantiteCaissesFinale - $stockDepartCaisses;
                 $quantiteBouteilles = $deltaCaisses * $bouteillesParCaisse;
+
+                // La création d'une mission est saisie et validée en caisses. Certaines
+                // anciennes lignes de stock peuvent toutefois avoir un compteur bouteilles
+                // désynchronisé (ex. 92 bouteilles pour un stock affiché en caisses).
+                // Verrouiller la ligne, valider avec la même unité que l'écran, puis
+                // remettre le compteur bouteilles en cohérence avant le transfert.
+                $stockPrincipal = $this->db->fetch(
+                    "SELECT id, quantite_pleine, caisses_pleine,
+                            quantite_pleine_physique, caisses_pleine_physique
+                     FROM stocks
+                     WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id
+                     LIMIT 1
+                     FOR UPDATE",
+                    [
+                        'produit_id' => $chargement['produit_id'],
+                        'emplacement_id' => $emplacementPrincipalId
+                    ]
+                );
+
+                $caissesDisponibles = max(0, (int) ($stockPrincipal['caisses_pleine'] ?? 0));
+                if ($deltaCaisses > $caissesDisponibles) {
+                    throw new Exception(sprintf(
+                        'Stock insuffisant pour %s : disponible %d caisses, demandé %d caisses.',
+                        $produit['nom'] ?? ('produit #' . (int) $chargement['produit_id']),
+                        $caissesDisponibles,
+                        $deltaCaisses
+                    ));
+                }
+
+                if ($stockPrincipal) {
+                    $quantitePleineAttendue = $caissesDisponibles * $bouteillesParCaisse;
+                    $quantitePleinePhysiqueAttendue = $stockPrincipal['caisses_pleine_physique'] === null
+                        ? null
+                        : ((int) $stockPrincipal['caisses_pleine_physique'] * $bouteillesParCaisse);
+                    $quantitePleineIncoherente = (int) ($stockPrincipal['quantite_pleine'] ?? 0) !== $quantitePleineAttendue;
+                    $quantitePleinePhysiqueIncoherente = $quantitePleinePhysiqueAttendue !== null
+                        && (int) ($stockPrincipal['quantite_pleine_physique'] ?? 0) !== $quantitePleinePhysiqueAttendue;
+
+                    if ($quantitePleineIncoherente || $quantitePleinePhysiqueIncoherente) {
+                        $this->db->query(
+                            "UPDATE stocks
+                             SET quantite_pleine = :quantite_pleine,
+                                 quantite_pleine_physique = :quantite_pleine_physique,
+                                 updated_at = NOW()
+                             WHERE id = :id",
+                            [
+                                'quantite_pleine' => $quantitePleineAttendue,
+                                'quantite_pleine_physique' => $quantitePleinePhysiqueAttendue
+                                    ?? $stockPrincipal['quantite_pleine_physique'],
+                                'id' => (int) $stockPrincipal['id']
+                            ]
+                        );
+                    }
+                }
+
                 $stockVideVehicule = $this->db->fetch(
                     "SELECT quantite_vide, caisses_vide
                      FROM stocks

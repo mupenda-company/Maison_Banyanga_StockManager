@@ -281,8 +281,23 @@ class Stock extends Model
 
         foreach ($delta as $champ => $variation) {
             if ($actuel[$champ] + $variation < 0) {
-                $libelle = str_replace('_', ' ', $champ);
-                throw new Exception('Stock insuffisant pour ' . $libelle . ' : disponible ' . $actuel[$champ] . ', demande ' . abs($variation));
+                $unite = str_starts_with($champ, 'quantite_') ? 'bouteilles' : 'caisses';
+                $typeStock = str_ends_with($champ, '_vide') ? 'vides' : 'pleines';
+                $nomProduit = trim((string) ($produit['nom'] ?? ''));
+                if ($nomProduit === '') {
+                    $nomProduit = 'produit #' . (int) $produitId;
+                }
+
+                throw new Exception(sprintf(
+                    'Stock insuffisant pour %s (%s %s) : disponible %d %s, demandé %d %s.',
+                    $nomProduit,
+                    $unite,
+                    $typeStock,
+                    $actuel[$champ],
+                    $unite,
+                    abs($variation),
+                    $unite
+                ));
             }
         }
 
