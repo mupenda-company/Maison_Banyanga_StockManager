@@ -9,6 +9,32 @@ class ApprovisionnementController extends Controller
     private $produitModel;
     private $emplacementModel;
     private $detteModel;
+
+    private function resolveEmballageSource(array $detail, array $produit, string $typeChargement): array
+    {
+        if ($typeChargement !== 'produit') {
+            return ['produit' => null, 'error' => null];
+        }
+
+        $sourceId = (int) ($detail['emballage_source_produit_id'] ?? $produit['id']);
+        $source = $this->produitModel->find($sourceId);
+        if (!$source) {
+            return ['produit' => null, 'error' => 'Le produit choisi comme emballage source est introuvable.'];
+        }
+
+        if (!$this->produitModel->emballagesCompatibles($produit, $source)) {
+            return [
+                'produit' => null,
+                'error' => sprintf(
+                    'Les emballages de %s ne sont pas compatibles avec %s.',
+                    $source['nom'] ?? ('produit #' . $sourceId),
+                    $produit['nom'] ?? ('produit #' . (int) $produit['id'])
+                )
+            ];
+        }
+
+        return ['produit' => $source, 'error' => null];
+    }
     
     public function __construct()
     {
@@ -341,6 +367,10 @@ class ApprovisionnementController extends Controller
             $typeDemande = $detail['type_chargement'] ?? 'produit';
             $typeChargement = in_array($typeDemande, ['emballage', 'injection'], true) ? $typeDemande : 'produit';
             $typeAchat = $detail['type_achat'] ?? 'deposer';
+            $emballageSource = $this->resolveEmballageSource($detail, $produit, $typeChargement);
+            if ($emballageSource['error']) {
+                return $this->error($emballageSource['error'], 422);
+            }
 
             if ($typeAchat === 'enlever' && $produit['prix_achat_enlever'] > 0) {
                 $prixProduit = (float) $produit['prix_achat_enlever'];
@@ -388,6 +418,7 @@ class ApprovisionnementController extends Controller
 
             $details[] = [
                 'produit_id' => $detail['produit_id'],
+                'emballage_source_produit_id' => $emballageSource['produit']['id'] ?? null,
                 'type_chargement' => $typeChargement,
                 'quantite_caisses' => $quantiteCaisses,
                 'quantite_bouteilles' => $quantiteCaisses * $produit['bouteilles_par_caisses'],
@@ -505,6 +536,10 @@ class ApprovisionnementController extends Controller
             $typeDemande = $detail['type_chargement'] ?? 'produit';
             $typeChargement = in_array($typeDemande, ['emballage', 'injection'], true) ? $typeDemande : 'produit';
             $typeAchat = $detail['type_achat'] ?? 'deposer';
+            $emballageSource = $this->resolveEmballageSource($detail, $produit, $typeChargement);
+            if ($emballageSource['error']) {
+                return $this->error($emballageSource['error'], 422);
+            }
 
             if ($typeAchat === 'enlever' && $produit['prix_achat_enlever'] > 0) {
                 $prixProduit = (float) $produit['prix_achat_enlever'];
@@ -554,6 +589,7 @@ class ApprovisionnementController extends Controller
 
             $details[] = [
                 'produit_id' => (int)$detail['produit_id'],
+                'emballage_source_produit_id' => $emballageSource['produit']['id'] ?? null,
                 'type_chargement' => $typeChargement,
                 'quantite_caisses' => $quantiteCaisses,
                 'quantite_bouteilles' => $quantiteCaisses * (int)$produit['bouteilles_par_caisses'],

@@ -69,6 +69,7 @@ CREATE TABLE `approvisionnement_details` (
   `id` int UNSIGNED NOT NULL,
   `approvisionnement_id` int UNSIGNED NOT NULL,
   `produit_id` int UNSIGNED NOT NULL,
+  `emballage_source_produit_id` int UNSIGNED DEFAULT NULL,
   `type_chargement` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'produit',
   `quantite_caisses` int NOT NULL,
   `quantite_bouteilles` int NOT NULL,
@@ -464,7 +465,8 @@ CREATE TABLE `produits` (
   `actif` tinyint(1) NOT NULL DEFAULT '1',
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `caisses_par_palette` int NOT NULL DEFAULT '0' COMMENT 'Nombre de caisses par palette'
+  `caisses_par_palette` int NOT NULL DEFAULT '0' COMMENT 'Nombre de caisses par palette',
+  `famille_emballage` varchar(80) COLLATE utf8mb4_unicode_ci DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -691,7 +693,8 @@ ALTER TABLE `approvisionnements`
 ALTER TABLE `approvisionnement_details`
   ADD PRIMARY KEY (`id`),
   ADD KEY `approvisionnement_id` (`approvisionnement_id`),
-  ADD KEY `produit_id` (`produit_id`);
+  ADD KEY `produit_id` (`produit_id`),
+  ADD KEY `emballage_source_produit_id` (`emballage_source_produit_id`);
 
 --
 -- Indexes for table `billetages`
@@ -1162,7 +1165,8 @@ ALTER TABLE `approvisionnements`
 --
 ALTER TABLE `approvisionnement_details`
   ADD CONSTRAINT `approvisionnement_details_ibfk_1` FOREIGN KEY (`approvisionnement_id`) REFERENCES `approvisionnements` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `approvisionnement_details_ibfk_2` FOREIGN KEY (`produit_id`) REFERENCES `produits` (`id`) ON DELETE CASCADE;
+  ADD CONSTRAINT `approvisionnement_details_ibfk_2` FOREIGN KEY (`produit_id`) REFERENCES `produits` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `approvisionnement_details_ibfk_3` FOREIGN KEY (`emballage_source_produit_id`) REFERENCES `produits` (`id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `billetages`

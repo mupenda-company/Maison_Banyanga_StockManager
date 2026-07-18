@@ -130,6 +130,7 @@ class ProduitController extends Controller
             'prix_vente_caisses' => 'required|numeric',
             'prix_emballage' => 'numeric',
             'bouteilles_par_caisses' => 'required|numeric',
+            'famille_emballage' => 'required',
             'caisses_par_palette' => 'numeric',
             'seuil_alerte' => 'numeric',
             'position_affichage' => 'numeric'
@@ -162,6 +163,7 @@ class ProduitController extends Controller
             'unite_base' => $data['unite_base'] ?? 'bouteille',
             'bouteilles_par_caisses' => $data['bouteilles_par_caisses'],
             'caisses_par_palette' => $data['caisses_par_palette'] ?? 0,
+            'famille_emballage' => trim((string) ($data['famille_emballage'] ?? '')) ?: null,
             'prix_achat_unitaire' => $prixAchatUnitaire,
             'prix_achat_deposer' => $prixAchatDeposer ?? 0,
             'prix_achat_enlever' => $prixAchatEnlever ?? 0,
@@ -232,9 +234,16 @@ class ProduitController extends Controller
         
         $updateData = array_intersect_key($data, array_flip([
             'code', 'nom', 'description', 'categorie', 'unite_base',
-            'bouteilles_par_caisses', 'caisses_par_palette', 'prix_achat_deposer', 'prix_achat_enlever', 'prix_vente_unitaire',
+            'bouteilles_par_caisses', 'caisses_par_palette', 'famille_emballage', 'prix_achat_deposer', 'prix_achat_enlever', 'prix_vente_unitaire',
             'prix_vente_caisses', 'prix_emballage', 'seuil_alerte', 'position_affichage'
         ]));
+
+        if (array_key_exists('famille_emballage', $updateData)) {
+            $updateData['famille_emballage'] = trim((string) $updateData['famille_emballage']);
+            if ($updateData['famille_emballage'] === '') {
+                $updateData['famille_emballage'] = 'PRODUIT_' . (int) $id;
+            }
+        }
         
         if (isset($data['prix_achat_enlever'])) {
             $btlUpd = isset($data['bouteilles_par_caisses']) && $data['bouteilles_par_caisses'] > 0 ? (int)$data['bouteilles_par_caisses'] : (int)($produit['bouteilles_par_caisses'] ?? 1);
@@ -280,13 +289,25 @@ class ProduitController extends Controller
         }
 
         // Vérifier s'il y a des ventes ou approvisionnements liés
+        $hasSourceColumn = (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'approvisionnement_details'
+               AND COLUMN_NAME = 'emballage_source_produit_id'"
+        );
+        $sourceLinksSql = $hasSourceColumn
+            ? ' + (SELECT COUNT(*) FROM approvisionnement_details WHERE emballage_source_produit_id = :id_source)'
+            : '';
+        $linkParams = ['id' => $id, 'id_appro' => $id];
+        if ($hasSourceColumn) {
+            $linkParams['id_source'] = $id;
+        }
+
         $hasLinks = $this->db->fetchColumn(
-            "SELECT (SELECT COUNT(*) FROM vente_details WHERE produit_id = :id) + 
-                    (SELECT COUNT(*) FROM approvisionnement_details WHERE produit_id = :id_appro)",
-            [
-                'id' => $id,
-                'id_appro' => $id,
-            ]
+            "SELECT (SELECT COUNT(*) FROM vente_details WHERE produit_id = :id)
+                    + (SELECT COUNT(*) FROM approvisionnement_details WHERE produit_id = :id_appro)"
+                    . $sourceLinksSql,
+            $linkParams
         );
 
         if ($hasLinks > 0) {

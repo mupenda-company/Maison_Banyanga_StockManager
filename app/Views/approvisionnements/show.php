@@ -108,6 +108,9 @@ ob_start();
                                         <span class="badge-success">Injection</span>
                                     <?php else: ?>
                                         <span class="badge-info">Produit seulement</span>
+                                        <div class="text-xs text-gray-500 mt-1">
+                                            Vides utilisés : <?= htmlspecialchars($detail['emballage_source_nom'] ?? $detail['produit_nom']) ?>
+                                        </div>
                                     <?php endif; ?>
                                 </td>
                                 <td class="text-right">

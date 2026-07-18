@@ -215,6 +215,17 @@ ob_start();
                                 <input type="number" x-model.number="form.bouteilles_par_caisses" class="input" required min="1">
                             </div>
                             <div>
+                                <label class="label">Famille d'emballage *</label>
+                                <input type="text" x-model="form.famille_emballage" class="input" list="familles-emballages"
+                                       placeholder="Ex. STANDARD_72CL_12" required>
+                                <datalist id="familles-emballages">
+                                    <?php foreach (array_unique(array_filter(array_column($produits, 'famille_emballage'))) as $famille): ?>
+                                        <option value="<?= htmlspecialchars($famille) ?>"></option>
+                                    <?php endforeach; ?>
+                                </datalist>
+                                <p class="text-xs text-gray-500 mt-1">Deux produits peuvent partager leurs vides uniquement s'ils ont exactement la même famille.</p>
+                            </div>
+                            <div>
                                 <label class="label text-blue-600 font-bold">Prix d'achat à Déposer / Caisse (<span x-text="window.DEVISE"></span>) *</label>
                                 <input type="number" x-model.number="form.prix_achat_deposer" class="input border-blue-300 focus:border-blue-500" required step="0.01" min="0">
                             </div>
@@ -272,6 +283,7 @@ document.addEventListener('alpine:init', () => {
             description: '',
             categorie: '',
             bouteilles_par_caisses: 24,
+            famille_emballage: '',
             caisses_par_palette: 0,
             prix_achat_deposer: '',
             prix_achat_enlever: '',
@@ -292,6 +304,7 @@ document.addEventListener('alpine:init', () => {
                 description: '',
                 categorie: '',
                 bouteilles_par_caisses: 24,
+                famille_emballage: '',
                 caisses_par_palette: 0,
                 prix_achat_deposer: '',
                 prix_achat_enlever: '',

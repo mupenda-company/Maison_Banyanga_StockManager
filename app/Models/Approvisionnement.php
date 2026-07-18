@@ -28,6 +28,7 @@ class Approvisionnement extends Model
             'prix_original' => "DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER prix_unitaire",
             'devise_prix' => "VARCHAR(3) NOT NULL DEFAULT 'CDF' AFTER prix_original",
             'taux_change' => "DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER devise_prix",
+            'emballage_source_produit_id' => "INT UNSIGNED NULL AFTER produit_id",
         ];
         foreach ($columns as $column => $definition) {
             $exists = (bool) $this->db->fetchColumn(
@@ -86,11 +87,13 @@ class Approvisionnement extends Model
         if ($approvisionnement) {
             $approvisionnement['details'] = $this->db->fetchAll(
                 "SELECT ad.*, p.nom as produit_nom, p.code as produit_code,
+                        pe.nom as emballage_source_nom, pe.code as emballage_source_code,
                         p.bouteilles_par_caisses, p.caisses_par_palette,
                         p.prix_achat_deposer, p.prix_achat_enlever,
                         p.prix_vente_unitaire, p.prix_vente_caisses
                  FROM approvisionnement_details ad
                  JOIN produits p ON ad.produit_id = p.id
+                 LEFT JOIN produits pe ON ad.emballage_source_produit_id = pe.id
                  WHERE ad.approvisionnement_id = :id
                  ORDER BY p.position_affichage ASC, p.nom ASC",
                 ['id' => $id]
@@ -175,7 +178,8 @@ class Approvisionnement extends Model
                     continue;
                 }
                 $produitId = (int) ($detail['produit_id'] ?? 0);
-                $besoinsEmballages[$produitId] = ($besoinsEmballages[$produitId] ?? 0) + (int) ($detail['quantite_caisses'] ?? 0);
+                $sourceId = (int) ($detail['emballage_source_produit_id'] ?? $produitId);
+                $besoinsEmballages[$sourceId] = ($besoinsEmballages[$sourceId] ?? 0) + (int) ($detail['quantite_caisses'] ?? 0);
             }
 
             foreach ($besoinsEmballages as $produitId => $caissesNecessaires) {
@@ -238,8 +242,9 @@ class Approvisionnement extends Model
                     );
 
                     if (!$isInjection) {
+                        $sourceEmballageId = (int) ($detail['emballage_source_produit_id'] ?? $detail['produit_id']);
                         $resultDeduction = $stockModel->deduireVide(
-                            $detail['produit_id'],
+                            $sourceEmballageId,
                             $emplacementPrincipalId,
                             $detail['quantite_caisses']
                         );
@@ -310,9 +315,11 @@ class Approvisionnement extends Model
             $ancien = [];
             foreach ($ancienAppro['details'] as $d) {
                 $detailType = $this->normalizeDetailType($d['type_chargement'] ?? 'produit');
-                $key = $detailType . ':' . (int) $d['produit_id'];
+                $sourceId = (int) ($d['emballage_source_produit_id'] ?? $d['produit_id']);
+                $key = $detailType . ':' . (int) $d['produit_id'] . ':' . $sourceId;
                 $ancien[$key] = $ancien[$key] ?? [
                     'produit_id' => (int) $d['produit_id'],
+                    'emballage_source_produit_id' => $sourceId,
                     'type_chargement' => $detailType,
                     'caisses' => 0,
                     'bouteilles' => 0,
@@ -324,9 +331,11 @@ class Approvisionnement extends Model
             $nouveau = [];
             foreach ($details as $d) {
                 $detailType = $this->normalizeDetailType($d['type_chargement'] ?? 'produit');
-                $key = $detailType . ':' . (int) $d['produit_id'];
+                $sourceId = (int) ($d['emballage_source_produit_id'] ?? $d['produit_id']);
+                $key = $detailType . ':' . (int) $d['produit_id'] . ':' . $sourceId;
                 $nouveau[$key] = $nouveau[$key] ?? [
                     'produit_id' => (int) $d['produit_id'],
+                    'emballage_source_produit_id' => $sourceId,
                     'type_chargement' => $detailType,
                     'caisses' => 0,
                     'bouteilles' => 0,
@@ -340,6 +349,7 @@ class Approvisionnement extends Model
             foreach ($detailKeys as $key) {
                 $ligneReference = $nouveau[$key] ?? $ancien[$key];
                 $produitId = (int) $ligneReference['produit_id'];
+                $sourceId = (int) ($ligneReference['emballage_source_produit_id'] ?? $produitId);
                 $detailType = $this->normalizeDetailType($ligneReference['type_chargement'] ?? 'produit');
                 $isEmballage = $detailType === 'emballage';
                 $isInjection = $detailType === 'injection';
@@ -365,8 +375,14 @@ class Approvisionnement extends Model
                     $stockDeltas[$produitId]['quantite_pleine'] += $diffBouteilles;
                     $stockDeltas[$produitId]['caisses_pleine'] += $diffCaisses;
                     if (!$isInjection) {
-                        $stockDeltas[$produitId]['quantite_vide'] -= $diffBouteilles;
-                        $stockDeltas[$produitId]['caisses_vide'] -= $diffCaisses;
+                        $stockDeltas[$sourceId] = $stockDeltas[$sourceId] ?? [
+                            'quantite_pleine' => 0,
+                            'caisses_pleine' => 0,
+                            'quantite_vide' => 0,
+                            'caisses_vide' => 0,
+                        ];
+                        $stockDeltas[$sourceId]['quantite_vide'] -= $diffBouteilles;
+                        $stockDeltas[$sourceId]['caisses_vide'] -= $diffCaisses;
                     }
                 }
             }
@@ -451,8 +467,15 @@ class Approvisionnement extends Model
                     $stockDeltas[$produitId]['quantite_pleine'] -= (int) $detail['quantite_bouteilles'];
                     $stockDeltas[$produitId]['caisses_pleine'] -= (int) $detail['quantite_caisses'];
                     if (!$isInjection) {
-                        $stockDeltas[$produitId]['quantite_vide'] += (int) $detail['quantite_bouteilles'];
-                        $stockDeltas[$produitId]['caisses_vide'] += (int) $detail['quantite_caisses'];
+                        $sourceId = (int) ($detail['emballage_source_produit_id'] ?? $produitId);
+                        $stockDeltas[$sourceId] = $stockDeltas[$sourceId] ?? [
+                            'quantite_pleine' => 0,
+                            'caisses_pleine' => 0,
+                            'quantite_vide' => 0,
+                            'caisses_vide' => 0,
+                        ];
+                        $stockDeltas[$sourceId]['quantite_vide'] += (int) $detail['quantite_bouteilles'];
+                        $stockDeltas[$sourceId]['caisses_vide'] += (int) $detail['quantite_caisses'];
                     }
                 }
             }

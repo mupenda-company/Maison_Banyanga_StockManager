@@ -8,7 +8,7 @@ class Produit extends Model
     protected $table = 'produits';
     protected $fillable = [
         'code', 'nom', 'description', 'categorie', 'unite_base',
-        'bouteilles_par_caisses', 'caisses_par_palette',
+        'bouteilles_par_caisses', 'caisses_par_palette', 'famille_emballage',
         'prix_achat_unitaire', 'prix_achat_deposer', 'prix_achat_enlever',
         'prix_vente_unitaire', 'prix_vente_caisses', 'prix_emballage',
         'seuil_alerte', 'position_affichage', 'actif'
@@ -16,12 +16,14 @@ class Produit extends Model
 
     private static bool $positionColumnChecked = false;
     private static bool $prixEmballageColumnChecked = false;
+    private static bool $familleEmballageColumnChecked = false;
 
     public function __construct()
     {
         parent::__construct();
         $this->ensurePositionAffichageColumn();
         $this->ensurePrixEmballageColumn();
+        $this->ensureFamilleEmballageColumn();
     }
 
     private function ensurePositionAffichageColumn(): void
@@ -64,6 +66,62 @@ class Produit extends Model
         }
 
         self::$prixEmballageColumnChecked = true;
+    }
+
+    private function ensureFamilleEmballageColumn(): void
+    {
+        if (self::$familleEmballageColumnChecked) {
+            return;
+        }
+
+        $exists = (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'produits'
+               AND COLUMN_NAME = 'famille_emballage'"
+        );
+
+        if (!$exists) {
+            $this->db->query("ALTER TABLE produits ADD famille_emballage VARCHAR(80) NULL AFTER caisses_par_palette");
+        }
+
+        // Compatibilité initiale demandée. Les autres produits restent isolés
+        // jusqu'à ce qu'une famille leur soit explicitement attribuée.
+        $this->db->query(
+            "UPDATE produits SET famille_emballage = 'STANDARD_72CL_12'
+             WHERE (famille_emballage IS NULL OR famille_emballage = '')
+               AND bouteilles_par_caisses = 12
+               AND (UPPER(nom) LIKE '%PRIMUS%72%' OR UPPER(nom) LIKE '%TURBO%72%')"
+        );
+        $this->db->query(
+            "UPDATE produits SET famille_emballage = 'STANDARD_50CL_20'
+             WHERE (famille_emballage IS NULL OR famille_emballage = '')
+               AND bouteilles_par_caisses = 20
+               AND (UPPER(nom) LIKE '%PRIMUS%50%' OR UPPER(nom) LIKE '%TURBO%50%')"
+        );
+        $this->db->query(
+            "UPDATE produits SET famille_emballage = 'CLASS_50CL_20'
+             WHERE (famille_emballage IS NULL OR famille_emballage = '')
+               AND bouteilles_par_caisses = 20
+               AND UPPER(nom) LIKE '%CLASS%50%'"
+        );
+        $this->db->query(
+            "UPDATE produits
+             SET famille_emballage = CONCAT('PRODUIT_', id)
+             WHERE famille_emballage IS NULL OR famille_emballage = ''"
+        );
+
+        self::$familleEmballageColumnChecked = true;
+    }
+
+    public function emballagesCompatibles(array $produit, array $source): bool
+    {
+        $familleProduit = trim((string) ($produit['famille_emballage'] ?? ''));
+        $familleSource = trim((string) ($source['famille_emballage'] ?? ''));
+
+        return $familleProduit !== ''
+            && $familleProduit === $familleSource
+            && (int) ($produit['bouteilles_par_caisses'] ?? 0) === (int) ($source['bouteilles_par_caisses'] ?? 0);
     }
     
     /**

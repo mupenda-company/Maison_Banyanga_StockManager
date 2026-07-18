@@ -55,10 +55,28 @@ $approvisionnementsUrl = url('approvisionnements');
                     fournisseur: 'BdGL',
                     type_achat: 'enlever',
                     notes: '',
-                    lignes: [{ produit_id: '', type_chargement: 'produit', quantite_achat: 0, unite_achat: 'caisse', prix_emballage_usd: '' }],
+                    lignes: [{ produit_id: '', emballage_source_produit_id: '', type_chargement: 'produit', quantite_achat: 0, unite_achat: 'caisse', prix_emballage_usd: '' }],
                     produits: [],
                     loading: false,
                     total: 0,
+                    emballagesCompatibles(ligne) {
+                        const cible = this.produits.find(p => p.id == ligne.produit_id);
+                        if (!cible) return [];
+                        return this.produits.filter(p =>
+                            p.famille_emballage === cible.famille_emballage
+                            && parseInt(p.bouteilles_par_caisses || 0) === parseInt(cible.bouteilles_par_caisses || 0)
+                        );
+                    },
+                    syncEmballageSource(ligne) {
+                        if (ligne.type_chargement !== 'produit') {
+                            ligne.emballage_source_produit_id = '';
+                            return;
+                        }
+                        const compatibles = this.emballagesCompatibles(ligne);
+                        if (!compatibles.some(p => p.id == ligne.emballage_source_produit_id)) {
+                            ligne.emballage_source_produit_id = ligne.produit_id || '';
+                        }
+                    },
                     recalc() {
                         this.total = 0;
                         this.lignes.forEach(l => {
@@ -70,7 +88,7 @@ $approvisionnementsUrl = url('approvisionnements');
                     }
                 }"
                 x-init="
-                    App.api('<?= $produitsApiUrl ?>').then(r => {
+                    App.api('<?= $produitsApiUrl ?>?actifs=true&with_stock=true').then(r => {
                         produits = Array.isArray(r) ? r : (r.data || []);
                         if (produits.length === 0) {
                             App.notify('Attention: aucun produit actif trouve.', 'warning');
@@ -88,6 +106,7 @@ $approvisionnementsUrl = url('approvisionnements');
                             const p = produits.find(p => p.id == l.produit_id);
                             return {
                                 produit_id: parseInt(l.produit_id),
+                                emballage_source_produit_id: (l.type_chargement || 'produit') === 'produit' ? parseInt(l.emballage_source_produit_id || l.produit_id) : null,
                                 quantite_caisses: getQuantiteCaisses(l, p),
                                 type_chargement: l.type_chargement || 'produit',
                                 prix_emballage_usd: ['emballage', 'injection'].includes(l.type_chargement || 'produit') ? parseFloat(l.prix_emballage_usd || 0) : 0,
@@ -142,7 +161,7 @@ $approvisionnementsUrl = url('approvisionnements');
                         <label class="label mb-0">Produits</label>
                         <button
                             type="button"
-                            @click="lignes.push({ produit_id: '', type_chargement: 'produit', quantite_achat: 0, unite_achat: 'caisse', prix_emballage_usd: '' })"
+                            @click="lignes.push({ produit_id: '', emballage_source_produit_id: '', type_chargement: 'produit', quantite_achat: 0, unite_achat: 'caisse', prix_emballage_usd: '' })"
                             class="btn-secondary btn-sm"
                         >
                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -158,6 +177,7 @@ $approvisionnementsUrl = url('approvisionnements');
                                 <tr>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Produit</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Nature</th>
+                                    <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Emballage utilisé</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Btl/Caisse</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">NP</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Achat</th>
@@ -173,7 +193,7 @@ $approvisionnementsUrl = url('approvisionnements');
                                 <template x-for="(ligne, index) in lignes" :key="index">
                                     <tr>
                                         <td class="px-3 py-2 min-w-52">
-                                            <select x-model="ligne.produit_id" class="input w-full" required>
+                                            <select x-model="ligne.produit_id" @change="syncEmballageSource(ligne); recalc()" class="input w-full" required>
                                                 <option value="">Selectionner</option>
                                                 <template x-for="p in produits" :key="p.id">
                                                     <option :value="p.id" x-text="p.nom"></option>
@@ -181,11 +201,22 @@ $approvisionnementsUrl = url('approvisionnements');
                                             </select>
                                         </td>
                                         <td class="px-3 py-2 min-w-40">
-                                            <select x-model="ligne.type_chargement" class="input" @change="if (ligne.type_chargement === 'emballage') ligne.unite_achat = 'caisse'; recalc()">
+                                            <select x-model="ligne.type_chargement" class="input" @change="if (ligne.type_chargement === 'emballage') ligne.unite_achat = 'caisse'; syncEmballageSource(ligne); recalc()">
                                                 <option value="produit">Produit seulement</option>
                                                 <option value="injection">Injection (produit + emballage)</option>
                                                 <option value="emballage">Emballage seulement</option>
                                             </select>
+                                        </td>
+                                        <td class="px-3 py-2 min-w-56">
+                                            <select x-show="ligne.type_chargement === 'produit'" x-model="ligne.emballage_source_produit_id"
+                                                    class="input w-full" :required="ligne.type_chargement === 'produit'">
+                                                <template x-for="source in emballagesCompatibles(ligne)" :key="source.id">
+                                                    <option :value="source.id"
+                                                            x-text="source.nom + ' - ' + Math.round(parseFloat(source.stock_caisses_vide || 0)) + ' cs vides'"></option>
+                                                </template>
+                                            </select>
+                                            <span x-show="ligne.type_chargement === 'injection'" class="text-xs text-blue-600">Inclus dans l'injection</span>
+                                            <span x-show="ligne.type_chargement === 'emballage'" class="text-xs text-gray-500">Entrée de vides</span>
                                         </td>
                                         <td class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
                                             <span x-text="produits.find(p => p.id == ligne.produit_id)?.bouteilles_par_caisses || '-'"></span>
