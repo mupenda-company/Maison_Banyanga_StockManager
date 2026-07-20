@@ -31,7 +31,7 @@ ob_start();
                     <!-- <a href="<?= url('vehicules/' . $vehicule['id'] . '/print') ?>" class="btn-secondary btn-sm no-print">
                         Imprimer
                     </a> -->
-                    <?php if (can('vehicules.gerer') && array_sum(array_map(fn($s) => (int) ($s['caisses_vide'] ?? 0), $vehicule['stock'] ?? [])) > 0): ?>
+                    <?php if (can('vehicules.retour_emballages') && array_sum(array_map(fn($s) => (int) ($s['caisses_vide'] ?? 0), $vehicule['stock'] ?? [])) > 0): ?>
                     <button type="button" class="btn-primary btn-sm no-print" onclick="retourEmballagesVehicule()">
                         Rentrer emballages
                     </button>

@@ -191,7 +191,7 @@ class VenteController extends Controller
 
     public function edit($id)
     {
-        $this->requirePermission('ventes.creer');
+        $this->requirePermission('ventes.modifier');
 
         $vente = $this->venteModel->getWithDetails($id);
 
@@ -271,7 +271,7 @@ class VenteController extends Controller
 
     public function update($id)
     {
-        $this->requirePermission('ventes.creer');
+        $this->requirePermission('ventes.modifier');
 
         $data = $this->getJsonInput();
 
@@ -475,7 +475,7 @@ class VenteController extends Controller
      */
     public function print($id)
     {
-        $this->requirePermission('ventes.voir');
+        $this->requirePermission('ventes.imprimer');
         
         $vente = $this->venteModel->getWithDetails($id);
         
@@ -626,7 +626,7 @@ class VenteController extends Controller
      */
     public function printParVehicule()
     {
-        $this->requirePermission('ventes.voir');
+        $this->requirePermission('ventes.imprimer');
         
         $vehiculeId = $_GET['vehicule_id'] ?? null;
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
@@ -738,7 +738,7 @@ class VenteController extends Controller
      */
     public function exportParVehicule()
     {
-        $this->requirePermission('ventes.voir');
+        $this->requirePermission('ventes.exporter');
 
         $vehiculeId = $_GET['vehicule_id'] ?? null;
         $dateDebut  = $_GET['date_debut'] ?? date('Y-m-01');
@@ -831,7 +831,7 @@ class VenteController extends Controller
      */
     public function exportAll()
     {
-        $this->requirePermission('ventes.voir');
+        $this->requirePermission('ventes.exporter');
         
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
         $dateFin = $_GET['date_fin'] ?? date('Y-m-d');

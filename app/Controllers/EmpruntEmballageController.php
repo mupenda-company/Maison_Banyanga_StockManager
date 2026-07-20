@@ -32,11 +32,13 @@ class EmpruntEmballageController extends Controller
         $emprunts = $this->empruntModel->getAllWithDetails($filters);
 
         if (isset($_GET['export']) && $_GET['export'] === 'excel') {
+            $this->requirePermission('emballages.exporter');
             $this->exportExcel($emprunts);
             return;
         }
 
         if (isset($_GET['print']) && (string) $_GET['print'] === '1') {
+            $this->requirePermission('emballages.imprimer');
             foreach ($emprunts as &$emprunt) {
                 $emprunt['lignes'] = $this->empruntModel->getOperationDetails(
                     $emprunt['operation_ref_label'] ?? ('EMP-' . $emprunt['id'])
@@ -62,7 +64,7 @@ class EmpruntEmballageController extends Controller
 
     public function store()
     {
-        $this->requirePermission('emballages.gerer');
+        $this->requirePermission('emballages.emprunter');
         $data = $this->getJsonInput();
 
         $sourceType = $data['source_type'] ?? '';
@@ -217,7 +219,7 @@ class EmpruntEmballageController extends Controller
 
     public function printBon($id)
     {
-        $this->requirePermission('emballages.voir');
+        $this->requirePermission('emballages.imprimer');
         $emprunt = $this->empruntModel->find($id);
         if (!$emprunt) {
             http_response_code(404);
@@ -242,7 +244,7 @@ class EmpruntEmballageController extends Controller
 
     public function printRemboursement($mouvementId)
     {
-        $this->requirePermission('emballages.voir');
+        $this->requirePermission('emballages.imprimer');
         $mouvement = $this->db->fetch(
             "SELECT m.*, e.operation_ref, e.direction, e.type_stock, e.source_type,
                     e.source_nom, e.source_contact, e.client_id, e.date_emprunt,
@@ -280,7 +282,7 @@ class EmpruntEmballageController extends Controller
 
     public function update($id)
     {
-        $this->requirePermission('emballages.gerer');
+        $this->requirePermission('emballages.modifier');
         $data = $this->getJsonInput();
         $emprunt = $this->empruntModel->find($id);
         if (!$emprunt) {
@@ -397,7 +399,7 @@ class EmpruntEmballageController extends Controller
 
     public function delete($id)
     {
-        $this->requirePermission('emballages.gerer');
+        $this->requirePermission('emballages.supprimer');
         $emprunt = $this->empruntModel->find($id);
         if (!$emprunt) {
             return $this->error('Operation non trouvee', 404);
@@ -564,7 +566,7 @@ class EmpruntEmballageController extends Controller
 
     public function rembourser($id)
     {
-        $this->requirePermission('emballages.gerer');
+        $this->requirePermission('emballages.rembourser');
         $data = $this->getJsonInput();
 
         $errors = $this->validate($data, [

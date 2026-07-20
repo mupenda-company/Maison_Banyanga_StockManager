@@ -34,18 +34,18 @@ ob_start();
     <div class="card-header flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Liste des approvisionnements</h2>
         <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-            <a href="?<?= http_build_query(array_merge($_GET, ['print' => '1'])) ?>" target="_blank" class="btn-secondary">
+            <?php if (can('approvisionnements.imprimer')): ?><a href="?<?= http_build_query(array_merge($_GET, ['print' => '1'])) ?>" target="_blank" class="btn-secondary">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
                 </svg>
                 Imprimer
-            </a>
-            <a href="?<?= http_build_query(array_merge($_GET, ['export' => 'excel'])) ?>" class="btn-secondary">
+            </a><?php endif; ?>
+            <?php if (can('approvisionnements.exporter')): ?><a href="?<?= http_build_query(array_merge($_GET, ['export' => 'excel'])) ?>" class="btn-secondary">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
                 Exporter Excel
-            </a>
+            </a><?php endif; ?>
             <?php if (can('approvisionnements.creer')): ?>
             <a href="<?= url('approvisionnements/create') ?>" class="btn-primary">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

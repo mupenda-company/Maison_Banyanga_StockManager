@@ -92,7 +92,7 @@ class DepenseController extends Controller
      */
     public function edit($id)
     {
-        $this->requirePermission('depenses.creer');
+        $this->requirePermission('depenses.modifier');
 
         $depense = $this->depenseModel->find((int) $id);
         if (!$depense) {
@@ -110,7 +110,7 @@ class DepenseController extends Controller
      */
     public function update($id)
     {
-        $this->requirePermission('depenses.creer');
+        $this->requirePermission('depenses.modifier');
 
         $depense = $this->depenseModel->find((int) $id);
         if (!$depense) {
@@ -156,7 +156,7 @@ class DepenseController extends Controller
      */
     public function delete($id)
     {
-        $this->requirePermission('depenses.creer');
+        $this->requirePermission('depenses.supprimer');
         
         $depense = $this->depenseModel->find($id);
         if (!$depense) {
@@ -174,7 +174,7 @@ class DepenseController extends Controller
     public function print($id)
     {
         $this->requireAuth();
-        $this->requirePermission('depenses.voir');
+        $this->requirePermission('depenses.imprimer');
         
         $depense = $this->depenseModel->getWithUser($id);
         if (!$depense) {
@@ -193,7 +193,7 @@ class DepenseController extends Controller
     public function printAll()
     {
         $this->requireAuth();
-        $this->requirePermission('depenses.voir');
+        $this->requirePermission('depenses.imprimer');
         
         $filters = [
             'categorie' => $_GET['categorie'] ?? null,

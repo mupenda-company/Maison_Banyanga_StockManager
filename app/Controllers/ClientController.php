@@ -39,11 +39,13 @@ class ClientController extends Controller
         $stats = $this->getClientActivityStats($search, $zoneId);
 
         if (isset($_GET['export']) && $_GET['export'] === 'excel') {
+            $this->requirePermission('clients.exporter');
             $this->exportClientsExcel($clients, $filters, $stats);
             return;
         }
 
         if (isset($_GET['print']) && (string) $_GET['print'] === '1') {
+            $this->requirePermission('clients.imprimer');
             $this->view('clients/print', [
                 'clients' => $clients,
                 'filters' => $filters,

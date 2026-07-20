@@ -12,7 +12,7 @@ class ManquantController extends Controller
 
     public function index()
     {
-        $this->requirePermission('pertes.voir');
+        $this->requirePermission('manquants.voir');
 
         $filters = [
             'agent_id' => $_GET['agent_id'] ?? null,
@@ -25,10 +25,12 @@ class ManquantController extends Controller
         $rows = $this->model->getWithDetails($filters);
 
         if (isset($_GET['export'])) {
+            $this->requirePermission('manquants.exporter');
             return $this->exportRows($rows);
         }
 
         if (isset($_GET['print'])) {
+            $this->requirePermission('manquants.imprimer');
             $this->view('manquants/print', [
                 'manquants' => $rows,
                 'resume' => $this->model->getSummaryByAgent($filters),
@@ -49,7 +51,7 @@ class ManquantController extends Controller
 
     public function create()
     {
-        $this->requirePermission('pertes.creer');
+        $this->requirePermission('manquants.creer');
 
         $this->view('manquants/create', [
             'agents' => (new User())->getActive(),
@@ -61,7 +63,7 @@ class ManquantController extends Controller
 
     public function edit($id)
     {
-        $this->requirePermission('pertes.creer');
+        $this->requirePermission('manquants.modifier');
 
         $manquant = $this->model->find((int) $id);
         if (!$manquant) {
@@ -78,7 +80,7 @@ class ManquantController extends Controller
 
     public function store()
     {
-        $this->requirePermission('pertes.creer');
+        $this->requirePermission('manquants.creer');
 
         $data = $this->getJsonInput();
         $errors = $this->validate($data, [
@@ -129,7 +131,7 @@ class ManquantController extends Controller
 
     public function update($id)
     {
-        $this->requirePermission('pertes.creer');
+        $this->requirePermission('manquants.modifier');
 
         $manquant = $this->model->find((int) $id);
         if (!$manquant) {
@@ -190,7 +192,7 @@ class ManquantController extends Controller
 
     public function payer($id)
     {
-        $this->requirePermission('pertes.creer');
+        $this->requirePermission('manquants.payer');
 
         $data = $this->getJsonInput();
         $montants = $this->montantsDepuisDeuxDevises($data, true);
@@ -216,7 +218,7 @@ class ManquantController extends Controller
 
     public function delete($id)
     {
-        $this->requirePermission('pertes.creer');
+        $this->requirePermission('manquants.supprimer');
 
         $this->model->delete((int) $id);
         return $this->success(null, 'Manquant supprimé');

@@ -34,11 +34,13 @@ class EmballageController extends Controller
         $resumeEmprunts = $this->getResumeEmprunts();
 
         if (isset($_GET['export']) && $_GET['export'] === 'excel') {
+            $this->requirePermission('emballages.exporter');
             $this->exportIndexExcel($stockEmballages, $clientsEmballage, $resumeEmprunts, $dateDebut, $dateFin);
             return;
         }
 
         if (isset($_GET['print']) && (string) $_GET['print'] === '1') {
+            $this->requirePermission('emballages.imprimer');
             $this->view('emballages/print', [
                 'dateDebut' => $dateDebut,
                 'dateFin' => $dateFin,

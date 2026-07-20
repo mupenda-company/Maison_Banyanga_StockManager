@@ -60,11 +60,13 @@ class ApprovisionnementController extends Controller
         
         // Exporter en Excel
         if (isset($_GET['export']) && $_GET['export'] === 'excel') {
+            $this->requirePermission('approvisionnements.exporter');
             $this->exportProduitsExcel($filters);
             return;
         }
 
         if (isset($_GET['print']) && $_GET['print'] === '1') {
+            $this->requirePermission('approvisionnements.imprimer');
             $this->printProduits($filters);
             return;
         }
@@ -314,7 +316,7 @@ class ApprovisionnementController extends Controller
 
     public function create()
     {
-        $this->requirePermission('approvisionnements.voir');
+        $this->requirePermission('approvisionnements.creer');
         
         $produits = $this->produitModel->getActive();
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
@@ -331,7 +333,7 @@ class ApprovisionnementController extends Controller
      */
     public function store()
     {
-        $this->requirePermission('approvisionnements.voir');
+        $this->requirePermission('approvisionnements.creer');
         
         $data = $this->getJsonInput();
         
@@ -489,7 +491,7 @@ class ApprovisionnementController extends Controller
     }
     public function edit($id)
     {
-        $this->requirePermission('approvisionnements.voir');
+        $this->requirePermission('approvisionnements.modifier');
 
         $approvisionnement = $this->approvisionnementModel->getWithDetails($id);
 
@@ -511,7 +513,7 @@ class ApprovisionnementController extends Controller
 
     public function update($id)
     {
-        $this->requirePermission('approvisionnements.voir');
+        $this->requirePermission('approvisionnements.modifier');
 
         $data = $this->getJsonInput();
 
@@ -631,7 +633,7 @@ class ApprovisionnementController extends Controller
     }
     public function print($id)
     {
-        $this->requirePermission('approvisionnements.voir');
+        $this->requirePermission('approvisionnements.imprimer');
 
         $approvisionnement = $this->approvisionnementModel->getWithDetails($id);
         if (!$approvisionnement) {
@@ -646,7 +648,7 @@ class ApprovisionnementController extends Controller
 
     public function exportDetail($id)
     {
-        $this->requirePermission('approvisionnements.voir');
+        $this->requirePermission('approvisionnements.exporter');
 
         $approvisionnement = $this->approvisionnementModel->getWithDetails($id);
         if (!$approvisionnement) {
@@ -792,7 +794,7 @@ class ApprovisionnementController extends Controller
      */
     public function annuler($id)
     {
-        $this->requirePermission('approvisionnements.voir');
+        $this->requirePermission('approvisionnements.supprimer');
         
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
         $result = $this->approvisionnementModel->annuler($id, $emplacementPrincipal['id']);
@@ -825,7 +827,7 @@ class ApprovisionnementController extends Controller
      */
     public function rembourserDette($id)
     {
-        $this->requirePermission('approvisionnements.voir');
+        $this->requirePermission('approvisionnements.rembourser');
         
         $data = $this->getJsonInput();
         

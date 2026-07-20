@@ -36,9 +36,9 @@ ob_start();
             <p class="text-sm text-gray-500 dark:text-gray-400">Rapport détaillé, emballages dus, paiements et restes à payer par agent.</p>
         </div>
         <div class="flex gap-2">
-            <?php if (can('pertes.creer')): ?><a href="<?= url('manquants/create') ?>" class="btn btn-primary">Enregistrer un manquant</a><?php endif; ?>
-            <a href="?<?= http_build_query(array_merge($query, ['export' => 1])) ?>" class="btn btn-secondary">Exporter CSV</a>
-            <button type="button" onclick="window.open('?<?= http_build_query(array_merge($query, ['print' => 1])) ?>','_blank')" class="btn btn-secondary">Imprimer</button>
+            <?php if (can('manquants.creer')): ?><a href="<?= url('manquants/create') ?>" class="btn btn-primary">Enregistrer un manquant</a><?php endif; ?>
+            <?php if (can('manquants.exporter')): ?><a href="?<?= http_build_query(array_merge($query, ['export' => 1])) ?>" class="btn btn-secondary">Exporter CSV</a><?php endif; ?>
+            <?php if (can('manquants.imprimer')): ?><button type="button" onclick="window.open('?<?= http_build_query(array_merge($query, ['print' => 1])) ?>','_blank')" class="btn btn-secondary">Imprimer</button><?php endif; ?>
         </div>
     </div>
 
@@ -198,15 +198,17 @@ ob_start();
                             <?php endif; ?>
                         </td>
                         <td class="no-print text-right whitespace-nowrap">
-                            <?php if (can('pertes.creer') && ($reste > 0.01 || $resteCaisses > 0.0001 || $resteEmb > 0.0001)): ?>
+                            <?php if (can('manquants.payer') && ($reste > 0.01 || $resteCaisses > 0.0001 || $resteEmb > 0.0001)): ?>
                                 <button type="button" @click="openPayment(<?= (int) $m['id'] ?>, '<?= htmlspecialchars($m['agent_nom'], ENT_QUOTES) ?>', <?= (float) $reste ?>, <?= (float) $resteCaisses ?>, <?= (float) $resteEmb ?>)" class="text-green-600 hover:text-green-800 mr-3" title="Régler">
                                     <svg class="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V6m0 12v-2m9-4a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                 </button>
                             <?php endif; ?>
-                            <?php if (can('pertes.creer')): ?>
+                            <?php if (can('manquants.modifier')): ?>
                                 <a href="<?= url('manquants/' . (int)$m['id'] . '/edit') ?>" class="text-primary-600 hover:text-primary-800 mr-3" title="Modifier">
                                     <svg class="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                 </a>
+                            <?php endif; ?>
+                            <?php if (can('manquants.supprimer')): ?>
                                 <button type="button" @click="removeManquant(<?= (int) $m['id'] ?>)" class="text-red-600 hover:text-red-800" title="Supprimer">
                                     <svg class="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                 </button>

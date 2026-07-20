@@ -22,7 +22,7 @@ class RistourneController extends Controller
      */
     public function index()
     {
-        $this->requirePermission('admin.voir');
+        $this->requirePermission('ristournes.voir');
         
         $filters = [
             'mois' => $_GET['mois'] ?? date('n'),
@@ -37,11 +37,13 @@ class RistourneController extends Controller
         $printMode = isset($_GET['print']) && (string) $_GET['print'] === '1';
 
         if (isset($_GET['export']) && $_GET['export'] === 'excel') {
+            $this->requirePermission('ristournes.exporter');
             $this->exportExcel($report, $filters);
             return;
         }
 
         if ($printMode) {
+            $this->requirePermission('ristournes.imprimer');
             $this->view('ristournes/print', [
                 'ristournes' => $ristournes,
                 'report' => $report,
@@ -224,7 +226,7 @@ class RistourneController extends Controller
      */
     public function calculer()
     {
-        $this->requirePermission('admin.voir');
+        $this->requirePermission('ristournes.calculer');
         
         $mois = $_GET['mois'] ?? date('n');
         $annee = $_GET['annee'] ?? date('Y');
@@ -291,7 +293,7 @@ class RistourneController extends Controller
      */
     public function payer($id)
     {
-        $this->requirePermission('admin.voir');
+        $this->requirePermission('ristournes.payer');
         
         $result = $this->ristourneModel->marquerPayee($id);
         
@@ -307,7 +309,7 @@ class RistourneController extends Controller
      */
     public function paliers()
     {
-        $this->requirePermission('admin.voir');
+        $this->requirePermission('ristournes.paliers');
         $paliers = $this->ristourneModel->getPaliers();
         $this->view('ristournes/paliers', ['paliers' => $paliers]);
     }
@@ -317,7 +319,7 @@ class RistourneController extends Controller
      */
     public function storePalier()
     {
-        $this->requirePermission('admin.voir');
+        $this->requirePermission('ristournes.paliers');
         $data = $this->getJsonInput();
 
         $errors = $this->validate($data, [
@@ -357,7 +359,7 @@ class RistourneController extends Controller
      */
     public function deletePalier($id)
     {
-        $this->requirePermission('admin.voir');
+        $this->requirePermission('ristournes.paliers');
         $this->db->delete('paliers_ristourne', 'id = :id', ['id' => $id]);
         return $this->success(null, 'Palier supprime.');
     }

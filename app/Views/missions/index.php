@@ -10,7 +10,7 @@ ob_start();
         <p class="text-gray-500 dark:text-gray-400">Gestion des missions de livraison et de ristourne</p>
     </div>
     <div class="flex gap-2 flex-wrap lg:justify-end">
-        <?php if (can('missions.voir')): ?>
+        <?php if (can('missions.imprimer')): ?>
         <a href="<?= url('missions/synthese') ?>" target="_blank" class="btn btn-secondary">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
@@ -26,7 +26,7 @@ ob_start();
             Nouvelle mission
         </a>
         <?php endif; ?>
-        <?php if (can('admin.voir')): ?>
+        <?php if (can('missions.creer')): ?>
         <a href="<?= url('missions/ristourne/create') ?>" class="btn btn-secondary">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -167,12 +167,12 @@ ob_start();
                                     </svg>
                                 </a>
                                 <?php endif; ?>
-                                <a href="<?= url('missions/' . $mission['id'] . ($mission['statut'] === 'terminee' ? '/facture' : '/print')) ?>" target="_blank" class="text-gray-600 hover:text-gray-700" title="<?= $mission['statut'] === 'terminee' ? 'Imprimer facture' : 'Imprimer bon' ?>">
+                                <?php if (can('missions.imprimer')): ?><a href="<?= url('missions/' . $mission['id'] . ($mission['statut'] === 'terminee' ? '/facture' : '/print')) ?>" target="_blank" class="text-gray-600 hover:text-gray-700" title="<?= $mission['statut'] === 'terminee' ? 'Imprimer facture' : 'Imprimer bon' ?>">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
                                     </svg>
-                                </a>
-                                <?php if ($mission['statut'] === 'en_cours' && can('missions.gerer')): ?>
+                                </a><?php endif; ?>
+                                <?php if ($mission['statut'] === 'en_cours' && can('missions.terminer')): ?>
                                 <button onclick="terminerMission(<?= $mission['id'] ?>)" class="text-green-600 hover:text-green-700" title="Terminer">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>

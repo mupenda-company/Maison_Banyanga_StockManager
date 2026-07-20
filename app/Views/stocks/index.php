@@ -1,5 +1,6 @@
 <?php 
 $emballageMode = !empty($emballageMode);
+$permissionPrefix = $emballageMode ? 'emballages' : 'stock';
 $pageTitle = $emballageMode ? 'Stock emballages' : 'Gestion des stocks';
 $stockBaseUrl = $emballageMode ? url('emballages/stock') : url('stocks');
 $inventaireUrl = $emballageMode ? url('emballages/inventaire') : url('stocks/inventaire');
@@ -139,7 +140,7 @@ ob_start();
             <span class="inline-flex px-2 py-0.5 rounded text-xs font-bold <?= $hasEcart ? 'bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/40 dark:text-red-400 dark:border-red-800' : 'bg-green-100 text-green-700 border border-green-200 dark:bg-green-900/40 dark:text-green-400 dark:border-green-800' ?>">
                 <?= $hasEcart ? 'Écart: ' . ($ecart > 0 ? '+' : '') . number_format($ecart, 0, '.', ' ') . ' cs' : 'Aligné' ?>
             </span>
-            <?php if ($hasEcart && can('stock.gerer')): ?>
+            <?php if ($hasEcart && can('stock.corriger')): ?>
             <a href="<?= url('stocks/correction') ?>?emplacement_id=<?= (int)$emp['id'] ?>" class="inline-flex px-2 py-0.5 rounded text-xs font-bold bg-primary-100 text-primary-700 border border-primary-200 dark:bg-primary-900/40 dark:text-primary-300 dark:border-primary-800">
                 Corriger
             </a>
@@ -151,13 +152,15 @@ ob_start();
 
 <!-- Actions -->
 <div class="flex flex-wrap gap-3 mb-6">
-    <?php if (can('stock.gerer')): ?>
+    <?php if (!$emballageMode && can('stock.corriger')): ?>
     <a href="<?= url('stocks/correction') ?>" class="btn-primary">
         Corriger les écarts
     </a>
     <a href="<?= url('stocks/ajustements') ?>" class="btn-secondary">
         Historique corrections
     </a>
+    <?php endif; ?>
+    <?php if (can($permissionPrefix . '.inventaire')): ?>
     <a href="<?= $inventaireUrl ?>" class="btn-secondary">
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2-2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
@@ -171,15 +174,19 @@ ob_start();
         <?= $emballageMode ? 'Stock initial emballages' : 'Inventaire initial' ?>
     </a>
     <?php endif; ?>
+    <?php if (can($permissionPrefix . '.mouvements')): ?>
     <a href="<?= $mouvementsUrl ?>" class="btn-secondary">
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
         </svg>
         <?= $emballageMode ? 'Mouvements emballages' : 'Historique mouvements' ?>
     </a>
+    <?php endif; ?>
+    <?php if (can($permissionPrefix . '.imprimer')): ?>
     <button type="button" onclick="window.open('<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>','_blank')" class="btn-secondary">Imprimer</button>
+    <?php endif; ?>
     <?php if (!empty($filters['date_stock'])): ?><span class="badge-info">Etat au <?= date('d/m/Y', strtotime($filters['date_stock'])) ?></span><?php endif; ?>
-    <?php if (can('stock.gerer')): ?>
+    <?php if (can($permissionPrefix . '.transferer')): ?>
     <button onclick="openTransfertModal()" class="btn btn-primary">
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
@@ -194,12 +201,12 @@ ob_start();
     <div class="card-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 py-3">
         <h2 class="text-lg font-bold text-gray-900 dark:text-white">Détail par produit et emplacement</h2>
         <div class="flex items-center space-x-2">
-            <a href="?<?= http_build_query(array_merge($_GET, ['export' => 'excel'])) ?>" class="btn btn-secondary btn-sm py-1.5">
+            <?php if (can($permissionPrefix . '.exporter')): ?><a href="?<?= http_build_query(array_merge($_GET, ['export' => 'excel'])) ?>" class="btn btn-secondary btn-sm py-1.5">
                 <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
                 Exporter Excel
-            </a>
+            </a><?php endif; ?>
         </div>
     </div>
     <div class="card-body p-0">

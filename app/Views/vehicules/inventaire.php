@@ -10,7 +10,7 @@ ob_start();
         <p class="text-sm text-gray-500 dark:text-gray-400">Consultez, corrigez et initialisez le stock présent dans chaque véhicule.</p>
     </div>
     <div class="flex items-center gap-2 no-print">
-        <?php if (isset($can_edit_inventory) && $can_edit_inventory): ?>
+        <?php if (can('vehicules.transferer')): ?>
         <button type="button" onclick="document.getElementById('modal-transfert').style.display='flex'" class="btn btn-warning btn-sm">
             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
@@ -21,9 +21,9 @@ ob_start();
         <a href="<?= url('vehicules') ?>" class="btn btn-secondary btn-sm">
             Retour aux véhicules
         </a>
-        <button type="button" onclick="(function(){var url='<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>';var w=window.open(url,'_blank');if(!w){window.location.href=url;}})()" class="btn btn-primary btn-sm">
+        <?php if (can('vehicules.imprimer')): ?><button type="button" onclick="(function(){var url='<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>';var w=window.open(url,'_blank');if(!w){window.location.href=url;}})()" class="btn btn-primary btn-sm">
             Imprimer
-        </button>
+        </button><?php endif; ?>
     </div>
 </div>
 
@@ -551,7 +551,7 @@ document.addEventListener('alpine:init', () => {
 </script>
 
 <!-- Modal Transfert entre véhicules -->
-<?php if (isset($can_edit_inventory) && $can_edit_inventory): ?>
+<?php if (can('vehicules.transferer')): ?>
 <div id="modal-transfert" x-data="transfertForm" x-init="$watch('isOpen', v => { if(!v) $el.style.display='none'; else $el.style.display='flex'; })" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
     <div class="flex items-center justify-center min-h-screen px-4">
         <div class="fixed inset-0 bg-black/50" @click="isOpen = false"></div>

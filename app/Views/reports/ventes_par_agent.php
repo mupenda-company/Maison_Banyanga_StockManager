@@ -218,8 +218,8 @@ $exportUrl = url('rapports/ventes-par-agent/export') . '?' . http_build_query([
                 </p>
                 <div class="flex gap-2">
                 <a href="<?= url('rapports') ?>" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 text-sm font-semibold">Retour aux rapports</a>
-                    <a href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-semibold">Exporter Excel</a>
-                    <button onclick="window.print()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-semibold">Imprimer le rapport affiché</button>
+                    <?php if (can('rapports.exporter')): ?><a href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-semibold">Exporter Excel</a><?php endif; ?>
+                    <?php if (can('rapports.imprimer')): ?><button onclick="window.print()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-semibold">Imprimer le rapport affiché</button><?php endif; ?>
                 </div>
             </div>
         </div>

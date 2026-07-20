@@ -262,7 +262,7 @@ class AdminController extends Controller
      */
     public function objectifs()
     {
-        $this->requirePermission('admin.voir');
+        $this->requirePermission('objectifs.voir');
 
         $periode = $_GET['periode'] ?? date('Y-m');
         if (!preg_match('/^\d{4}-\d{2}$/', (string) $periode)) {
@@ -313,13 +313,13 @@ class AdminController extends Controller
 
     public function printObjectifs()
     {
-        $this->requirePermission('admin.voir');
+        $this->requirePermission('objectifs.imprimer');
         $this->view('admin/objectifs-print', $this->getObjectifsReportData());
     }
 
     public function exportObjectifs()
     {
-        $this->requirePermission('admin.voir');
+        $this->requirePermission('objectifs.exporter');
         $report = $this->getObjectifsReportData();
 
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
@@ -390,7 +390,7 @@ class AdminController extends Controller
      */
     public function storeObjectifs()
     {
-        $this->requirePermission('admin.voir');
+        $this->requirePermission('objectifs.gerer');
 
         $data = $this->getJsonInput();
         if (empty($data)) {

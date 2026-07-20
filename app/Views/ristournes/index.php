@@ -19,9 +19,9 @@ ob_start();
     </div>
     
     <div class="flex gap-3">
-        <button type="button" onclick="window.open('<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>','_blank')" class="btn btn-secondary">Imprimer</button>
-        <a href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary">Exporter Excel</a>
-        <?php if (can('admin.voir')): ?>
+        <?php if (can('ristournes.imprimer')): ?><button type="button" onclick="window.open('<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>','_blank')" class="btn btn-secondary">Imprimer</button><?php endif; ?>
+        <?php if (can('ristournes.exporter')): ?><a href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary">Exporter Excel</a><?php endif; ?>
+        <?php if (can('ristournes.calculer')): ?>
         <button onclick="calculerRistournes(this)" class="btn btn-primary">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
             <span class="loading-text hidden">Calcul en cours...</span>
@@ -110,7 +110,7 @@ ob_start();
                                     <?php endif; ?>
                                 </td>
                                 <td class="text-right no-print">
-                                    <?php if ($r['statut'] === 'calculee'): ?>
+                                    <?php if ($r['statut'] === 'calculee' && can('ristournes.payer')): ?>
                                         <button onclick="payerRistourne(<?= $r['id'] ?>)" class="btn btn-sm btn-success flex items-center gap-2 ml-auto">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -132,7 +132,7 @@ ob_start();
     </div>
 </div>
 
-<?php if (can('admin.voir')): ?>
+<?php if (can('ristournes.calculer')): ?>
 <div id="ristourneProductModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
     <div class="flex items-center justify-center min-h-screen px-4">
         <div class="fixed inset-0 bg-black/50" onclick="closeRistourneProductModal()"></div>

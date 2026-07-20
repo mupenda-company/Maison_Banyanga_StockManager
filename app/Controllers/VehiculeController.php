@@ -36,10 +36,13 @@ class VehiculeController extends Controller
      */
     public function inventaire()
     {
-        $this->requirePermission('vehicules.voir');
+        $this->requirePermission('vehicules.inventaire');
 
         $printMode = isset($_GET['print']) && (string) $_GET['print'] === '1';
-        $canEditInventory = $this->hasPermission('vehicules.gerer');
+        if ($printMode) {
+            $this->requirePermission('vehicules.imprimer');
+        }
+        $canEditInventory = $this->hasPermission('vehicules.inventaire');
 
         $vehiculesBase = $this->vehiculeModel->getWithAgent();
         $vehicules = [];
@@ -219,7 +222,7 @@ class VehiculeController extends Controller
      */
     public function print($id)
     {
-        $this->requirePermission('vehicules.voir');
+        $this->requirePermission('vehicules.imprimer');
 
         $vehicule = $this->vehiculeModel->getWithStock($id);
 
@@ -268,7 +271,7 @@ class VehiculeController extends Controller
      */
     public function store()
     {
-        $this->requirePermission('vehicules.gerer');
+        $this->requirePermission('vehicules.creer');
         
         $data = $this->getJsonInput();
         
@@ -310,7 +313,7 @@ class VehiculeController extends Controller
      */
     public function update($id)
     {
-        $this->requirePermission('vehicules.gerer');
+        $this->requirePermission('vehicules.modifier');
         
         $vehicule = $this->vehiculeModel->find($id);
         
@@ -348,7 +351,7 @@ class VehiculeController extends Controller
      */
     public function transfertVehicule()
     {
-        $this->requirePermission('vehicules.gerer');
+        $this->requirePermission('vehicules.transferer');
         
         $data = $this->getJsonInput();
         
@@ -556,7 +559,7 @@ class VehiculeController extends Controller
      */
     public function enregistrerInventaire($id)
     {
-        $this->requirePermission('vehicules.gerer');
+        $this->requirePermission('vehicules.inventaire');
 
         $data = $this->getJsonInput();
         $lignes = $data['lignes'] ?? [];
@@ -664,7 +667,7 @@ class VehiculeController extends Controller
     }
     public function retourEmballages($id)
     {
-        $this->requirePermission('vehicules.gerer');
+        $this->requirePermission('vehicules.retour_emballages');
 
         try {
             $this->db->beginTransaction();
@@ -743,7 +746,7 @@ class VehiculeController extends Controller
     }
     public function delete($id)
     {
-        $this->requirePermission('admin.voir');
+        $this->requirePermission('vehicules.supprimer');
         
         $vehicule = $this->vehiculeModel->find($id);
         

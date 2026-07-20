@@ -31,16 +31,17 @@ ob_start();
             </p>
         </div>
         <div class="flex flex-wrap gap-2">
-            <a href="<?= url('admin/objectifs/print') . '?' . http_build_query(['periode' => $periode, 'type' => $typeObjectif]) ?>"
+            <?php if (can('objectifs.imprimer')): ?><a href="<?= url('admin/objectifs/print') . '?' . http_build_query(['periode' => $periode, 'type' => $typeObjectif]) ?>"
                target="_blank" class="btn btn-secondary">Imprimer</a>
-            <a href="<?= url('admin/objectifs/export') . '?' . http_build_query(['periode' => $periode, 'type' => $typeObjectif]) ?>"
-               class="btn btn-secondary">Exporter Excel</a>
+            <?php endif; ?>
+            <?php if (can('objectifs.exporter')): ?><a href="<?= url('admin/objectifs/export') . '?' . http_build_query(['periode' => $periode, 'type' => $typeObjectif]) ?>"
+               class="btn btn-secondary">Exporter Excel</a><?php endif; ?>
             <a href="<?= url('admin/settings') ?>" class="btn btn-secondary">
                 Retour aux parametres
             </a>
-            <button type="button" @click="saveObjectifs()" class="btn btn-primary" :disabled="saving">
+            <?php if (can('objectifs.gerer')): ?><button type="button" @click="saveObjectifs()" class="btn btn-primary" :disabled="saving">
                 <span x-text="saving ? 'Enregistrement...' : 'Enregistrer les objectifs'"></span>
-            </button>
+            </button><?php endif; ?>
         </div>
     </div>
 

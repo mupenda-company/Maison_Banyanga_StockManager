@@ -1362,19 +1362,18 @@ INSERT INTO `emplacements` (`code`, `nom`, `type`, `capacite`) VALUES
 ('ENT-001', 'Entrepôt Principal', 'fixe', 1000000);
 
 -- Produit par defauf pour m'evite de tous les ecrire hahha
-INSERT INTO `produits` (`code`, `nom`, `description`, `categorie`, `unite_base`, `bouteilles_par_caisses`, `prix_achat_unitaire`, `prix_achat_deposer`, `prix_achat_enlever`, `prix_vente_unitaire`, `prix_vente_caisses`, `seuil_alerte`, `actif`, `caisses_par_palette`) VALUES
-('PRD-0001', 'PRIMUS 72CL', '', 'Alcolisé', 'caisse', 12, 3023.67, 37050.00, 36284.00, 3250.00, 39000.00, 10, 1, 102),
-('PRD-0002', 'PRIMUS 50CL', '', 'Alcolisé', 'caisse', 20, 2336.70, 47500.00, 46734.00, 2500.00, 50000.00, 10, 1, 102),
-('PRD-0003', 'TURBO KING 72CL', '', 'Alcolisé', 'caisse', 12, 3182.00, 38950.00, 38184.00, 3416.67, 41000.00, 15, 1, 102),
-('PRD-0004', 'TURBO KING 50CL', '', 'Alcolisé', 'caisse', 20, 2431.70, 49400.00, 48634.00, 2600.00, 52000.00, 10, 1, 102),
-('PRD-0005', 'SUPER BOOCKB 65CL', '', 'Alcolisé', 'caisse', 12, 3182.00, 38950.00, 38184.00, 3416.67, 41000.00, 10, 1, 85),
-('PRD-0006', 'MUTZIG BL 33CL', '', 'Alcolisé', 'caisse', 24, 1868.08, 45600.00, 44834.00, 2000.00, 48000.00, 10, 1, 84),
-('PRD-0007', 'MUTZIG BL 65CL', '', 'Alcolisé', 'caisse', 12, 3182.00, 38950.00, 38184.00, 3416.67, 41000.00, 10, 1, 85),
-('PRD-0008', 'CLASS 50CL', '', 'Alcolisé', 'caisse', 20, 2336.70, 47500.00, 46734.00, 2500.00, 50000.00, 10, 1, 102),
-('PRD-0009', 'CLASS 33CL', '', 'Alcolisé', 'caisse', 24, 1947.25, 47500.00, 46734.00, 2083.33, 50000.00, 10, 1, 84),
-('PRD-0010', 'ENERGY MALT 33CL', '', 'Alcolisé', 'caisse', 24, 1551.42, 38000.00, 37234.00, 1666.67, 40000.00, 10, 1, 84),
-('PRD-0011', 'LEGEND 33CL', '', 'Alcolisé', 'caisse', 24, 2026.42, 49400.00, 48634.00, 2166.67, 52000.00, 10, 1, 84);
-
+INSERT INTO `produits` (`code`, `nom`, `description`, `categorie`, `unite_base`, `bouteilles_par_caisses`, `prix_achat_unitaire`, `prix_achat_deposer`, `prix_achat_enlever`, `prix_vente_unitaire`, `prix_vente_caisses`, `prix_emballage`, `seuil_alerte`, `position_affichage`, `actif`,`caisses_par_palette`, `famille_emballage`) VALUES
+('PRD-0001', 'PRIMUS 72CL', '', 'Alcolisé', 'caisse', 12, 3023.67, 37050.00, 36284.00, 3250.00, 39000.00, 0.00, 10, 1, 1, 102, '72CL_12'),
+('PRD-0002', 'PRIMUS 50CL', '', 'Alcolisé', 'caisse', 20, 2336.70, 47500.00, 46734.00, 2500.00, 50000.00, 0.00, 10, 2, 1, 102, '50CL_20'),
+('PRD-0003', 'TURBO KING 72CL', '', 'Alcolisé', 'caisse', 12, 3182.00, 38950.00, 38184.00, 3416.67, 41000.00, 0.00, 15, 3, 1, 102, '72CL_12'),
+('PRD-0004', 'TURBO KING 50CL', '', 'Alcolisé', 'caisse', 20, 2431.70, 49400.00, 48634.00, 2600.00, 52000.00, 0.00, 15, 4, 1, 102, '50CL_20'),
+('PRD-0005', 'SUPER BOOCKB 65CL', '', 'Alcolisé', 'caisse', 12, 3182.00, 38950.00, 38184.00, 3416.67, 41000.00, 0.00, 10, 7, 1, 85, '65CL_12'),
+('PRD-0006', 'MUTZIG BL 33CL', '', 'Alcolisé', 'caisse', 24, 1868.08, 45600.00, 44834.00, 2000.00, 48000.00, 0.00, 10, 6, 1, 84, '33CL_24'),
+('PRD-0007', 'MUTZIG BL 65CL', '', 'Alcolisé', 'caisse', 12, 3182.00, 38950.00, 38184.00, 3416.67, 41000.00, 16100.00, 10, 5, 1, 85, '65CL_12'),
+('PRD-0008', 'CLASS 50CL', '', 'Alcolisé', 'caisse', 20, 2336.70, 47500.00, 46734.00, 2500.00, 50000.00, 13800.00, 10, 8, 1, 102, 'CLASS_50CL_20'),
+('PRD-0009', 'CLASS 33CL', '', 'Alcolisé', 'caisse', 24, 1947.25, 47500.00, 46734.00, 2083.33, 50000.00, 0.00, 10, 9, 1, 84, '33CL_24'),
+('PRD-0010', 'ENERGY MALT 33CL', '', 'Alcolisé', 'caisse', 24, 1551.42, 38000.00, 37234.00, 1666.67, 40000.00, 0.00, 10, 11, 1, 84, '33CL_24'),
+('PRD-0011', 'LEGEND 33CL', '', 'Alcolisé', 'caisse', 24, 2026.42, 49400.00, 48634.00, 2166.67, 52000.00, 0.00, 10, 10, 1, 84, '33CL_24');
 
 
 -- Rôles système
@@ -1426,7 +1425,64 @@ INSERT INTO `permissions` (`code`, `module`, `action`, `description`) VALUES
 ('admin.voir', 'admin', 'voir', 'Accès administration'),
 ('admin.utilisateurs', 'admin', 'utilisateurs', 'Gérer les utilisateurs'),
 ('admin.parametres', 'admin', 'parametres', 'Gérer les paramètres'),
-('admin.roles', 'admin', 'roles', 'Gérer les rôles et permissions');
+('admin.roles', 'admin', 'roles', 'Gérer les rôles et permissions'),
+('clients.imprimer', 'clients', 'imprimer', 'Imprimer la liste des clients'),
+('clients.exporter', 'clients', 'exporter', 'Exporter la liste des clients'),
+('stock.mouvements', 'stock', 'mouvements', 'Voir les mouvements du stock'),
+('stock.imprimer', 'stock', 'imprimer', 'Imprimer les données du stock'),
+('stock.exporter', 'stock', 'exporter', 'Exporter les données du stock'),
+('stock.transferer', 'stock', 'transferer', 'Transférer du stock'),
+('stock.inventaire', 'stock', 'inventaire', 'Réaliser un inventaire du stock'),
+('stock.corriger', 'stock', 'corriger', 'Corriger le stock'),
+('approvisionnements.imprimer', 'approvisionnements', 'imprimer', 'Imprimer un approvisionnement'),
+('approvisionnements.exporter', 'approvisionnements', 'exporter', 'Exporter un approvisionnement'),
+('approvisionnements.rembourser', 'approvisionnements', 'rembourser', 'Rembourser une dette d approvisionnement'),
+('emballages.imprimer', 'emballages', 'imprimer', 'Imprimer les données des emballages'),
+('emballages.exporter', 'emballages', 'exporter', 'Exporter les données des emballages'),
+('emballages.inventaire', 'emballages', 'inventaire', 'Réaliser un inventaire des emballages'),
+('emballages.transferer', 'emballages', 'transferer', 'Transférer des emballages'),
+('emballages.emprunter', 'emballages', 'emprunter', 'Créer un emprunt d emballages'),
+('emballages.modifier', 'emballages', 'modifier', 'Modifier un emprunt d emballages'),
+('emballages.supprimer', 'emballages', 'supprimer', 'Supprimer un emprunt d emballages'),
+('emballages.rembourser', 'emballages', 'rembourser', 'Rembourser un emprunt d emballages'),
+('ventes.imprimer', 'ventes', 'imprimer', 'Imprimer les ventes'),
+('ventes.exporter', 'ventes', 'exporter', 'Exporter les ventes'),
+('vehicules.imprimer', 'vehicules', 'imprimer', 'Imprimer la fiche d un véhicule'),
+('vehicules.creer', 'vehicules', 'creer', 'Créer un véhicule'),
+('vehicules.modifier', 'vehicules', 'modifier', 'Modifier un véhicule'),
+('vehicules.supprimer', 'vehicules', 'supprimer', 'Supprimer un véhicule'),
+('vehicules.inventaire', 'vehicules', 'inventaire', 'Réaliser l inventaire d un véhicule'),
+('vehicules.transferer', 'vehicules', 'transferer', 'Transférer des produits entre véhicules'),
+('vehicules.retour_emballages', 'vehicules', 'retour_emballages', 'Retourner les emballages d un véhicule'),
+('missions.imprimer', 'missions', 'imprimer', 'Imprimer une mission ou une facture'),
+('missions.terminer', 'missions', 'terminer', 'Terminer une mission'),
+('pertes.imprimer', 'pertes', 'imprimer', 'Imprimer les pertes'),
+('pertes.exporter', 'pertes', 'exporter', 'Exporter les pertes'),
+('pertes.modifier', 'pertes', 'modifier', 'Modifier une perte'),
+('pertes.supprimer', 'pertes', 'supprimer', 'Supprimer une perte'),
+('depenses.modifier', 'depenses', 'modifier', 'Modifier une dépense'),
+('depenses.imprimer', 'depenses', 'imprimer', 'Imprimer les dépenses'),
+('rapports.imprimer', 'rapports', 'imprimer', 'Imprimer les rapports'),
+('rapports.exporter', 'rapports', 'exporter', 'Exporter les rapports'),
+('finance.imprimer', 'finance', 'imprimer', 'Imprimer les données financières'),
+('finance.exporter', 'finance', 'exporter', 'Exporter les données financières'),
+('ristournes.voir', 'ristournes', 'voir', 'Voir les ristournes'),
+('ristournes.calculer', 'ristournes', 'calculer', 'Calculer les ristournes'),
+('ristournes.payer', 'ristournes', 'payer', 'Payer une ristourne'),
+('ristournes.paliers', 'ristournes', 'paliers', 'Gérer les paliers de ristourne'),
+('ristournes.imprimer', 'ristournes', 'imprimer', 'Imprimer les ristournes'),
+('ristournes.exporter', 'ristournes', 'exporter', 'Exporter les ristournes'),
+('objectifs.voir', 'objectifs', 'voir', 'Voir les objectifs'),
+('objectifs.gerer', 'objectifs', 'gerer', 'Modifier les objectifs'),
+('objectifs.imprimer', 'objectifs', 'imprimer', 'Imprimer les objectifs'),
+('objectifs.exporter', 'objectifs', 'exporter', 'Exporter les objectifs'),
+('manquants.voir', 'manquants', 'voir', 'Voir les manquants'),
+('manquants.creer', 'manquants', 'creer', 'Créer un manquant'),
+('manquants.modifier', 'manquants', 'modifier', 'Modifier un manquant'),
+('manquants.supprimer', 'manquants', 'supprimer', 'Supprimer un manquant'),
+('manquants.payer', 'manquants', 'payer', 'Enregistrer un paiement de manquant'),
+('manquants.imprimer', 'manquants', 'imprimer', 'Imprimer les manquants'),
+('manquants.exporter', 'manquants', 'exporter', 'Exporter les manquants');
 
 -- Admin = toutes les permissions
 INSERT INTO `role_permissions` (`role_id`, `permission_id`)
@@ -1437,24 +1493,25 @@ INSERT INTO `role_permissions` (`role_id`, `permission_id`)
 SELECT r.id, p.id FROM `roles` r, `permissions` p
 WHERE r.nom = 'magasinier' AND p.code IN (
     'dashboard.voir',
-    'ventes.voir', 'ventes.creer', 'ventes.modifier', 'ventes.supprimer',
-    'clients.voir', 'clients.creer', 'clients.modifier',
+    'ventes.voir', 'ventes.creer', 'ventes.modifier', 'ventes.supprimer', 'ventes.imprimer', 'ventes.exporter',
+    'clients.voir', 'clients.creer', 'clients.modifier', 'clients.imprimer', 'clients.exporter',
     'produits.voir',
-    'stock.voir', 'stock.gerer',
-    'approvisionnements.voir', 'approvisionnements.creer', 'approvisionnements.modifier', 'approvisionnements.supprimer',
-    'missions.voir', 'missions.creer', 'missions.modifier', 'missions.supprimer', 'missions.gerer',
-    'pertes.voir', 'pertes.creer',
-    'vehicules.voir', 'vehicules.gerer',
-    'emballages.voir', 'emballages.gerer',
-    'rapports.voir'
+    'stock.voir', 'stock.gerer', 'stock.mouvements', 'stock.imprimer', 'stock.exporter', 'stock.transferer', 'stock.inventaire', 'stock.corriger',
+    'approvisionnements.voir', 'approvisionnements.creer', 'approvisionnements.modifier', 'approvisionnements.supprimer', 'approvisionnements.imprimer', 'approvisionnements.exporter', 'approvisionnements.rembourser',
+    'missions.voir', 'missions.creer', 'missions.modifier', 'missions.supprimer', 'missions.gerer', 'missions.imprimer', 'missions.terminer',
+    'pertes.voir', 'pertes.creer', 'pertes.modifier', 'pertes.supprimer', 'pertes.imprimer', 'pertes.exporter',
+    'manquants.voir', 'manquants.creer', 'manquants.modifier', 'manquants.supprimer', 'manquants.payer', 'manquants.imprimer', 'manquants.exporter',
+    'vehicules.voir', 'vehicules.gerer', 'vehicules.creer', 'vehicules.modifier', 'vehicules.supprimer', 'vehicules.imprimer', 'vehicules.inventaire', 'vehicules.transferer', 'vehicules.retour_emballages',
+    'emballages.voir', 'emballages.gerer', 'emballages.imprimer', 'emballages.exporter', 'emballages.inventaire', 'emballages.transferer', 'emballages.emprunter', 'emballages.modifier', 'emballages.supprimer', 'emballages.rembourser',
+    'rapports.voir', 'rapports.imprimer', 'rapports.exporter'
 );
 
 -- Vendeur
 INSERT INTO `role_permissions` (`role_id`, `permission_id`)
 SELECT r.id, p.id FROM `roles` r, `permissions` p
 WHERE r.nom = 'vendeur' AND p.code IN (
-    'ventes.voir', 'ventes.creer', 'ventes.modifier',
-    'clients.voir', 'clients.creer', 'clients.modifier',
+    'ventes.voir', 'ventes.creer', 'ventes.modifier', 'ventes.imprimer', 'ventes.exporter',
+    'clients.voir', 'clients.creer', 'clients.modifier', 'clients.imprimer', 'clients.exporter',
     'produits.voir'
 );
 

@@ -34,7 +34,7 @@ class FinanceController extends Controller
     public function print()
     {
         $this->requireAuth();
-        $this->requirePermission('finance.voir');
+        $this->requirePermission('finance.imprimer');
 
         $data = $this->getFinanceData();
         $this->view('finance/print', $data);
@@ -83,7 +83,7 @@ class FinanceController extends Controller
     public function export()
     {
         $this->requireAuth();
-        $this->requirePermission('finance.voir');
+        $this->requirePermission('finance.exporter');
 
         $data = $this->getFinanceData();
 

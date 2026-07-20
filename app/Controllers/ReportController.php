@@ -94,7 +94,7 @@ class ReportController extends Controller
     public function exportVentesParAgent()
     {
         $this->requireAuth();
-        $this->requirePermission('rapports.voir');
+        $this->requirePermission('rapports.exporter');
 
         $data = $this->getVentesParAgentReportData();
 

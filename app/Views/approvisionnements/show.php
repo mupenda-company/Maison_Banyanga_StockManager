@@ -19,16 +19,18 @@ ob_start();
             <div class="card-header flex items-center justify-between">
                 <h2 class="text-lg font-semibold">Approvisionnement N° <?= htmlspecialchars($approvisionnement['numero_bon'] ?? $approvisionnement['id']) ?></h2>
                 <div class="flex gap-2">
-                    <?php if ($approvisionnement['statut'] === 'valide'): ?>
+                    <?php if ($approvisionnement['statut'] === 'valide' && can('approvisionnements.modifier')): ?>
                     <a href="<?= url('approvisionnements/' . $approvisionnement['id'] . '/edit') ?>"
                     class="btn btn-sm btn-primary">
                         Modifier
                     </a>
                     <?php endif; ?>
-                    <a href="<?= url('approvisionnements/' . $approvisionnement['id'] . '/print') ?>" target="_blank" class="btn btn-sm btn-secondary">Imprimer</a>
-                    <a href="<?= url('approvisionnements/' . $approvisionnement['id'] . '/export') ?>" class="btn btn-sm btn-success">Excel</a>
-                    <?php if ($approvisionnement['statut'] === 'en_attente'): ?>
+                    <?php if (can('approvisionnements.imprimer')): ?><a href="<?= url('approvisionnements/' . $approvisionnement['id'] . '/print') ?>" target="_blank" class="btn btn-sm btn-secondary">Imprimer</a><?php endif; ?>
+                    <?php if (can('approvisionnements.exporter')): ?><a href="<?= url('approvisionnements/' . $approvisionnement['id'] . '/export') ?>" class="btn btn-sm btn-success">Excel</a><?php endif; ?>
+                    <?php if ($approvisionnement['statut'] === 'en_attente' && can('approvisionnements.modifier')): ?>
                     <button onclick="valider()" class="btn btn-sm btn-primary">Valider la réception</button>
+                    <?php endif; ?>
+                    <?php if ($approvisionnement['statut'] === 'en_attente' && can('approvisionnements.supprimer')): ?>
                     <button onclick="annuler()" class="btn btn-sm btn-danger">Annuler</button>
                     <?php endif; ?>
                 </div>

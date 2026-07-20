@@ -102,7 +102,7 @@ class MissionController extends Controller
      */
     public function createRestourne()
     {
-        $this->requirePermission('admin.voir');
+        $this->requirePermission('missions.creer');
 
         $vehicules = $this->vehiculeModel->getDisponibles();
         $produits = $this->produitModel->getWithStock();
@@ -150,7 +150,7 @@ class MissionController extends Controller
      */
     public function create()
     {
-        $this->requirePermission('missions.gerer');
+        $this->requirePermission('missions.creer');
         
         $vehicules = $this->vehiculeModel->getDisponibles();
         $produits = $this->produitModel->getWithStock();
@@ -171,7 +171,7 @@ class MissionController extends Controller
      */
     public function store()
     {
-        $this->requirePermission('missions.gerer');
+        $this->requirePermission('missions.creer');
         
         $data = $this->getJsonInput();
         
@@ -341,7 +341,7 @@ class MissionController extends Controller
      */
     public function storeRestourne()
     {
-        $this->requirePermission('admin.voir');
+        $this->requirePermission('missions.creer');
 
         $data = $this->getJsonInput();
 
@@ -442,7 +442,7 @@ class MissionController extends Controller
      */
     public function edit($id)
     {
-        $this->requirePermission('missions.gerer');
+        $this->requirePermission('missions.modifier');
 
         $mission = $this->missionModel->getWithDetails($id);
         if (!$mission) {
@@ -493,7 +493,7 @@ class MissionController extends Controller
      */
     public function update($id)
     {
-        $this->requirePermission('missions.gerer');
+        $this->requirePermission('missions.modifier');
 
         $mission = $this->missionModel->getWithDetails($id);
         if (!$mission) {
@@ -615,7 +615,7 @@ class MissionController extends Controller
      */
     public function terminer($id)
     {
-        $this->requirePermission('missions.gerer');
+        $this->requirePermission('missions.terminer');
 
         $data = $this->getJsonInput();
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
@@ -673,7 +673,7 @@ class MissionController extends Controller
      */
     public function annuler($id)
     {
-        $this->requirePermission('missions.gerer');
+        $this->requirePermission('missions.supprimer');
 
         $mission = $this->missionModel->getWithDetails($id);
         if (!$mission) {
@@ -699,7 +699,7 @@ class MissionController extends Controller
      */
     public function print($id)
     {
-        $this->requirePermission('missions.voir');
+        $this->requirePermission('missions.imprimer');
         
         $mission = $this->missionModel->getWithDetails($id);
         if (!$mission) {
@@ -719,7 +719,7 @@ class MissionController extends Controller
      */
     public function facture($id)
     {
-        $this->requirePermission('missions.voir');
+        $this->requirePermission('missions.imprimer');
 
         $mission = $this->missionModel->getWithDetails($id);
         if (!$mission) {
@@ -739,7 +739,7 @@ class MissionController extends Controller
      */
     public function synthese()
     {
-        $this->requirePermission('missions.voir');
+        $this->requirePermission('missions.imprimer');
 
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
         $dateFin = $_GET['date_fin'] ?? date('Y-m-d');

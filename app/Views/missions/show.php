@@ -69,14 +69,16 @@ ob_start();
                         Modifier
                     </a>
                     <?php endif; ?>
-                    <a href="<?= url('missions/' . $mission['id'] . ($mission['statut'] === 'terminee' ? '/facture' : '/print')) ?>" target="_blank" class="btn btn-sm btn-secondary">
+                    <?php if (can('missions.imprimer')): ?><a href="<?= url('missions/' . $mission['id'] . ($mission['statut'] === 'terminee' ? '/facture' : '/print')) ?>" target="_blank" class="btn btn-sm btn-secondary">
                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
                         </svg>
                         <?= $isRestourne ? 'Bon de ristourne' : ($mission['statut'] === 'terminee' ? 'Facture de mission' : 'Bon de sortie') ?>
-                    </a>
-                    <?php if ($mission['statut'] === 'en_cours' && can('missions.gerer')): ?>
+                    </a><?php endif; ?>
+                    <?php if ($mission['statut'] === 'en_cours' && can('missions.terminer')): ?>
                     <button onclick="terminerMission()" class="btn btn-sm btn-primary"><?= $isRestourne ? 'Clôturer' : 'Terminer' ?></button>
+                    <?php endif; ?>
+                    <?php if ($mission['statut'] === 'en_cours' && can('missions.supprimer')): ?>
                     <button onclick="annulerMission()" class="btn btn-sm btn-danger">Annuler</button>
                     <?php endif; ?>
                 </div>

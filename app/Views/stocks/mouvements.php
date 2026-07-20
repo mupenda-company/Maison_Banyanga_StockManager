@@ -1,5 +1,6 @@
 <?php 
 $emballageMode = !empty($emballageMode);
+$permissionPrefix = $emballageMode ? 'emballages' : 'stock';
 $pageTitle = $emballageMode ? 'Mouvements emballages' : 'Mouvements de stock';
 $stockBaseUrl = $emballageMode ? url('emballages/stock') : url('stocks');
 $mouvementsBaseUrl = $emballageMode ? url('emballages/mouvements') : url('stocks/mouvements');
@@ -104,27 +105,35 @@ ob_start();
     <div class="card-header flex items-center justify-between">
         <h2 class="text-lg font-semibold">Historique des mouvements</h2>
         <div class="flex gap-2 no-print">
+            <?php if (can($permissionPrefix . '.imprimer')): ?>
             <button type="button" onclick="(function(){var url='<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>';var w=window.open(url,'_blank');if(!w){window.location.href=url;}})()" class="btn btn-sm btn-secondary mr-2">
                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
                 </svg>
                 Imprimer
             </button>
+            <?php endif; ?>
+            <?php if (can($permissionPrefix . '.exporter')): ?>
             <a href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-sm btn-secondary mr-2">
                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
                 Exporter
             </a>
+            <?php endif; ?>
+            <?php if (can($permissionPrefix . '.transferer')): ?>
             <button onclick="openTransfertModal()" class="btn btn-sm btn-primary mr-2">
                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
                 </svg>
                 Transfert
             </button>
+            <?php endif; ?>
+            <?php if (can($permissionPrefix . '.inventaire')): ?>
             <button onclick="openAjustementModal()" class="btn btn-sm btn-secondary">
                 Ajustement
             </button>
+            <?php endif; ?>
         </div>
     </div>
     <div class="card-body p-0">

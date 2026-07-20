@@ -195,7 +195,7 @@ ob_start();
             </p>
         </div>
 
-        <?php if (can('admin.voir')): ?>
+        <?php if (can('objectifs.voir')): ?>
         <div class="flex justify-end">
             <a href="<?= url('admin/objectifs?type=approvisionnement') ?>" class="btn btn-secondary">Gérer les objectifs</a>
         </div>
@@ -239,7 +239,7 @@ ob_start();
             </p>
         </div>
 
-        <?php if (can('admin.voir')): ?>
+        <?php if (can('objectifs.voir')): ?>
         <div class="flex justify-end">
             <a href="<?= url('admin/objectifs?type=vente') ?>" class="btn btn-secondary">Gérer les objectifs</a>
         </div>

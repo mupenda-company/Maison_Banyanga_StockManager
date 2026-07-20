@@ -39,6 +39,7 @@ class PerteController extends Controller
         $printMode = isset($_GET['print']) && (string) $_GET['print'] === '1';
 
         if (isset($_GET['export']) && $_GET['export'] === 'excel') {
+            $this->requirePermission('pertes.exporter');
             $this->exportExcel($pertes);
             return;
         }
@@ -52,6 +53,7 @@ class PerteController extends Controller
         $pertesParAgent = $this->perteModel->getByAgent($filters['date_debut'] ?: date('Y-m-01'), $filters['date_fin'] ?: date('Y-m-d'));
 
         if ($printMode) {
+            $this->requirePermission('pertes.imprimer');
             $this->view('pertes/print', [
                 'pertes' => $pertes,
                 'filters' => $filters,
@@ -223,7 +225,7 @@ class PerteController extends Controller
      */
     public function edit($id)
     {
-        $this->requirePermission('pertes.creer');
+        $this->requirePermission('pertes.modifier');
 
         $perte = $this->perteModel->getWithDetails((int) $id);
         if (!$perte) {
@@ -243,7 +245,7 @@ class PerteController extends Controller
      */
     public function update($id)
     {
-        $this->requirePermission('pertes.creer');
+        $this->requirePermission('pertes.modifier');
 
         $data = $this->getJsonInput();
 
@@ -285,7 +287,7 @@ class PerteController extends Controller
      */
     public function delete($id)
     {
-        $this->requirePermission('pertes.voir');
+        $this->requirePermission('pertes.supprimer');
         
         $result = $this->perteModel->supprimer($id);
         

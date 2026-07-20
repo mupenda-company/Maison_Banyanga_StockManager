@@ -11,12 +11,12 @@ ob_start();
         <p class="text-gray-500 dark:text-gray-400">Inventaire reel des emballages vides, dettes clients et emprunts / prets en cours</p>
     </div>
     <div class="flex items-center gap-3">
-        <?php if (can('emballages.gerer')): ?>
+        <?php if (can('emballages.inventaire')): ?>
         <a href="<?= url('emballages/inventaire-initial') ?>" class="btn btn-secondary">Inventaire initial</a>
         <?php endif; ?>
-        <a href="?<?= http_build_query(array_merge($_GET, ['print' => 1])) ?>" target="_blank" class="btn btn-secondary">Imprimer</a>
-        <a href="?<?= http_build_query(array_merge($_GET, ['export' => 'excel'])) ?>" class="btn btn-secondary">Exporter</a>
-        <a href="<?= url('emballages/emprunts') ?>" class="btn btn-primary">Emprunts / prets</a>
+        <?php if (can('emballages.imprimer')): ?><a href="?<?= http_build_query(array_merge($_GET, ['print' => 1])) ?>" target="_blank" class="btn btn-secondary">Imprimer</a><?php endif; ?>
+        <?php if (can('emballages.exporter')): ?><a href="?<?= http_build_query(array_merge($_GET, ['export' => 'excel'])) ?>" class="btn btn-secondary">Exporter</a><?php endif; ?>
+        <?php if (can('emballages.voir')): ?><a href="<?= url('emballages/emprunts') ?>" class="btn btn-primary">Emprunts / prets</a><?php endif; ?>
     </div>
 </div>
 

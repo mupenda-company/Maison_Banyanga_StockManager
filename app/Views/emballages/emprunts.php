@@ -14,9 +14,9 @@ ob_start();
         <p class="text-gray-500 dark:text-gray-400">Produits pleins et emballages vides empruntes ou pretes avec un client, distributeur ou personne externe</p>
     </div>
     <div class="flex flex-wrap gap-2 lg:justify-end">
-        <a href="<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" class="btn btn-secondary">Imprimer</a>
-        <a href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary">Exporter Excel</a>
-        <?php if (can('emballages.gerer')): ?>
+        <?php if (can('emballages.imprimer')): ?><a href="<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" class="btn btn-secondary">Imprimer</a><?php endif; ?>
+        <?php if (can('emballages.exporter')): ?><a href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary">Exporter Excel</a><?php endif; ?>
+        <?php if (can('emballages.emprunter')): ?>
         <button type="button" onclick="openEmpruntModal()" class="btn btn-primary">Nouvelle operation</button>
         <?php endif; ?>
     </div>
@@ -126,21 +126,25 @@ ob_start();
                             <td><?= $emprunt['statut'] === 'solde' ? '<span class="badge-success">Solde</span>' : '<span class="badge-warning">En cours</span>' ?></td>
                             <td class="text-right">
                                 <div class="flex justify-end gap-2">
-                                <a href="<?= url('emballages/emprunts/' . (int) $emprunt['id'] . '/print') ?>" target="_blank" class="btn btn-sm btn-secondary" title="Imprimer le bon signé">
+                                <?php if (can('emballages.imprimer')): ?><a href="<?= url('emballages/emprunts/' . (int) $emprunt['id'] . '/print') ?>" target="_blank" class="btn btn-sm btn-secondary" title="Imprimer le bon signé">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2m-12-4h12v8H6v-8z"/></svg>
-                                </a>
+                                </a><?php endif; ?>
                                 <button type="button" class="btn btn-sm btn-secondary" onclick="openDetailsModal(<?= (int) $emprunt['id'] ?>)" title="Voir le detail">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                 </button>
-                                <?php if (can('emballages.gerer') && $emprunt['statut'] === 'en_cours' && (int) $emprunt['quantite_utilisee'] === 0 && (int) $emprunt['quantite_retournee'] === 0): ?>
+                                <?php if ($emprunt['statut'] === 'en_cours' && (int) $emprunt['quantite_utilisee'] === 0 && (int) $emprunt['quantite_retournee'] === 0): ?>
+                                <?php if (can('emballages.modifier')): ?>
                                 <button type="button" class="btn btn-sm btn-primary" onclick='openEditEmpruntModal(<?= htmlspecialchars(json_encode($emprunt), ENT_QUOTES, 'UTF-8') ?>)' title="Modifier">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                 </button>
+                                <?php endif; ?>
+                                <?php if (can('emballages.supprimer')): ?>
                                 <button type="button" class="btn btn-sm btn-danger" onclick="deleteEmprunt(<?= (int) $emprunt['id'] ?>)" title="Supprimer">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                 </button>
                                 <?php endif; ?>
-                                <?php if (can('emballages.gerer') && (int) ($emprunt['nombre_produits'] ?? 1) === 1 && $emprunt['statut'] === 'en_cours' && (int) $emprunt['reste_caisses'] > 0): ?>
+                                <?php endif; ?>
+                                <?php if (can('emballages.rembourser') && (int) ($emprunt['nombre_produits'] ?? 1) === 1 && $emprunt['statut'] === 'en_cours' && (int) $emprunt['reste_caisses'] > 0): ?>
                                 <button type="button" class="btn btn-sm btn-secondary" onclick="openRemboursementModal(<?= (int) $emprunt['id'] ?>, <?= (int) $emprunt['reste_caisses'] ?>, '<?= htmlspecialchars($emprunt['source_type'] === 'client' ? ($emprunt['client_nom'] ?? 'Client') : ($emprunt['source_nom'] ?? 'Externe'), ENT_QUOTES, 'UTF-8') ?>')" title="<?= ($emprunt['direction'] ?? 'recu') === 'donne' ? 'Retour recu' : 'Rembourser' ?>">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a4 4 0 010 8H7m-4-8l4-4m-4 4l4 4"/></svg>
                                 </button>
@@ -218,7 +222,7 @@ ob_start();
                                 <td class="text-right font-bold text-orange-600" x-text="formatCs(ligne.reste_caisses)"></td>
                                 <td class="text-right">
                                     <div class="flex flex-col items-end gap-1">
-                                    <?php if (can('emballages.gerer')): ?>
+                                    <?php if (can('emballages.rembourser')): ?>
                                     <button type="button" class="btn btn-sm btn-secondary"
                                             x-show="ligne.statut === 'en_cours' && parseInt(ligne.reste_caisses || 0, 10) > 0"
                                             @click="openRemboursementModal(parseInt(ligne.id, 10), parseInt(ligne.reste_caisses, 10), partnerName(operation))">

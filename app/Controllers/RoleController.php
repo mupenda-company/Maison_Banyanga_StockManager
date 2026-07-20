@@ -55,7 +55,7 @@ class RoleController extends Controller
         ]);
 
         $permIds = $data['permissionIds'] ?? $data['permissions'] ?? [];
-        if (!empty($permIds) && is_array($permIds)) {
+        if (is_array($permIds)) {
             $this->roleModel->syncPermissions($id, $permIds);
         }
 
@@ -87,8 +87,9 @@ class RoleController extends Controller
             $this->roleModel->update($id, $updateData);
         }
 
+        $hasPermissions = array_key_exists('permissionIds', $data) || array_key_exists('permissions', $data);
         $permIds = $data['permissionIds'] ?? $data['permissions'] ?? [];
-        if (!empty($permIds) && is_array($permIds)) {
+        if ($hasPermissions && is_array($permIds)) {
             $this->roleModel->syncPermissions($id, $permIds);
         }
 

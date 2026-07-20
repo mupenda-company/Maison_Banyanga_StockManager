@@ -362,11 +362,13 @@
                 <?php endif; ?>
                 
                 <!-- Pertes -->
-                <?php if (can('pertes.voir')): ?>
+                <?php if (can('manquants.voir')): ?>
                 <a href="<?= url('manquants') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/manquants') !== false ? 'active' : '' ?>">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M5.07 19h13.86a2 2 0 001.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16a2 2 0 001.73 3z"/></svg>
                     Manquants agents
                 </a>
+                <?php endif; ?>
+                <?php if (can('pertes.voir')): ?>
                 <a href="<?= url('pertes') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/pertes') !== false ? 'active' : '' ?>">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
@@ -396,7 +398,7 @@
                 <?php endif; ?>
                 
                 <!-- Admin -->
-                <?php if (can('admin.voir') || can('rapports.voir') || can('finance.voir')): ?>
+                <?php if (can('admin.voir') || can('rapports.voir') || can('finance.voir') || can('objectifs.voir') || can('ristournes.voir')): ?>
                 <div class="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
                     <p class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Administration</p>
 
@@ -418,14 +420,16 @@
                     </a>
                     <?php endif; ?>
 
-                    <?php if (can('admin.voir')): ?>
+                    <?php if (can('objectifs.voir')): ?>
                     <a href="<?= url('admin/objectifs') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/admin/objectifs') !== false ? 'active' : '' ?>">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V5m0 12v-1m8-5a8 8 0 11-16 0 8 8 0 0116 0z"/>
                         </svg>
                         Objectifs mensuels
                     </a>
+                    <?php endif; ?>
 
+                    <?php if (can('ristournes.voir')): ?>
                     <a href="<?= url('ristournes') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/ristournes') !== false ? 'active' : '' ?>">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>

@@ -46,11 +46,13 @@ class StockController extends Controller
 
         // Exporter en Excel
         if (isset($_GET['export']) && $_GET['export'] === 'excel') {
+            $this->requireStockOrEmballagePermission('exporter');
             $this->exportExcel($filters);
             return;
         }
 
         if (isset($_GET['print']) && (string) $_GET['print'] === '1') {
+            $this->requireStockOrEmballagePermission('imprimer');
             if (!empty($filters['date_stock'])) {
                 $stocks = $this->stockModel->getHistoricalInventory($filters['date_stock'], $filters);
             } else {
@@ -125,7 +127,7 @@ class StockController extends Controller
      */
     public function inventaireInitial()
     {
-        $this->requireStockOrEmballagePermission('gerer');
+        $this->requireStockOrEmballagePermission('inventaire');
 
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
         $produits = $this->produitModel->getActive();
@@ -348,7 +350,7 @@ class StockController extends Controller
      */
     public function inventaire()
     {
-        $this->requireStockOrEmballagePermission('voir');
+        $this->requireStockOrEmballagePermission('inventaire');
         
         $filters = [
             'produit_id' => $_GET['produit_id'] ?? null,
@@ -364,10 +366,15 @@ class StockController extends Controller
 
         // Exporter en Excel
         if (isset($_GET['export']) && $_GET['export'] === 'excel') {
+            $this->requireStockOrEmballagePermission('exporter');
             $this->exportInventaireExcel($filters);
             return;
         }
         
+        if ($printMode) {
+            $this->requireStockOrEmballagePermission('imprimer');
+        }
+
         if (!empty($filters['date_stock'])) {
             $allInventaire = $this->stockModel->getHistoricalInventory($filters['date_stock'], $filters);
             $total = count($allInventaire);
@@ -588,9 +595,12 @@ class StockController extends Controller
      */
     public function mouvements()
     {
-        $this->requireStockOrEmballagePermission('voir');
+        $this->requireStockOrEmballagePermission('mouvements');
 
         $printMode = isset($_GET['print']) && (string)$_GET['print'] === '1';
+        if ($printMode) {
+            $this->requireStockOrEmballagePermission('imprimer');
+        }
 
         $date = $_GET['date'] ?? null;
         $dateDebut = $_GET['date_debut'] ?? null;
@@ -638,6 +648,7 @@ class StockController extends Controller
         
         // Exporter en Excel
         if (isset($_GET['export']) && $_GET['export'] === 'excel') {
+            $this->requireStockOrEmballagePermission('exporter');
             $this->exportMouvementsExcel($filters);
             return;
         }
@@ -753,7 +764,7 @@ class StockController extends Controller
     {
         $data = $this->getJsonInput();
         $mode = ($data['mode'] ?? 'stock') === 'emballage' ? 'emballage' : 'stock';
-        $this->requirePermission($mode === 'emballage' ? 'emballages.gerer' : 'stock.gerer');
+        $this->requirePermission($mode === 'emballage' ? 'emballages.transferer' : 'stock.transferer');
 
         if (!empty($data['lignes']) && is_array($data['lignes'])) {
             $totalLignes = 0;
@@ -878,7 +889,7 @@ class StockController extends Controller
     {
         $data = $this->getJsonInput();
         $mode = ($data['mode'] ?? 'stock') === 'emballage' ? 'emballage' : 'stock';
-        $this->requirePermission($mode === 'emballage' ? 'emballages.gerer' : 'stock.gerer');
+        $this->requirePermission($mode === 'emballage' ? 'emballages.inventaire' : 'stock.inventaire');
         
         
         $errors = $this->validate($data, [
@@ -952,7 +963,7 @@ class StockController extends Controller
      */
     public function correction()
     {
-        $this->requirePermission('stock.gerer');
+        $this->requirePermission('stock.corriger');
 
         $filters = [
             'produit_id' => $_GET['produit_id'] ?? null,
@@ -976,7 +987,7 @@ class StockController extends Controller
     {
         $data = $this->getJsonInput();
         $mode = ($data['mode'] ?? 'stock') === 'emballage' ? 'emballage' : 'stock';
-        $this->requirePermission($mode === 'emballage' ? 'emballages.gerer' : 'stock.gerer');
+        $this->requirePermission($mode === 'emballage' ? 'emballages.inventaire' : 'stock.corriger');
 
         $errors = $this->validate($data, [
             'produit_id' => 'required|numeric',
