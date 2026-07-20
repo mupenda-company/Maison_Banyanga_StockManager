@@ -290,6 +290,101 @@ class AdminController extends Controller
         ]);
     }
 
+    private function getObjectifsReportData(): array
+    {
+        $periode = $_GET['periode'] ?? date('Y-m');
+        if (!preg_match('/^\d{4}-\d{2}$/', (string) $periode)) {
+            $periode = date('Y-m');
+        }
+
+        $typeObjectif = ($_GET['type'] ?? 'vente') === 'approvisionnement' ? 'approvisionnement' : 'vente';
+        [$annee, $mois] = array_map('intval', explode('-', $periode));
+        $overview = $this->objectifProduitModel->getMonthlyOverview($annee, $mois, $typeObjectif);
+
+        return [
+            'periode' => $periode,
+            'periodeLabel' => date('m/Y', strtotime($periode . '-01')),
+            'typeObjectif' => $typeObjectif,
+            'typeLabel' => $typeObjectif === 'approvisionnement' ? 'Approvisionnement' : 'Vente',
+            'rows' => $overview['rows'],
+            'summary' => $overview['summary'],
+        ];
+    }
+
+    public function printObjectifs()
+    {
+        $this->requirePermission('admin.voir');
+        $this->view('admin/objectifs-print', $this->getObjectifsReportData());
+    }
+
+    public function exportObjectifs()
+    {
+        $this->requirePermission('admin.voir');
+        $report = $this->getObjectifsReportData();
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Objectifs ' . $report['periode']);
+        $sheet->fromArray(['OBJECTIFS MENSUELS PAR PRODUIT'], null, 'A1');
+        $sheet->fromArray(['Periode', $report['periodeLabel']], null, 'A2');
+        $sheet->fromArray(['Type', $report['typeLabel']], null, 'A3');
+        $sheet->fromArray([
+            'Objectif total', (int) ($report['summary']['objectif_total'] ?? 0),
+            'Realise total', (int) ($report['summary']['realise_total'] ?? 0),
+            'Reste total', (int) ($report['summary']['reste_total'] ?? 0),
+            'Progression', (float) ($report['summary']['progression'] ?? 0) / 100,
+        ], null, 'A4');
+
+        $headers = ['CODE', 'PRODUIT', 'OBJECTIF (CS)', 'REALISE (CS)', 'RESTE (CS)', 'SURPLUS (CS)', 'PROGRESSION'];
+        $sheet->fromArray($headers, null, 'A6');
+        $rowIndex = 7;
+        foreach ($report['rows'] as $row) {
+            $objectif = (int) ($row['objectif_caisses'] ?? 0);
+            $realise = (int) ($row['realise_caisses'] ?? 0);
+            $reste = (int) ($row['reste_caisses'] ?? max(0, $objectif - $realise));
+            $surplus = $objectif > 0 ? max(0, $realise - $objectif) : 0;
+            $progression = $objectif > 0 ? min(1, $realise / $objectif) : 0;
+            $sheet->fromArray([
+                $row['code'] ?? '', $row['nom'] ?? '', $objectif, $realise,
+                $reste, $surplus, $progression,
+            ], null, 'A' . $rowIndex++);
+        }
+
+        $lastDataRow = max(7, $rowIndex - 1);
+        $sheet->mergeCells('A1:G1');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+        $sheet->getStyle('A6:G6')->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => '2563EB'],
+            ],
+            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER],
+        ]);
+        $sheet->getStyle('G4')->getNumberFormat()->setFormatCode('0.0%');
+        $sheet->getStyle('G7:G' . $lastDataRow)->getNumberFormat()->setFormatCode('0.0%');
+        $sheet->getStyle('C7:F' . $lastDataRow)->getNumberFormat()->setFormatCode('#,##0');
+        $sheet->freezePane('A7');
+        $sheet->setAutoFilter('A6:G' . $lastDataRow);
+        foreach (range(1, count($headers)) as $column) {
+            $sheet->getColumnDimensionByColumn($column)->setAutoSize(true);
+        }
+
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+        $filename = 'objectifs_' . $report['typeObjectif'] . '_' . $report['periode'] . '.xlsx';
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: max-age=0, must-revalidate');
+        header('Pragma: public');
+        header('Expires: 0');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->setPreCalculateFormulas(false);
+        $writer->save('php://output');
+        exit;
+    }
+
     /**
      * Enregistrer les objectifs mensuels
      */

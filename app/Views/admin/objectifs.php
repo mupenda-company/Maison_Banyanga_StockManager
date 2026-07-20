@@ -31,6 +31,10 @@ ob_start();
             </p>
         </div>
         <div class="flex flex-wrap gap-2">
+            <a href="<?= url('admin/objectifs/print') . '?' . http_build_query(['periode' => $periode, 'type' => $typeObjectif]) ?>"
+               target="_blank" class="btn btn-secondary">Imprimer</a>
+            <a href="<?= url('admin/objectifs/export') . '?' . http_build_query(['periode' => $periode, 'type' => $typeObjectif]) ?>"
+               class="btn btn-secondary">Exporter Excel</a>
             <a href="<?= url('admin/settings') ?>" class="btn btn-secondary">
                 Retour aux parametres
             </a>
