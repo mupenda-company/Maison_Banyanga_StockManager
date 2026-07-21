@@ -12,12 +12,66 @@ class RoleController extends Controller
         $this->permissionModel = new Permission();
     }
 
+    private function containsOwnerRole(array $roleIds): bool
+    {
+        foreach ($roleIds as $roleId) {
+            if ($this->roleModel->isOwnerRole((int) $roleId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function requireRoleHierarchy(int $userId, array $roleIds): void
+    {
+        $userModel = new User();
+        $targetIsOwner = $userModel->isOwner($userId);
+        if ($targetIsOwner && !is_owner()) {
+            $this->error('Ce compte est hors de votre niveau de gestion.', 403);
+        }
+        if (!is_owner() && $this->containsOwnerRole($roleIds)) {
+            $this->error('Vous ne pouvez pas attribuer ce niveau de role.', 403);
+        }
+        if ($targetIsOwner && !$this->containsOwnerRole($roleIds)) {
+            $this->error('Le role proprietaire ne peut pas etre retire de ce compte.', 403);
+        }
+    }
+
+    private function requireAssignablePermissions(array $permissionIds): void
+    {
+        if (is_owner()) return;
+        foreach ($permissionIds as $permissionId) {
+            if ($this->permissionModel->idHasCode((int) $permissionId, 'clients.qr')) {
+                $this->error('La permission QR clients est reservee au proprietaire.', 403);
+            }
+        }
+    }
+
     public function index()
     {
         $this->requirePermission('admin.roles');
 
         $roles = $this->roleModel->getAllWithPermissions();
+        if (!is_owner()) {
+            $roles = array_values(array_filter($roles, fn($role) => ($role['nom'] ?? '') !== 'proprietaire'));
+            foreach ($roles as &$visibleRole) {
+                $visibleRole['permissions'] = array_values(array_filter(
+                    $visibleRole['permissions'] ?? [],
+                    fn($permission) => ($permission['code'] ?? '') !== 'clients.qr'
+                ));
+            }
+            unset($visibleRole);
+        }
         $permissionsGrouped = $this->permissionModel->getAllGroupedByModule();
+        if (!is_owner()) {
+            foreach ($permissionsGrouped as &$modulePermissions) {
+                $modulePermissions = array_values(array_filter(
+                    $modulePermissions,
+                    fn($permission) => ($permission['code'] ?? '') !== 'clients.qr'
+                ));
+            }
+            unset($modulePermissions);
+        }
 
         if ($this->isAjax()) {
             return $this->success(['roles' => $roles, 'permissionsGrouped' => $permissionsGrouped]);
@@ -56,6 +110,7 @@ class RoleController extends Controller
 
         $permIds = $data['permissionIds'] ?? $data['permissions'] ?? [];
         if (is_array($permIds)) {
+            $this->requireAssignablePermissions($permIds);
             $this->roleModel->syncPermissions($id, $permIds);
         }
 
@@ -74,6 +129,10 @@ class RoleController extends Controller
             return $this->error('Rôle non trouvé', 404);
         }
 
+        if (($role['nom'] ?? '') === 'proprietaire') {
+            return $this->error('Le role proprietaire est protege.', 403);
+        }
+
         $data = $this->getJsonInput();
 
         if (isset($data['nom']) && $data['nom'] !== $role['nom']) {
@@ -90,6 +149,7 @@ class RoleController extends Controller
         $hasPermissions = array_key_exists('permissionIds', $data) || array_key_exists('permissions', $data);
         $permIds = $data['permissionIds'] ?? $data['permissions'] ?? [];
         if ($hasPermissions && is_array($permIds)) {
+            $this->requireAssignablePermissions($permIds);
             $this->roleModel->syncPermissions($id, $permIds);
         }
 
@@ -131,6 +191,8 @@ class RoleController extends Controller
             if (!isset($data['role_ids']) || !is_array($data['role_ids'])) {
                 return $this->error('role_ids est requis', 422);
             }
+
+            $this->requireRoleHierarchy((int) $userId, $data['role_ids']);
 
             $this->roleModel->syncUserRoles($userId, $data['role_ids']);
 

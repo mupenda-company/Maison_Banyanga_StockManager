@@ -69,6 +69,40 @@ class Role extends Model
         return array_column($rows, 'code');
     }
 
+    public function getAllPermissionCodes(): array
+    {
+        $rows = $this->db->fetchAll("SELECT code FROM permissions ORDER BY code");
+        return array_column($rows, 'code');
+    }
+
+    public function userHasRole(int $userId, string $roleName): bool
+    {
+        return (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*)
+             FROM user_roles ur
+             INNER JOIN roles r ON r.id = ur.role_id
+             WHERE ur.user_id = :user_id AND r.nom = :role_name",
+            ['user_id' => $userId, 'role_name' => $roleName]
+        );
+    }
+
+    public function isOwnerRole(int $roleId): bool
+    {
+        return (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*) FROM roles WHERE id = :id AND nom = 'proprietaire'",
+            ['id' => $roleId]
+        );
+    }
+
+    public function getVisibleRoles(bool $includeOwner): array
+    {
+        $sql = "SELECT * FROM roles";
+        if (!$includeOwner) {
+            $sql .= " WHERE nom <> 'proprietaire'";
+        }
+        return $this->db->fetchAll($sql . " ORDER BY nom");
+    }
+
     public function assignRole($userId, $roleId)
     {
         $this->db->insert('user_roles', [

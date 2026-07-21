@@ -1,7 +1,7 @@
 <?php 
 $pageTitle = 'Gestion des utilisateurs';
 $usersJson = json_encode($users, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
-$rolesList = (new Role())->all('nom');
+$rolesList = $rolesList ?? [];
 $rolesJson = json_encode($rolesList, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 ob_start();
 ?>

@@ -27,4 +27,12 @@ class Permission extends Model
         }
         return $this->db->fetchColumn($sql, $params) > 0;
     }
+
+    public function idHasCode(int $permissionId, string $code): bool
+    {
+        return (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*) FROM permissions WHERE id = :id AND code = :code",
+            ['id' => $permissionId, 'code' => $code]
+        );
+    }
 }

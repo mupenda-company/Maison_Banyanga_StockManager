@@ -107,6 +107,11 @@ abstract class Controller
     protected function requireRole($roles)
     {
         $this->requireAuth();
+        $this->refreshSessionPermissions();
+
+        if (!empty($_SESSION['is_owner'])) {
+            return true;
+        }
         
         if (!is_array($roles)) {
             $roles = [$roles];
@@ -127,10 +132,26 @@ abstract class Controller
     {
         $this->requireAuth();
         $this->refreshSessionPermissions();
+        if (!empty($_SESSION['is_owner'])) {
+            return true;
+        }
         $permissions = $_SESSION['user_permissions'] ?? [];
         if (!in_array($permissionCode, $permissions)) {
             if ($this->isAjax()) {
                 return $this->error('Accès refusé - permission requise : ' . $permissionCode, 403);
+            }
+            redirect('unauthorized');
+        }
+        return true;
+    }
+
+    protected function requireOwner()
+    {
+        $this->requireAuth();
+        $this->refreshSessionPermissions();
+        if (empty($_SESSION['is_owner'])) {
+            if ($this->isAjax()) {
+                return $this->error('Acces reserve au proprietaire.', 403);
             }
             redirect('unauthorized');
         }
@@ -144,6 +165,7 @@ abstract class Controller
     {
         if (!isset($_SESSION['user_id'])) return false;
         $this->refreshSessionPermissions();
+        if (!empty($_SESSION['is_owner'])) return true;
         return in_array($permissionCode, $_SESSION['user_permissions'] ?? []);
     }
 
@@ -155,7 +177,10 @@ abstract class Controller
         if (!isset($_SESSION['user_id'])) return;
         require_once ROOT_PATH . '/app/Models/Role.php';
         $roleModel = new Role();
-        $_SESSION['user_permissions'] = $roleModel->getUserPermissionCodes($_SESSION['user_id']);
+        $_SESSION['is_owner'] = $roleModel->userHasRole((int) $_SESSION['user_id'], 'proprietaire');
+        $_SESSION['user_permissions'] = !empty($_SESSION['is_owner'])
+            ? $roleModel->getAllPermissionCodes()
+            : $roleModel->getUserPermissionCodes($_SESSION['user_id']);
     }
     
     /**

@@ -204,6 +204,13 @@ class ClientController extends Controller
             $clients = $this->clientModel->getAllWithZone();
         }
 
+        // Le jeton QR est un secret d'identification et ne doit jamais etre
+        // expose dans les listes generales, y compris dans l'application mobile.
+        foreach ($clients as &$client) {
+            unset($client['qr_token']);
+        }
+        unset($client);
+
         return $this->success($clients);
     }
 
@@ -261,6 +268,7 @@ class ClientController extends Controller
                 'nom' => $data['nom'],
                 'telephone' => $data['telephone'] ?? null,
                 'numero_client' => $numeroClient !== '' ? $numeroClient : null,
+                'qr_token' => bin2hex(random_bytes(16)),
                 'adresse' => $data['adresse'] ?? null,
                 'zone_id' => $data['zone_id'],
                 'taux_ristourne' => isset($data['taux_ristourne']) && $data['taux_ristourne'] !== ''
@@ -339,6 +347,56 @@ class ClientController extends Controller
             'dettes' => $dettes,
             'dette_emballages' => $detteEmballages
         ]);
+    }
+
+    public function printQrCodes()
+    {
+        $this->requireOwner();
+        $clients = $this->clientModel->getAllWithZone();
+        foreach ($clients as &$client) {
+            $client['qr_payload'] = $this->clientModel->qrPayload($client);
+        }
+        unset($client);
+
+        $this->view('clients/qr-print', ['clients' => $clients]);
+    }
+
+    public function printQrCode($id)
+    {
+        $this->requireOwner();
+        $client = $this->clientModel->getWithZone((int) $id);
+        if (!$client || !(int) ($client['actif'] ?? 0)) {
+            return $this->error('Client actif non trouve', 404);
+        }
+        $client['qr_payload'] = $this->clientModel->qrPayload($client);
+        $this->view('clients/qr-print', ['clients' => [$client]]);
+    }
+
+    public function regenerateQrCode($id)
+    {
+        $this->requireOwner();
+        $client = $this->clientModel->find((int) $id);
+        if (!$client) {
+            return $this->error('Client non trouve', 404);
+        }
+
+        $this->clientModel->regenerateQrToken((int) $id);
+        return $this->success(null, 'QR code du client regenere');
+    }
+
+    public function findMobileByQr($token)
+    {
+        $token = strtolower(trim((string) $token));
+        if (!preg_match('/^[a-f0-9]{32}$/', $token)) {
+            return $this->error('QR client invalide', 422);
+        }
+
+        $client = $this->clientModel->getByQrToken($token);
+        if (!$client) {
+            return $this->error('Client actif introuvable pour ce QR code', 404);
+        }
+
+        return $this->success($client, 'Client identifie');
     }
 
     /**

@@ -63,7 +63,38 @@ class User extends Model
     public function getActive()
     {
         return $this->db->fetchAll(
-            "SELECT * FROM {$this->table} WHERE actif = 1 ORDER BY nom, prenom"
+            "SELECT u.* FROM {$this->table} u
+             WHERE u.actif = 1
+               AND NOT EXISTS (
+                   SELECT 1 FROM user_roles ur
+                   INNER JOIN roles r ON r.id = ur.role_id
+                   WHERE ur.user_id = u.id AND r.nom = 'proprietaire'
+               )
+             ORDER BY u.nom, u.prenom"
+        );
+    }
+
+    public function getManageableUsers(bool $includeOwners): array
+    {
+        $sql = "SELECT u.* FROM users u";
+        if (!$includeOwners) {
+            $sql .= " WHERE NOT EXISTS (
+                SELECT 1 FROM user_roles ur
+                INNER JOIN roles r ON r.id = ur.role_id
+                WHERE ur.user_id = u.id AND r.nom = 'proprietaire'
+            )";
+        }
+        return $this->db->fetchAll($sql . " ORDER BY u.nom, u.prenom");
+    }
+
+    public function isOwner(int $userId): bool
+    {
+        return (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*)
+             FROM user_roles ur
+             INNER JOIN roles r ON r.id = ur.role_id
+             WHERE ur.user_id = :user_id AND r.nom = 'proprietaire'",
+            ['user_id' => $userId]
         );
     }
     

@@ -53,7 +53,10 @@ class AuthController extends Controller
 
             // Charger les permissions du rôle
             $roleModel = new Role();
-            $_SESSION['user_permissions'] = $roleModel->getUserPermissionCodes($user['id']);
+            $_SESSION['is_owner'] = $roleModel->userHasRole((int) $user['id'], 'proprietaire');
+            $_SESSION['user_permissions'] = !empty($_SESSION['is_owner'])
+                ? $roleModel->getAllPermissionCodes()
+                : $roleModel->getUserPermissionCodes($user['id']);
 
             $redirectTo = getDefaultRoute();
             

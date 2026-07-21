@@ -50,6 +50,7 @@ ob_start();
                 <button type="submit" class="btn btn-secondary w-full xl:w-auto">Rechercher</button>
                 <?php if (can('clients.imprimer')): ?><a href="?<?= http_build_query(array_merge($_GET, ['print' => 1])) ?>" target="_blank" class="btn btn-secondary w-full xl:w-auto">Imprimer</a><?php endif; ?>
                 <?php if (can('clients.exporter')): ?><a href="?<?= http_build_query(array_merge($_GET, ['export' => 'excel'])) ?>" class="btn btn-secondary w-full xl:w-auto">Exporter</a><?php endif; ?>
+                <?php if (is_owner()): ?><a href="<?= url('clients/qr') ?>" target="_blank" class="btn btn-secondary w-full xl:w-auto">QR clients actifs</a><?php endif; ?>
                 <?php if (can('clients.creer')): ?>
                 <button type="button" @click="openModal()" class="btn btn-primary w-full xl:w-auto">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -106,6 +107,11 @@ ob_start();
                                         <a href="<?= url('clients/' . $client['id']) ?>" class="text-blue-500 hover:text-blue-700" title="Voir détails">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                         </a>
+                                        <?php if (is_owner()): ?>
+                                        <a href="<?= url('clients/' . $client['id'] . '/qr') ?>" target="_blank" class="text-purple-600 hover:text-purple-800" title="Imprimer le QR code">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h6v6H3V3zm12 0h6v6h-6V3zM3 15h6v6H3v-6zm12 0h2v2h-2v-2zm4 0h2v6h-2v-6zm-4 4h2v2h-2v-2z"/></svg>
+                                        </a>
+                                        <?php endif; ?>
                                         <button @click="editClient(<?= htmlspecialchars(json_encode($client)) ?>)" class="text-primary-600 hover:text-primary-700" title="Modifier" <?php if (!can('clients.modifier')): ?>style="display:none"<?php endif; ?>>
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                         </button>

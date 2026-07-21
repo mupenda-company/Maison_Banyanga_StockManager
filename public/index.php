@@ -12,6 +12,8 @@ if (defined('BASE_PATH') && BASE_PATH !== '') {
 $requestPath = str_replace('/index.php', '', $requestPath);
 $requestPath = rtrim($requestPath, '/') ?: '/';
 
+AuditLog::registerRequest($requestPath);
+
 if (strpos($requestPath, '/api/mobile/') === 0) {
     header('Access-Control-Allow-Origin: *');
     header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
@@ -121,6 +123,9 @@ $routes = [
     'POST::/api/clients' => ['ClientController', 'store'],
     'PUT::/api/clients/(\d+)' => ['ClientController', 'update'],
     'DELETE::/api/clients/(\d+)' => ['ClientController', 'delete'],
+    'GET::/clients/qr' => ['ClientController', 'printQrCodes'],
+    'GET::/clients/(\d+)/qr' => ['ClientController', 'printQrCode'],
+    'POST::/api/clients/(\d+)/qr/regenerate' => ['ClientController', 'regenerateQrCode'],
     'GET::/clients/zones' => ['ClientController', 'byZone'],
     
     // Véhicules
@@ -162,6 +167,7 @@ $routes = [
     'POST::/api/mobile/vente' => ['MobileController', 'storeVente'],
     'GET::/api/mobile/vente/(\d+)/facture' => ['MobileController', 'getVenteFacture'],
     'GET::/api/mobile/clients' => ['ClientController', 'apiList'],
+    'GET::/api/mobile/client/qr/([a-fA-F0-9]{32})' => ['ClientController', 'findMobileByQr'],
     'GET::/api/mobile/ventes' => ['MobileController', 'listVentes'],
     'GET::/api/mobile/ventes-par-agent' => ['MobileController', 'ventesParAgent'],
     'POST::/api/mobile/ristournes/(\d+)/payer' => ['MobileController', 'payerRistourne'],

@@ -33,6 +33,11 @@ define('DB_CHARSET', 'utf8mb4');
 define('APP_NAME', 'Logistique');
 define('APP_VERSION', '1.0.0');
 
+// RECOLTE LOCALE SUR LES RISTOURNES CLIENTS
+// Laissez cette ligne active pour appliquer la deduction par caisse.
+// Commentez uniquement cette ligne pour desactiver completement la recolte locale.
+// define('APPLIQUER_RECOLTE_LOCALE', true);
+
 // URL de base — logique claire et unique
 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
 
@@ -106,7 +111,12 @@ function redirect($path = '') {
 
 function can($permissionCode) {
     if (!isset($_SESSION['user_id'])) return false;
+    if (!empty($_SESSION['is_owner'])) return true;
     return in_array($permissionCode, $_SESSION['user_permissions'] ?? []);
+}
+
+function is_owner() {
+    return isset($_SESSION['user_id']) && !empty($_SESSION['is_owner']);
 }
 
 function getDefaultRoute() {

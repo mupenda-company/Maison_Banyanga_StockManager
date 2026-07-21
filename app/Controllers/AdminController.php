@@ -18,6 +18,26 @@ class AdminController extends Controller
         $this->produitModel = new Produit();
         $this->objectifProduitModel = new ObjectifProduit();
     }
+
+    private function requireManageableUser(int $userId): void
+    {
+        if ($this->userModel->isOwner($userId) && !is_owner()) {
+            $this->error('Ce compte est hors de votre niveau de gestion.', 403);
+        }
+    }
+
+    private function requireAssignableRoles(array $roleIds): void
+    {
+        if (is_owner()) {
+            return;
+        }
+        $roleModel = new Role();
+        foreach ($roleIds as $roleId) {
+            if ($roleModel->isOwnerRole((int) $roleId)) {
+                $this->error('Vous ne pouvez pas attribuer ce niveau de role.', 403);
+            }
+        }
+    }
     
     /**
      * Tableau de bord admin
@@ -27,7 +47,7 @@ class AdminController extends Controller
         $this->requirePermission('admin.voir');
         
         $stats = [
-            'users' => $this->userModel->count(),
+            'users' => count($this->userModel->getManageableUsers(is_owner())),
             'produits' => (new Produit())->count(),
             'clients' => (new Client())->count(),
             'vehicules' => (new Vehicule())->count()
@@ -45,7 +65,7 @@ class AdminController extends Controller
     {
         $this->requirePermission('admin.voir');
         
-        $users = $this->userModel->all('nom, prenom');
+        $users = $this->userModel->getManageableUsers(is_owner());
         $roleModel = new Role();
         
         // Ajouter les role_ids et role_names à chaque utilisateur
@@ -56,7 +76,8 @@ class AdminController extends Controller
         }
         
         $this->view('admin/users', [
-            'users' => $users
+            'users' => $users,
+            'rolesList' => $roleModel->getVisibleRoles(is_owner())
         ]);
     }
     
@@ -65,7 +86,7 @@ class AdminController extends Controller
      */
     public function storeUser()
     {
-        $this->requirePermission('admin.voir');
+        $this->requirePermission('admin.utilisateurs');
         
         $data = $this->getJsonInput();
         
@@ -80,6 +101,8 @@ class AdminController extends Controller
         if (!empty($errors)) {
             return $this->error('Erreurs de validation', 422, $errors);
         }
+
+        $this->requireAssignableRoles($data['role_ids'] ?? []);
         
         // Déduire le rôle legacy depuis les role_ids (seulement pour les rôles système)
         $roleModel = new Role();
@@ -127,7 +150,7 @@ class AdminController extends Controller
     public function updateUser($id)
     {
         try {
-            $this->requirePermission('admin.voir');
+            $this->requirePermission('admin.utilisateurs');
             
             $user = $this->userModel->find($id);
             
@@ -135,7 +158,9 @@ class AdminController extends Controller
                 return $this->error('Utilisateur non trouvé', 404);
             }
             
+            $this->requireManageableUser((int) $id);
             $data = $this->getJsonInput();
+            $this->requireAssignableRoles($data['role_ids'] ?? []);
             
             // Vérifier username unique
             if (isset($data['username']) && $data['username'] !== $user['username']) {
@@ -154,6 +179,10 @@ class AdminController extends Controller
             $updateData = array_intersect_key($data, array_flip([
                 'username', 'telephone', 'nom', 'prenom', 'actif'
             ]));
+
+            if ($this->userModel->isOwner((int) $id)) {
+                unset($updateData['username'], $updateData['actif']);
+            }
             
             // Sync legacy role field from role_ids (only for system roles)
             if (!empty($data['role_ids'])) {
@@ -201,10 +230,16 @@ class AdminController extends Controller
      */
     public function deleteUser($id)
     {
-        $this->requirePermission('admin.voir');
+        $this->requirePermission('admin.utilisateurs');
         
         if ($id == $_SESSION['user_id']) {
             return $this->error('Vous ne pouvez pas supprimer votre propre compte', 400);
+        }
+
+        $this->requireManageableUser((int) $id);
+
+        if ($this->userModel->isOwner((int) $id)) {
+            return $this->error('Le compte proprietaire est protege contre la suppression.', 403);
         }
         
         $user = $this->userModel->find($id);
@@ -235,7 +270,8 @@ class AdminController extends Controller
      */
     public function resetPassword($id)
     {
-        $this->requirePermission('admin.voir');
+        $this->requirePermission('admin.utilisateurs');
+        $this->requireManageableUser((int) $id);
         
         $newPassword = substr(md5(uniqid()), 0, 8);
         $this->userModel->updatePassword($id, $newPassword);

@@ -6,16 +6,18 @@
 class Client extends Model
 {
     protected $table = 'clients';
-    protected $fillable = ['nom', 'telephone', 'numero_client', 'adresse', 'zone_id', 'email', 'taux_ristourne', 'notes', 'actif'];
+    protected $fillable = ['nom', 'telephone', 'numero_client', 'qr_token', 'adresse', 'zone_id', 'email', 'taux_ristourne', 'notes', 'actif'];
 
     private static bool $numeroClientColumnChecked = false;
     private static bool $numeroClientUniqueIndexChecked = false;
+    private static bool $qrTokenColumnChecked = false;
 
     public function __construct()
     {
         parent::__construct();
         $this->ensureNumeroClientColumn();
         $this->ensureNumeroClientUniqueIndex();
+        $this->ensureQrTokens();
     }
 
     private function ensureNumeroClientColumn(): void
@@ -71,6 +73,72 @@ class Client extends Model
         }
 
         self::$numeroClientUniqueIndexChecked = true;
+    }
+
+    private function ensureQrTokens(): void
+    {
+        if (self::$qrTokenColumnChecked) {
+            return;
+        }
+
+        $exists = (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND COLUMN_NAME = 'qr_token'"
+        );
+        if (!$exists) {
+            $this->db->query("ALTER TABLE clients ADD qr_token CHAR(32) NULL AFTER numero_client");
+        }
+
+        $clients = $this->db->fetchAll("SELECT id FROM clients WHERE qr_token IS NULL OR qr_token = ''");
+        foreach ($clients as $client) {
+            $this->db->query(
+                "UPDATE clients SET qr_token = :token WHERE id = :id",
+                ['token' => $this->generateUniqueQrToken(), 'id' => (int) $client['id']]
+            );
+        }
+
+        $indexExists = (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*) FROM information_schema.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND INDEX_NAME = 'uk_clients_qr_token'"
+        );
+        if (!$indexExists) {
+            $this->db->query("ALTER TABLE clients ADD UNIQUE KEY uk_clients_qr_token (qr_token)");
+        }
+
+        self::$qrTokenColumnChecked = true;
+    }
+
+    private function generateUniqueQrToken(): string
+    {
+        do {
+            $token = bin2hex(random_bytes(16));
+        } while ($this->db->fetchColumn("SELECT COUNT(*) FROM clients WHERE qr_token = :token", ['token' => $token]));
+        return $token;
+    }
+
+    public function getByQrToken(string $token)
+    {
+        return $this->db->fetch(
+            "SELECT c.id, c.nom, c.telephone, c.numero_client, c.adresse, c.email,
+                    c.zone_id, c.actif, z.nom AS zone_nom
+             FROM clients c
+             LEFT JOIN zones z ON z.id = c.zone_id
+             WHERE c.qr_token = :token AND c.actif = 1
+             LIMIT 1",
+            ['token' => strtolower(trim($token))]
+        );
+    }
+
+    public function regenerateQrToken(int $clientId): string
+    {
+        $token = $this->generateUniqueQrToken();
+        $this->update($clientId, ['qr_token' => $token]);
+        return $token;
+    }
+
+    public function qrPayload(array $client): string
+    {
+        return 'BRALIMA-CLIENT:' . strtolower((string) ($client['qr_token'] ?? ''));
     }
     
     /**

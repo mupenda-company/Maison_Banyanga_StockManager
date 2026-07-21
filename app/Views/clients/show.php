@@ -39,6 +39,11 @@ ob_start();
             <div class="card">
                 <div class="card-header flex items-center justify-between">
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white"><?= htmlspecialchars($client['nom']) ?></h2>
+                    <div class="flex gap-2">
+                    <?php if (is_owner()): ?>
+                    <a href="<?= url('clients/' . $client['id'] . '/qr') ?>" target="_blank" class="btn btn-sm btn-primary">Imprimer QR</a>
+                    <button type="button" @click="regenerateQr()" class="btn btn-sm btn-danger">Régénérer QR</button>
+                    <?php endif; ?>
                     <?php if (can('clients.modifier')): ?>
                     <button @click="openEdit()" class="btn btn-sm btn-secondary">
                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -47,6 +52,7 @@ ob_start();
                         Modifier
                     </button>
                     <?php endif; ?>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
@@ -270,6 +276,21 @@ document.addEventListener('alpine:init', () => {
         },
         openEdit() { this.isModalOpen = true; },
         closeEdit() { this.isModalOpen = false; },
+        async regenerateQr() {
+            const ok = await App.confirm({
+                title: 'Régénérer le QR code ?',
+                message: 'L’ancien QR code ne fonctionnera plus. Il faudra imprimer et placer le nouveau chez le client.',
+                confirmText: 'Régénérer',
+                cancelText: 'Annuler',
+                type: 'warning'
+            });
+            if (!ok) return;
+            try {
+                await App.api('/api/clients/<?= (int) $client['id'] ?>/qr/regenerate', 'POST');
+                App.notify('Nouveau QR code généré', 'success');
+                window.open('<?= url('clients/' . (int) $client['id'] . '/qr') ?>', '_blank');
+            } catch (e) { App.notify(e.message, 'error'); }
+        },
         async save() {
             if (this.loading) return;
             const ok = await App.confirm({

@@ -67,8 +67,20 @@ class Ristourne extends Model
     public function calculerDeductionLocale($totalCaisses)
     {
         $totalCaisses = (int) $totalCaisses;
+
+        // La recolte locale est volontairement desactivee lorsque la constante
+        // n'existe pas. Il suffit donc de commenter sa ligne dans config.php.
+        if (!defined('APPLIQUER_RECOLTE_LOCALE') || APPLIQUER_RECOLTE_LOCALE !== true) {
+            return [
+                'active' => false,
+                'taux_local' => 0,
+                'deduction_locale' => 0,
+                'palier_local' => 'Desactivee'
+            ];
+        }
+
         if ($totalCaisses < 5) {
-            return ['taux_local' => 0, 'deduction_locale' => 0, 'palier_local' => 'Aucun'];
+            return ['active' => true, 'taux_local' => 0, 'deduction_locale' => 0, 'palier_local' => 'Aucun'];
         } elseif ($totalCaisses <= 200) {
             $taux = 100;
             $palier = '5-200 cs';
@@ -80,6 +92,7 @@ class Ristourne extends Model
             $palier = '501+ cs';
         }
         return [
+            'active' => true,
             'taux_local' => $taux,
             'deduction_locale' => $taux * $totalCaisses,
             'palier_local' => $palier
@@ -142,6 +155,7 @@ class Ristourne extends Model
             'taux_local' => $deductionLocale['taux_local'],
             'deduction_locale' => $deductionLocale['deduction_locale'],
             'palier_local' => $deductionLocale['palier_local'],
+            'recolte_locale_active' => $deductionLocale['active'],
             'montant_ristourne_net' => $montantRistourneNet
         ];
     }

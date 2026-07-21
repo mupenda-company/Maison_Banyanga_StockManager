@@ -114,6 +114,7 @@ CREATE TABLE `clients` (
   `nom` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
   `telephone` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `numero_client` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `qr_token` char(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `adresse` text COLLATE utf8mb4_unicode_ci,
   `zone_id` int UNSIGNED DEFAULT NULL,
   `email` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -580,6 +581,20 @@ CREATE TABLE `users` (
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `audit_logs` (
+  `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` int UNSIGNED DEFAULT NULL,
+  `methode` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `route` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `statut_http` smallint UNSIGNED NOT NULL DEFAULT '200',
+  `adresse_ip` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `user_agent` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_audit_user` (`user_id`),
+  KEY `idx_audit_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 --
 -- Table structure for table `user_roles`
@@ -709,6 +724,7 @@ ALTER TABLE `billetages`
 ALTER TABLE `clients`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `uk_clients_numero_client` (`numero_client`),
+  ADD UNIQUE KEY `uk_clients_qr_token` (`qr_token`),
   ADD KEY `zone_id` (`zone_id`);
 
 --
@@ -1298,6 +1314,9 @@ ALTER TABLE `stocks`
 --
 -- Constraints for table `user_roles`
 --
+ALTER TABLE `audit_logs`
+  ADD CONSTRAINT `fk_audit_logs_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
 ALTER TABLE `user_roles`
   ADD CONSTRAINT `user_roles_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `user_roles_ibfk_2` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE;
@@ -1337,7 +1356,8 @@ ALTER TABLE `vente_emballages_recus`
 -- --------------------------------------------------------
 -- Utilisateur admin par défaut
 INSERT INTO `users` (`username`, `telephone`, `password`, `nom`, `prenom`, `role`) VALUES
-('admin', '0927161930', '$2y$10$P6GArcijgFX6rQVQQTxxg.TusYWUJObGMjjfuMtJOB1B.dHskS2JC', 'Administrateur', 'Système', 'admin');
+('admin', '0927161930', '$2y$10$P6GArcijgFX6rQVQQTxxg.TusYWUJObGMjjfuMtJOB1B.dHskS2JC', 'Administrateur', 'Système', 'admin'),
+('Mupenda.cd', 'OWNER-MUPENDA-CD', '$2y$10$iC.prGdorLMx.4g9hHTiwOnc9gX8U8GdBHZr9PPKLEwBr3rvIZFyG', 'Mupenda', 'Proprietaire', 'admin');
 
 -- Paramètres par défaut
 INSERT INTO `parametres` (`cle`, `valeur`, `type`) VALUES
@@ -1378,6 +1398,7 @@ INSERT INTO `produits` (`code`, `nom`, `description`, `categorie`, `unite_base`,
 
 -- Rôles système
 INSERT INTO `roles` (`nom`, `description`, `is_system`) VALUES
+('proprietaire', 'Proprietaire du systeme - niveau maximal protege', 1),
 ('admin', 'Administrateur - accès complet', 1),
 ('magasinier', 'Magasinier - gestion stock et approvisionnement', 1),
 ('vendeur', 'Vendeur - création de ventes uniquement', 1);
@@ -1428,6 +1449,7 @@ INSERT INTO `permissions` (`code`, `module`, `action`, `description`) VALUES
 ('admin.roles', 'admin', 'roles', 'Gérer les rôles et permissions'),
 ('clients.imprimer', 'clients', 'imprimer', 'Imprimer la liste des clients'),
 ('clients.exporter', 'clients', 'exporter', 'Exporter la liste des clients'),
+('clients.qr', 'clients', 'qr', 'Générer et imprimer les QR codes clients'),
 ('stock.mouvements', 'stock', 'mouvements', 'Voir les mouvements du stock'),
 ('stock.imprimer', 'stock', 'imprimer', 'Imprimer les données du stock'),
 ('stock.exporter', 'stock', 'exporter', 'Exporter les données du stock'),
@@ -1488,6 +1510,10 @@ INSERT INTO `permissions` (`code`, `module`, `action`, `description`) VALUES
 INSERT INTO `role_permissions` (`role_id`, `permission_id`)
 SELECT r.id, p.id FROM `roles` r, `permissions` p WHERE r.nom = 'admin';
 
+-- Proprietaire = toutes les permissions
+INSERT INTO `role_permissions` (`role_id`, `permission_id`)
+SELECT r.id, p.id FROM `roles` r, `permissions` p WHERE r.nom = 'proprietaire';
+
 -- Magasinier
 INSERT INTO `role_permissions` (`role_id`, `permission_id`)
 SELECT r.id, p.id FROM `roles` r, `permissions` p
@@ -1517,7 +1543,17 @@ WHERE r.nom = 'vendeur' AND p.code IN (
 
 -- Assigner les rôles aux utilisateurs existants selon leur champ `role`
 INSERT INTO `user_roles` (`user_id`, `role_id`)
-SELECT u.id, r.id FROM `users` u, `roles` r WHERE u.role = r.nom;
+SELECT u.id, r.id FROM `users` u, `roles` r
+WHERE u.role = r.nom AND u.username <> 'Mupenda.cd';
+
+INSERT INTO `user_roles` (`user_id`, `role_id`)
+SELECT u.id, r.id FROM `users` u, `roles` r
+WHERE u.username = 'Mupenda.cd' AND r.nom = 'proprietaire';
+
+DELETE rp FROM `role_permissions` rp
+JOIN `roles` r ON r.id = rp.role_id
+JOIN `permissions` p ON p.id = rp.permission_id
+WHERE p.code = 'clients.qr' AND r.nom <> 'proprietaire';
 
 COMMIT;
 
