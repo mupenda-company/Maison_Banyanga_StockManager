@@ -20,11 +20,11 @@ if ($isLocal) {
     define('DB_USER', 'root');
     define('DB_PASS', '');
 } else {
-    // mugabo
+    // suncity
     define('DB_HOST', 'localhost');
-    define('DB_NAME', 'mbmugabo_bralima_logistique');
-    define('DB_USER', 'mbmugabo_NelsonMupenda');
-    define('DB_PASS', 'B;C2.XN#(#2IOr9s');
+    define('DB_NAME', 'suncityc_bralima_logistique');
+    define('DB_USER', 'suncityc_NelsonMupenda');
+    define('DB_PASS', 'HgK9Em3H=}lJ_[jj');
 
 }
 define('DB_CHARSET', 'utf8mb4');
@@ -36,7 +36,7 @@ define('APP_VERSION', '1.0.0');
 // RECOLTE LOCALE SUR LES RISTOURNES CLIENTS
 // Laissez cette ligne active pour appliquer la deduction par caisse.
 // Commentez uniquement cette ligne pour desactiver completement la recolte locale.
-// define('APPLIQUER_RECOLTE_LOCALE', true);
+define('APPLIQUER_RECOLTE_LOCALE', true);
 
 // URL de base — logique claire et unique
 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
