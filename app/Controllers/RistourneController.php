@@ -95,6 +95,12 @@ class RistourneController extends Controller
             $row['palier_recolte_locale'] = $deduction['palier_local'] ?? '';
             $row['ca_total_apres_recolte'] = max(0, $caBrut - $recolteLocale);
             $row['ca_total'] = $row['ca_total_apres_recolte'];
+            $row['montant_ristourne_brut'] = max(0, (float) ($row['montant_ristourne'] ?? 0));
+            $tauxRistourne = max(0, (float) ($row['taux_applique'] ?? 0));
+            $row['montant_ristourne'] = round(
+                ($row['ca_total_apres_recolte'] * $tauxRistourne) / 100,
+                2
+            );
         }
         unset($row);
 

@@ -142,7 +142,8 @@ class Ristourne extends Model
 
         // Deduction locale
         $deductionLocale = $this->calculerDeductionLocale($totalCaisses);
-        $montantRistourneNet = max(0, $montantRistourne - $deductionLocale['deduction_locale']);
+        $caTotalApresRecolte = max(0, $totalCA - $deductionLocale['deduction_locale']);
+        $montantRistourneNet = ($caTotalApresRecolte * $tauxRistourne) / 100;
 
         return [
             'client_id' => $clientId,
@@ -158,6 +159,7 @@ class Ristourne extends Model
             'deduction_locale' => $deductionLocale['deduction_locale'],
             'palier_local' => $deductionLocale['palier_local'],
             'recolte_locale_active' => $deductionLocale['active'],
+            'ca_total_apres_recolte' => $caTotalApresRecolte,
             'montant_ristourne_net' => $montantRistourneNet
         ];
     }
