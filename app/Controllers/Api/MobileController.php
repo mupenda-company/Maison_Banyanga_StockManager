@@ -91,6 +91,11 @@ class MobileController extends Controller {
 
             );
 
+            // Compatibilité avec l'application mobile existante, qui lit encore
+            // le champ singulier "mission". La requête place déjà la mission de
+            // vente en premier lorsqu'un agent possède plusieurs missions actives.
+            $mission = $missions[0] ?? null;
+
 
 
             $parametreModel = new Parametre();
