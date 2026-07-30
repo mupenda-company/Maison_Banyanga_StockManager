@@ -191,7 +191,7 @@ ob_start();
 async function annulerVente(id) {
     const ok = await App.confirm({
         title: 'Annuler la vente ?',
-        message: 'Êtes-vous sûr de vouloir annuler cette vente ?',
+        message: 'Êtes-vous sûr de vouloir annuler cette vente ? Le stock sera corrigé seulement si la vente est du jour et si sa mission est encore en cours.',
         confirmText: 'Annuler',
         cancelText: 'Retour',
         type: 'warning'

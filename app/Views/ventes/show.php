@@ -70,7 +70,7 @@ ob_start();
                         <tbody>
                             <?php foreach ($vente['details'] as $detail): 
                                 $btlParCaisse = (int)($detail['bouteilles_par_caisses'] ?? 24);
-                                $caisses = intdiv((int)$detail['quantite'], $btlParCaisse);
+                                $caisses = (int)($detail['quantite_caisses'] ?? intdiv((int)$detail['quantite'], $btlParCaisse));
                                 $caissesVidesRecues = (int)($detail['caisses_vides_recues'] ?? 0);
                                 $detteCaisses = max(0, $caisses - $caissesVidesRecues);
                                 $prixCaisse = $detail['prix_unitaire'] * $btlParCaisse;
@@ -83,7 +83,6 @@ ob_start();
                                 </td>
                                 <td class="text-right">
                                     <div class="font-bold text-gray-900 dark:text-white"><?= number_format($caisses, 0, '.', ' ') ?> cs</div>
-                                    <div class="text-[10px] text-gray-400 italic"><?= number_format($detail['quantite']) ?> btl</div>
                                 </td>
                                 <td class="text-right font-medium">
                                     <?= number_format($caissesVidesRecues, 0, '.', ' ') ?> cs
@@ -122,7 +121,7 @@ ob_start();
                     $totalDetteCaisses = 0;
                     foreach ($vente['details'] as $detail) {
                         $btlParCaisse = (int)($detail['bouteilles_par_caisses'] ?? 24);
-                        $caisses = intdiv((int)$detail['quantite'], $btlParCaisse);
+                        $caisses = (int)($detail['quantite_caisses'] ?? intdiv((int)$detail['quantite'], $btlParCaisse));
                         $caissesVidesRecues = (int)($detail['caisses_vides_recues'] ?? 0);
                         $totalCaissesVidesRecues += $caissesVidesRecues;
                         $totalDetteCaisses += max(0, $caisses - $caissesVidesRecues);
@@ -195,9 +194,15 @@ ob_start();
 
 <script>
 async function annulerVente() {
+    const retablitStock = <?= json_encode(
+        date('Y-m-d', strtotime((string) ($vente['date_vente'] ?? 'now'))) === date('Y-m-d')
+        && (empty($vente['mission_id']) || ($vente['mission_statut'] ?? null) === 'en_cours')
+    ) ?>;
     const ok = await App.confirm({
         title: 'Annuler la vente ?',
-        message: 'Êtes-vous sûr de vouloir annuler cette vente ? Le stock sera rétabli.',
+        message: retablitStock
+            ? 'Êtes-vous sûr de vouloir annuler cette vente ? Les caisses pleines et les emballages vides seront corrigés dans le stock actuel.'
+            : 'Êtes-vous sûr de vouloir annuler cette vente ? Cette facture est ancienne ou sa mission est clôturée : le stock actuel ne sera pas modifié.',
         confirmText: 'Annuler',
         cancelText: 'Retour',
         type: 'warning'

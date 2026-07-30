@@ -464,7 +464,9 @@ class VenteController extends Controller
         $result = $this->venteModel->annuler($id);
         
         if ($result['success']) {
-            return $this->success(null, 'Vente annulée avec succès');
+            return $this->success([
+                'stock_retabli' => (bool) ($result['stock_retabli'] ?? false)
+            ], $result['message'] ?? 'Vente annulée avec succès');
         }
         
         return $this->error($result['message'], 400);

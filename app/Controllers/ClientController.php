@@ -302,7 +302,8 @@ class ClientController extends Controller
         $ventesData = $venteModel->getAllWithClient(1, 100, [
             'client_id' => $id,
             'date_debut' => $dateDebut,
-            'date_fin' => $dateFin
+            'date_fin' => $dateFin,
+            'statut' => 'validee'
         ]);
 
         $kpis = $this->clientModel->getKpis($id, $dateDebut, $dateFin);

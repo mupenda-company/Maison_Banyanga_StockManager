@@ -40,14 +40,16 @@ class Vente extends Model
     public function getWithDetails($id)
     {
         $vente = $this->db->fetch(
-            "SELECT v.*, u.nom as created_by_nom, u.prenom as created_by_prenom, 
+            "SELECT v.*, u.nom as created_by_nom, u.prenom as created_by_prenom,
                     e.nom as emplacement_nom, c.nom as client_nom, c.telephone as client_telephone,
-                    c.numero_client as client_numero, c.adresse as client_adresse, z.nom as zone_nom
+                    c.numero_client as client_numero, c.adresse as client_adresse, z.nom as zone_nom,
+                    m.statut as mission_statut, m.numero_mission
              FROM {$this->table} v
              LEFT JOIN users u ON v.created_by = u.id
              LEFT JOIN emplacements e ON v.emplacement_id = e.id
              LEFT JOIN clients c ON v.client_id = c.id
              LEFT JOIN zones z ON c.zone_id = z.id
+             LEFT JOIN missions m ON v.mission_id = m.id
              WHERE v.id = :id",
             ['id' => $id]
         );
@@ -111,6 +113,11 @@ class Vente extends Model
         if (!empty($filters['emplacement_id'])) {
             $where .= " AND v.emplacement_id = :emplacement_id";
             $params['emplacement_id'] = $filters['emplacement_id'];
+        }
+
+        if (!empty($filters['statut']) && in_array($filters['statut'], ['en_attente', 'validee', 'annulee'], true)) {
+            $where .= " AND v.statut = :statut";
+            $params['statut'] = $filters['statut'];
         }
         
         $offset = ($page - 1) * $perPage;
@@ -425,6 +432,7 @@ class Vente extends Model
 
             $emplacementRetourId = (int) ($vente['emplacement_id'] ?? 0);
             $missionId = (int) ($vente['mission_id'] ?? 0);
+            $missionStatut = null;
 
             /**
              * Une vente faite depuis le téléphone est liée à une mission.
@@ -433,7 +441,7 @@ class Vente extends Model
              */
             if ($missionId > 0) {
                 $missionVehicule = $this->db->fetch(
-                    "SELECT v.emplacement_id AS vehicule_emplacement_id
+                    "SELECT v.emplacement_id AS vehicule_emplacement_id, m.statut
                      FROM missions m
                      JOIN vehicules v ON m.vehicule_id = v.id
                      WHERE m.id = :mission_id
@@ -444,9 +452,15 @@ class Vente extends Model
                 if (!empty($missionVehicule['vehicule_emplacement_id'])) {
                     $emplacementRetourId = (int) $missionVehicule['vehicule_emplacement_id'];
                 }
+                $missionStatut = $missionVehicule['statut'] ?? null;
             }
 
-            if ($emplacementRetourId <= 0) {
+            $dateVente = date('Y-m-d', strtotime((string) ($vente['date_vente'] ?? 'now')));
+            $annulationDuJour = $dateVente === date('Y-m-d');
+            $missionEncoreActive = $missionId <= 0 || $missionStatut === 'en_cours';
+            $retablirStock = $annulationDuJour && $missionEncoreActive;
+
+            if ($retablirStock && $emplacementRetourId <= 0) {
                 throw new Exception('Emplacement de retour introuvable pour cette vente.');
             }
             
@@ -458,7 +472,8 @@ class Vente extends Model
             $mouvementModel = new MouvementStock();
             $emballagesRecus = $vente['emballages_recus'] ?? [];
 
-            foreach ($vente['details'] as $detail) {
+            if ($retablirStock) {
+                foreach ($vente['details'] as $detail) {
                 $btlParCaisse = (int) ($detail['bouteilles_par_caisses'] ?? 24);
                 if ($btlParCaisse <= 0) {
                     $btlParCaisse = 24;
@@ -511,10 +526,49 @@ class Vente extends Model
                 $emballagesRecus = array_map(function ($detail) {
                     return [
                         'produit_id' => $detail['produit_id'],
+                        'produit_nom' => $detail['produit_nom'] ?? null,
                         'caisses_recues' => $detail['caisses_vides_recues'] ?? 0,
                         'bouteilles_par_caisses' => $detail['bouteilles_par_caisses'] ?? 24
                     ];
                 }, $vente['details']);
+            }
+
+            $videsDemandesParProduit = [];
+            foreach ($emballagesRecus as $emballage) {
+                $produitId = (int) ($emballage['produit_id'] ?? 0);
+                $caisses = max(0, (int) ($emballage['caisses_recues'] ?? 0));
+                if ($produitId <= 0 || $caisses <= 0) {
+                    continue;
+                }
+
+                if (!isset($videsDemandesParProduit[$produitId])) {
+                    $videsDemandesParProduit[$produitId] = [
+                        'caisses' => 0,
+                        'produit_nom' => $emballage['produit_nom'] ?? ('Produit #' . $produitId),
+                        'bouteilles_par_caisse' => max(1, (int) ($emballage['bouteilles_par_caisses'] ?? 24)),
+                    ];
+                }
+                $videsDemandesParProduit[$produitId]['caisses'] += $caisses;
+            }
+
+            foreach ($videsDemandesParProduit as $produitId => $demande) {
+                $stock = $stockModel->getStock($produitId, $emplacementRetourId);
+                $btlParCaisse = $demande['bouteilles_par_caisse'];
+                $caissesCompteur = max(0, (int) ($stock['caisses_vide'] ?? 0));
+                $caissesSelonBouteilles = intdiv(
+                    max(0, (int) ($stock['quantite_vide'] ?? 0)),
+                    $btlParCaisse
+                );
+                $caissesDisponibles = min($caissesCompteur, $caissesSelonBouteilles);
+
+                if ($caissesDisponibles < $demande['caisses']) {
+                    throw new Exception(sprintf(
+                        'Stock insuffisant d’emballages vides pour %s : disponible %d caisse(s), demandé %d caisse(s).',
+                        $demande['produit_nom'],
+                        $caissesDisponibles,
+                        $demande['caisses']
+                    ));
+                }
             }
 
             foreach ($emballagesRecus as $emballage) {
@@ -551,9 +605,17 @@ class Vente extends Model
                     'created_by' => $_SESSION['user_id'] ?? ($vente['created_by'] ?? null)
                 ]);
             }
+            }
             
             $this->db->commit();
-            return ['success' => true];
+            $cibleStock = $missionId > 0 ? 'du véhicule' : 'de l’emplacement de vente';
+            return [
+                'success' => true,
+                'stock_retabli' => $retablirStock,
+                'message' => $retablirStock
+                    ? 'Vente annulée avec succès. Le stock ' . $cibleStock . ' a été rétabli en caisses.'
+                    : 'Vente annulée avec succès. Aucun stock actuel n’a été modifié car la facture est ancienne ou sa mission est déjà clôturée.'
+            ];
             
         } catch (Exception $e) {
             $this->db->rollBack();
