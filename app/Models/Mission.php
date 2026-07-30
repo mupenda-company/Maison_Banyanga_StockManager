@@ -201,11 +201,15 @@ class Mission extends Model
                     `mission_id` INT UNSIGNED NOT NULL,
                     `ristourne_id` INT UNSIGNED NOT NULL,
                     `produit_id` INT UNSIGNED NULL,
+                    `produit_complement_id` INT UNSIGNED NULL,
                     `montant_ristourne` DECIMAL(15,2) NOT NULL DEFAULT 0,
                     `caisses_prevues` INT NOT NULL DEFAULT 0,
                     `bouteilles_prevues` INT NOT NULL DEFAULT 0,
+                    `caisses_complement_prevues` INT NOT NULL DEFAULT 0,
                     `caisses_livrees` INT NOT NULL DEFAULT 0,
                     `bouteilles_livrees` INT NOT NULL DEFAULT 0,
+                    `caisses_complement_livrees` INT NOT NULL DEFAULT 0,
+                    `bouteilles_complement_livrees` INT NOT NULL DEFAULT 0,
                     `caisses_vides_recues` INT NOT NULL DEFAULT 0,
                     `montant_livre` DECIMAL(15,2) NOT NULL DEFAULT 0,
                     `proposition_montant` DECIMAL(15,2) NOT NULL DEFAULT 0,
@@ -215,6 +219,7 @@ class Mission extends Model
                     FOREIGN KEY (`mission_id`) REFERENCES `missions`(`id`) ON DELETE CASCADE,
                     FOREIGN KEY (`ristourne_id`) REFERENCES `ristournes`(`id`) ON DELETE CASCADE,
                     FOREIGN KEY (`produit_id`) REFERENCES `produits`(`id`) ON DELETE SET NULL,
+                    FOREIGN KEY (`produit_complement_id`) REFERENCES `produits`(`id`) ON DELETE SET NULL,
                     FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON DELETE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
             );
@@ -271,6 +276,32 @@ class Mission extends Model
                 );
                 if (!$colComplementExists) {
                     $this->db->query("ALTER TABLE mission_ristournes ADD COLUMN complement_confirme TINYINT(1) NOT NULL DEFAULT 0 AFTER proposition_montant");
+                }
+
+                $separateComplementColumns = [
+                    'produit_complement_id' => "ALTER TABLE mission_ristournes ADD COLUMN produit_complement_id INT UNSIGNED NULL AFTER produit_id",
+                    'caisses_complement_prevues' => "ALTER TABLE mission_ristournes ADD COLUMN caisses_complement_prevues INT NOT NULL DEFAULT 0 AFTER bouteilles_prevues",
+                    'caisses_complement_livrees' => "ALTER TABLE mission_ristournes ADD COLUMN caisses_complement_livrees INT NOT NULL DEFAULT 0 AFTER bouteilles_livrees",
+                    'bouteilles_complement_livrees' => "ALTER TABLE mission_ristournes ADD COLUMN bouteilles_complement_livrees INT NOT NULL DEFAULT 0 AFTER caisses_complement_livrees",
+                ];
+                foreach ($separateComplementColumns as $column => $alterSql) {
+                    $columnExists = (bool) $this->db->fetchColumn(
+                        "SELECT COUNT(*) FROM information_schema.COLUMNS
+                         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mission_ristournes' AND COLUMN_NAME = :column",
+                        ['column' => $column]
+                    );
+                    if (!$columnExists) {
+                        $this->db->query($alterSql);
+                    }
+                }
+
+                $complementFkExists = (bool) $this->db->fetchColumn(
+                    "SELECT COUNT(*) FROM information_schema.KEY_COLUMN_USAGE
+                     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mission_ristournes'
+                       AND COLUMN_NAME = 'produit_complement_id' AND REFERENCED_TABLE_NAME = 'produits'"
+                );
+                if (!$complementFkExists) {
+                    $this->db->query("ALTER TABLE mission_ristournes ADD CONSTRAINT mission_ristournes_complement_fk FOREIGN KEY (produit_complement_id) REFERENCES produits(id) ON DELETE SET NULL");
                 }
 
                 $productNullable = $this->db->fetchColumn(
@@ -372,10 +403,17 @@ class Mission extends Model
             $mission['ristournes'] = [];
             if (($mission['type_mission'] ?? 'vente') === 'ristourne') {
                 $mission['ristournes'] = $this->db->fetchAll(
-                    "SELECT mr.*, c.nom as client_nom, c.numero_client, p.nom as produit_nom, p.code as produit_code, p.bouteilles_par_caisses, p.prix_vente_caisses, p.prix_vente_unitaire
+                    "SELECT mr.*, c.nom as client_nom, c.numero_client,
+                            p.nom as produit_nom, p.code as produit_code, p.bouteilles_par_caisses,
+                            p.prix_vente_caisses, p.prix_vente_unitaire,
+                            pc.nom as produit_complement_nom, pc.code as produit_complement_code,
+                            pc.bouteilles_par_caisses as bouteilles_par_caisse_complement,
+                            pc.prix_vente_caisses as prix_complement_caisses,
+                            pc.prix_vente_unitaire as prix_complement_unitaire
                      FROM mission_ristournes mr
                      JOIN clients c ON mr.client_id = c.id
                      LEFT JOIN produits p ON mr.produit_id = p.id
+                     LEFT JOIN produits pc ON mr.produit_complement_id = pc.id
                      WHERE mr.mission_id = :mission_id
                      ORDER BY c.nom ASC",
                     ['mission_id' => $id]
@@ -604,10 +642,83 @@ class Mission extends Model
             $this->db->beginTransaction();
             
             // Récupérer l'emplacement du véhicule
-            $vehicule = (new Vehicule())->find($data['vehicule_id']);
+            $vehicule = $this->db->fetch(
+                "SELECT * FROM vehicules WHERE id = :id AND actif = 1 FOR UPDATE",
+                ['id' => (int) $data['vehicule_id']]
+            );
+            if (!$vehicule) {
+                throw new Exception('Vehicule non trouve');
+            }
             $emplacementVehicule = $vehicule['emplacement_id'];
+
+            $missionVenteActive = (int) $this->db->fetchColumn(
+                "SELECT COUNT(*)
+                 FROM missions
+                 WHERE vehicule_id = :vehicule_id
+                   AND statut = 'en_cours'
+                   AND COALESCE(type_mission, 'vente') = 'vente'",
+                ['vehicule_id' => (int) $data['vehicule_id']]
+            );
+            if ($missionVenteActive > 0) {
+                throw new Exception('Ce vehicule a deja une mission de vente en cours. Terminez-la avant d en creer une autre.');
+            }
             
             // Créer la mission
+            $totalPhysiqueActuel = (int) $this->db->fetchColumn(
+                "SELECT COALESCE(SUM(caisses_pleine), 0)
+                 FROM stocks
+                 WHERE emplacement_id = :emplacement_id",
+                ['emplacement_id' => (int) $emplacementVehicule]
+            );
+            $variationPhysique = 0;
+            foreach ($chargements as $chargementCapacite) {
+                $produitIdCapacite = (int) ($chargementCapacite['produit_id'] ?? 0);
+                if ($produitIdCapacite <= 0) {
+                    continue;
+                }
+
+                $stockPhysiqueProduit = (int) $this->db->fetchColumn(
+                    "SELECT COALESCE(caisses_pleine, 0)
+                     FROM stocks
+                     WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id
+                     LIMIT 1",
+                    [
+                        'produit_id' => $produitIdCapacite,
+                        'emplacement_id' => (int) $emplacementVehicule
+                    ]
+                );
+                $reserveRistourne = (int) $this->db->fetchColumn(
+                    "SELECT COALESCE(SUM(GREATEST(
+                                0,
+                                COALESCE(mc.quantite_caisses, 0)
+                                - FLOOR(COALESCE(mc.quantite_vendue, 0) / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))
+                            )), 0)
+                     FROM missions m
+                     JOIN mission_chargements mc ON mc.mission_id = m.id
+                     JOIN produits p ON p.id = mc.produit_id
+                     WHERE m.vehicule_id = :vehicule_id
+                       AND m.statut = 'en_cours'
+                       AND COALESCE(m.type_mission, 'vente') = 'ristourne'
+                       AND mc.produit_id = :produit_id",
+                    [
+                        'vehicule_id' => (int) $data['vehicule_id'],
+                        'produit_id' => $produitIdCapacite
+                    ]
+                );
+                $stockLibreVente = max(0, $stockPhysiqueProduit - $reserveRistourne);
+                $stockFinalVente = max(0, (int) ($chargementCapacite['quantite_caisses'] ?? 0));
+                $variationPhysique += $stockFinalVente - $stockLibreVente;
+            }
+
+            $capaciteVehicule = max(0, (int) ($vehicule['capacite'] ?? 0));
+            $totalFinalVehicule = max(0, $totalPhysiqueActuel + $variationPhysique);
+            if ($capaciteVehicule > 0 && $totalFinalVehicule > $capaciteVehicule) {
+                throw new Exception(
+                    'La mission depasse la capacite du vehicule. Capacite: ' . $capaciteVehicule
+                    . ' caisses, total final dans le vehicule: ' . $totalFinalVehicule . ' caisses.'
+                );
+            }
+
             $missionId = $this->create($data);
             
             // Charger le véhicule et déduire de l'entrepôt
@@ -642,10 +753,28 @@ class Mission extends Model
                     }
                 }
 
-                $stockDepartCaisses = $caissesDejaDansVehicule;
-                if ($stockDepartCaisses <= 0) {
-                    $stockDepartCaisses = max(0, (int) ($chargement['stock_depart_caisses'] ?? 0));
-                }
+                $caissesReserveesRistourne = (int) $this->db->fetchColumn(
+                    "SELECT COALESCE(SUM(GREATEST(
+                                0,
+                                COALESCE(mc.quantite_caisses, 0)
+                                - FLOOR(COALESCE(mc.quantite_vendue, 0) / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))
+                            )), 0)
+                     FROM missions m
+                     JOIN mission_chargements mc ON mc.mission_id = m.id
+                     JOIN produits p ON p.id = mc.produit_id
+                     WHERE m.vehicule_id = :vehicule_id
+                       AND m.statut = 'en_cours'
+                       AND COALESCE(m.type_mission, 'vente') = 'ristourne'
+                       AND mc.produit_id = :produit_id",
+                    [
+                        'vehicule_id' => (int) $data['vehicule_id'],
+                        'produit_id' => (int) $chargement['produit_id']
+                    ]
+                );
+
+                // Le stock d'une mission de ristourne qui utilise deja ce vehicule
+                // reste physiquement present, mais il ne devient pas du stock de vente.
+                $stockDepartCaisses = max(0, $caissesDejaDansVehicule - $caissesReserveesRistourne);
 
                 $quantiteCaissesFinale = array_key_exists('quantite_caisses', $chargement)
                     ? max(0, (int) $chargement['quantite_caisses'])
@@ -709,22 +838,12 @@ class Mission extends Model
                     }
                 }
 
-                $stockVideVehicule = $this->db->fetch(
-                    "SELECT quantite_vide, caisses_vide
-                     FROM stocks
-                     WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id
-                     LIMIT 1",
-                    [
-                        'produit_id' => $chargement['produit_id'],
-                        'emplacement_id' => $emplacementVehicule
-                    ]
-                );
                 $chargementInsert = [
                     'mission_id' => $missionId,
                     'produit_id' => (int) $chargement['produit_id'],
                     'type_chargement' => $chargement['type_chargement'] ?? 'vente',
                     'quantite_caisses' => $quantiteCaissesFinale,
-                    'caisses_deja_dans_vehicule' => $caissesDejaDansVehicule,
+                    'caisses_deja_dans_vehicule' => $stockDepartCaisses,
                     'quantite_chargee' => $quantiteBouteilles,
                     'quantite_retournee' => 0,
                     'quantite_vendue' => 0,
@@ -744,14 +863,12 @@ class Mission extends Model
                     ]
                 );
                 
-                $stockModel->setInitialStock(
+                $stockModel->updateOrCreate(
                     $chargement['produit_id'],
                     $emplacementVehicule,
                     [
-                        'quantite_pleine' => $quantiteCaissesFinale * $bouteillesParCaisse,
-                        'caisses_pleine' => $quantiteCaissesFinale,
-                        'quantite_vide' => (int) ($stockVideVehicule['quantite_vide'] ?? 0),
-                        'caisses_vide' => (int) ($stockVideVehicule['caisses_vide'] ?? 0),
+                        'quantite_pleine' => $quantiteBouteilles,
+                        'caisses_pleine' => $deltaCaisses,
                     ]
                 );
                 
@@ -1078,7 +1195,10 @@ class Mission extends Model
                 throw new Exception('Aucune ristourne selectionnee');
             }
 
-            $vehicule = (new Vehicule())->find((int) ($data['vehicule_id'] ?? 0));
+            $vehicule = $this->db->fetch(
+                "SELECT * FROM vehicules WHERE id = :id AND actif = 1 FOR UPDATE",
+                ['id' => (int) ($data['vehicule_id'] ?? 0)]
+            );
             if (!$vehicule) {
                 throw new Exception('Vehicule non trouve');
             }
@@ -1088,12 +1208,24 @@ class Mission extends Model
                 throw new Exception('Emplacement vehicule introuvable');
             }
 
+            $missionRistourneActive = (int) $this->db->fetchColumn(
+                "SELECT COUNT(*)
+                 FROM missions
+                 WHERE vehicule_id = :vehicule_id
+                   AND statut = 'en_cours'
+                   AND COALESCE(type_mission, 'vente') = 'ristourne'",
+                ['vehicule_id' => (int) $data['vehicule_id']]
+            );
+            if ($missionRistourneActive > 0) {
+                throw new Exception('Ce vehicule a deja une mission de ristourne en cours. Terminez-la avant d en creer une autre.');
+            }
+
             $zoneIdDemandee = (int) ($data['zone_id'] ?? 0);
             if ($zoneIdDemandee <= 0) {
                 throw new Exception('Selectionnez une zone pour la mission de ristourne');
             }
 
-            $chargementsData = array_merge($data['chargements'] ?? [], $data['chargements_vente'] ?? []);
+            $chargementsData = $data['chargements'] ?? [];
             if (empty($chargementsData) || !is_array($chargementsData)) {
                 throw new Exception('Selectionnez au moins un produit a envoyer dans le vehicule');
             }
@@ -1145,6 +1277,25 @@ class Mission extends Model
                 throw new Exception('Selectionnez au moins un produit a envoyer dans le vehicule');
             }
 
+            $stockActuelVehicule = (int) $this->db->fetchColumn(
+                "SELECT COALESCE(SUM(caisses_pleine), 0)
+                 FROM stocks
+                 WHERE emplacement_id = :emplacement_id",
+                ['emplacement_id' => $emplacementVehicule]
+            );
+            $totalNouveauChargement = array_sum(array_map(
+                static fn($chargement) => max(0, (int) ($chargement['caisses'] ?? 0)),
+                $chargementsParProduit
+            ));
+            $capaciteVehicule = max(0, (int) ($vehicule['capacite'] ?? 0));
+            $totalFinalVehicule = $stockActuelVehicule + $totalNouveauChargement;
+            if ($capaciteVehicule > 0 && $totalFinalVehicule > $capaciteVehicule) {
+                throw new Exception(
+                    'La mission depasse la capacite du vehicule. Capacite: ' . $capaciteVehicule
+                    . ' caisses, total final dans le vehicule: ' . $totalFinalVehicule . ' caisses.'
+                );
+            }
+
             $ristourneIds = [];
             foreach ($ristournesData as $ristourneItem) {
                 $ristourneId = (int) ($ristourneItem['ristourne_id'] ?? $ristourneItem['id'] ?? 0);
@@ -1180,19 +1331,88 @@ class Mission extends Model
                     continue;
                 }
 
+                $selectedProductIds = json_decode((string) ($ristourne['produits_ristourne'] ?? '[]'), true);
+                $selectedProductIds = is_array($selectedProductIds)
+                    ? array_values(array_unique(array_map('intval', $selectedProductIds)))
+                    : [];
+                $complementProductId = (int) ($ristourne['produit_complement_id'] ?? 0);
+                $plannedCases = 0;
+                $suggestedAmount = 0;
+
+                if (empty($selectedProductIds)) {
+                    throw new Exception('Aucun produit principal n est configure pour la ristourne #' . $ristourneId);
+                }
+
+                $mainCasePriceCents = null;
+                $hasLoadedMainProduct = false;
+                foreach ($selectedProductIds as $selectedProductId) {
+                    $mainProduct = $produitModel->find($selectedProductId);
+                    if (!$mainProduct) {
+                        throw new Exception('Un produit principal de la ristourne #' . $ristourneId . ' est introuvable');
+                    }
+                    $mainBottlesPerCase = max(1, (int) ($mainProduct['bouteilles_par_caisses'] ?? 24));
+                    $mainCasePrice = (float) ($mainProduct['prix_vente_caisses'] ?? 0);
+                    if ($mainCasePrice <= 0) {
+                        $mainCasePrice = (float) ($mainProduct['prix_vente_unitaire'] ?? 0) * $mainBottlesPerCase;
+                    }
+                    $currentPriceCents = (int) round($mainCasePrice * 100);
+                    if ($currentPriceCents <= 0) {
+                        throw new Exception('Prix caisse invalide pour un produit principal de la ristourne');
+                    }
+                    if ($mainCasePriceCents === null) {
+                        $mainCasePriceCents = $currentPriceCents;
+                    } elseif ($mainCasePriceCents !== $currentPriceCents) {
+                        throw new Exception('Les produits principaux de la ristourne doivent avoir le meme prix caisse');
+                    }
+                    if (!empty($chargementsParProduit['ristourne:' . $selectedProductId])) {
+                        $hasLoadedMainProduct = true;
+                    }
+                }
+                if (!$hasLoadedMainProduct) {
+                    throw new Exception('Ajoutez au chargement au moins un produit principal autorise pour le client ' . ($ristourne['client_nom'] ?? '#' . $ristourneId));
+                }
+
+                if ($complementProductId <= 0) {
+                    throw new Exception('Aucun produit de complement n est configure pour la ristourne #' . $ristourneId);
+                }
+                $loadingKey = 'ristourne:' . $complementProductId;
+                if (empty($chargementsParProduit[$loadingKey])) {
+                    throw new Exception('Ajoutez le produit de complement au chargement de ristourne pour le client ' . ($ristourne['client_nom'] ?? '#' . $ristourneId));
+                }
+                $complementProduct = $produitModel->find($complementProductId);
+                if (!$complementProduct) {
+                    throw new Exception('Le produit de complement de la ristourne #' . $ristourneId . ' est introuvable');
+                }
+                $complementBottlesPerCase = max(1, (int) ($complementProduct['bouteilles_par_caisses'] ?? 24));
+                $complementCasePrice = (float) ($complementProduct['prix_vente_caisses'] ?? 0);
+                if ($complementCasePrice <= 0) {
+                    $complementCasePrice = (float) ($complementProduct['prix_vente_unitaire'] ?? 0) * $complementBottlesPerCase;
+                }
+                if ($complementCasePrice <= 0) {
+                    throw new Exception('Prix caisse invalide pour le produit de complement');
+                }
+                $mainCasePrice = ($mainCasePriceCents ?? 0) / 100;
+                $plannedCases = $mainCasePrice > 0 ? (int) floor($montantRistourne / $mainCasePrice) : 0;
+                $remainder = $mainCasePrice > 0 ? max(0, $montantRistourne - ($plannedCases * $mainCasePrice)) : 0;
+                $suggestedAmount = max(0, round($complementCasePrice - $remainder, 2));
+
                 $totalMontantRistourne += $montantRistourne;
                 $missionRistournes[] = [
                     'ristourne_id' => (int) $ristourneId,
                     'produit_id' => null,
+                    'produit_complement_id' => $complementProductId,
                     'client_id' => (int) $ristourne['client_id'],
                     'montant_ristourne' => $montantRistourne,
-                    'caisses_prevues' => 0,
+                    'caisses_prevues' => $plannedCases,
                     'bouteilles_prevues' => 0,
+                    'caisses_complement_prevues' => 1,
                     'caisses_livrees' => 0,
                     'bouteilles_livrees' => 0,
+                    'caisses_complement_livrees' => 0,
+                    'bouteilles_complement_livrees' => 0,
                     'caisses_vides_recues' => 0,
                     'montant_livre' => 0,
-                    'proposition_montant' => 0,
+                    'proposition_montant' => $suggestedAmount,
                     'complement_confirme' => 0,
                     'statut' => 'en_attente',
                 ];
@@ -1247,15 +1467,9 @@ class Mission extends Model
                     'caisses_pleine' => -$chargement['caisses']
                 ]);
 
-                $stockVideVehicule = $this->db->fetch(
-                    "SELECT quantite_vide, caisses_vide FROM stocks WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id LIMIT 1",
-                    ['produit_id' => $produitId, 'emplacement_id' => $emplacementVehicule]
-                );
-                $stockModel->setInitialStock($produitId, $emplacementVehicule, [
+                $stockModel->updateOrCreate($produitId, $emplacementVehicule, [
                     'quantite_pleine' => $chargement['bouteilles'],
                     'caisses_pleine' => $chargement['caisses'],
-                    'quantite_vide' => (int) ($stockVideVehicule['quantite_vide'] ?? 0),
-                    'caisses_vide' => (int) ($stockVideVehicule['caisses_vide'] ?? 0),
                 ]);
 
                 $mouvementModel->create([

@@ -398,7 +398,7 @@
                 <?php endif; ?>
                 
                 <!-- Admin -->
-                <?php if (can('admin.voir') || can('rapports.voir') || can('finance.voir') || can('objectifs.voir') || can('ristournes.voir')): ?>
+                <?php if (can('admin.voir') || can('admin.backup') || can('rapports.voir') || can('finance.voir') || can('objectifs.voir') || can('ristournes.voir')): ?>
                 <div class="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
                     <p class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Administration</p>
 
@@ -463,6 +463,15 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
                         Paramètres
+                    </a>
+                    <?php endif; ?>
+
+                    <?php if (can('admin.backup')): ?>
+                    <a href="<?= url('admin/backup') ?>" class="sidebar-link <?= strpos($_SERVER['REQUEST_URI'], '/admin/backup') !== false ? 'active' : '' ?>">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7c0-1.657 3.582-3 8-3s8 1.343 8 3-3.582 3-8 3-8-1.343-8-3zm0 0v5c0 1.657 3.582 3 8 3s8-1.343 8-3V7m-16 5v5c0 1.657 3.582 3 8 3s8-1.343 8-3v-5"/>
+                        </svg>
+                        Sauvegarde
                     </a>
                     <?php endif; ?>
                 </div>

@@ -305,11 +305,15 @@ CREATE TABLE `mission_ristournes` (
   `mission_id` int UNSIGNED NOT NULL,
   `ristourne_id` int UNSIGNED NOT NULL,
   `produit_id` int UNSIGNED DEFAULT NULL,
+  `produit_complement_id` int UNSIGNED DEFAULT NULL,
   `montant_ristourne` decimal(15,2) NOT NULL DEFAULT '0.00',
   `caisses_prevues` int NOT NULL DEFAULT '0',
   `bouteilles_prevues` int NOT NULL DEFAULT '0',
+  `caisses_complement_prevues` int NOT NULL DEFAULT '0',
   `caisses_livrees` int NOT NULL DEFAULT '0',
   `bouteilles_livrees` int NOT NULL DEFAULT '0',
+  `caisses_complement_livrees` int NOT NULL DEFAULT '0',
+  `bouteilles_complement_livrees` int NOT NULL DEFAULT '0',
   `caisses_vides_recues` int NOT NULL DEFAULT '0',
   `montant_livre` decimal(15,2) NOT NULL DEFAULT '0.00',
   `montant_restant_admin` decimal(15,2) NOT NULL DEFAULT '0.00',
@@ -499,6 +503,7 @@ CREATE TABLE `ristournes` (
   `taux_applique` decimal(5,2) NOT NULL,
   `montant_ristourne` decimal(15,2) NOT NULL,
   `produits_ristourne` text COLLATE utf8mb4_unicode_ci,
+  `produit_complement_id` int UNSIGNED DEFAULT NULL,
   `statut` enum('calculee','en_livraison','payee','annulee') COLLATE utf8mb4_unicode_ci DEFAULT 'calculee',
   `date_paiement` date DEFAULT NULL,
   `notes` text COLLATE utf8mb4_unicode_ci,
@@ -805,6 +810,7 @@ ALTER TABLE `mission_ristournes`
   ADD KEY `mission_id` (`mission_id`),
   ADD KEY `ristourne_id` (`ristourne_id`),
   ADD KEY `produit_id` (`produit_id`),
+  ADD KEY `produit_complement_id` (`produit_complement_id`),
   ADD KEY `client_id` (`client_id`);
 
 --
@@ -878,7 +884,8 @@ ALTER TABLE `retours_emballages`
 ALTER TABLE `ristournes`
   ADD PRIMARY KEY (`id`),
   ADD KEY `client_id` (`client_id`),
-  ADD KEY `palier_id` (`palier_id`);
+  ADD KEY `palier_id` (`palier_id`),
+  ADD KEY `idx_ristournes_produit_complement` (`produit_complement_id`);
 
 --
 -- Indexes for table `ristourne_paliers`
@@ -1254,7 +1261,8 @@ ALTER TABLE `mission_ristournes`
   ADD CONSTRAINT `mission_ristournes_ibfk_1` FOREIGN KEY (`mission_id`) REFERENCES `missions` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `mission_ristournes_ibfk_2` FOREIGN KEY (`ristourne_id`) REFERENCES `ristournes` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `mission_ristournes_ibfk_3` FOREIGN KEY (`produit_id`) REFERENCES `produits` (`id`) ON DELETE SET NULL,
-  ADD CONSTRAINT `mission_ristournes_ibfk_4` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE;
+  ADD CONSTRAINT `mission_ristournes_ibfk_4` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `mission_ristournes_ibfk_5` FOREIGN KEY (`produit_complement_id`) REFERENCES `produits` (`id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `mouvements_stock`
@@ -1295,7 +1303,8 @@ ALTER TABLE `retours_emballages`
 --
 ALTER TABLE `ristournes`
   ADD CONSTRAINT `ristournes_ibfk_1` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `ristournes_ibfk_2` FOREIGN KEY (`palier_id`) REFERENCES `paliers_ristourne` (`id`) ON DELETE SET NULL;
+  ADD CONSTRAINT `ristournes_ibfk_2` FOREIGN KEY (`palier_id`) REFERENCES `paliers_ristourne` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_ristournes_produit_complement` FOREIGN KEY (`produit_complement_id`) REFERENCES `produits` (`id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `role_permissions`
@@ -1504,7 +1513,8 @@ INSERT INTO `permissions` (`code`, `module`, `action`, `description`) VALUES
 ('manquants.supprimer', 'manquants', 'supprimer', 'Supprimer un manquant'),
 ('manquants.payer', 'manquants', 'payer', 'Enregistrer un paiement de manquant'),
 ('manquants.imprimer', 'manquants', 'imprimer', 'Imprimer les manquants'),
-('manquants.exporter', 'manquants', 'exporter', 'Exporter les manquants');
+('manquants.exporter', 'manquants', 'exporter', 'Exporter les manquants'),
+('admin.backup', 'admin', 'backup', 'Créer et télécharger une sauvegarde de la base de données');
 
 -- Admin = toutes les permissions
 INSERT INTO `role_permissions` (`role_id`, `permission_id`)
@@ -1553,7 +1563,7 @@ WHERE u.username = 'Mupenda.cd' AND r.nom = 'proprietaire';
 DELETE rp FROM `role_permissions` rp
 JOIN `roles` r ON r.id = rp.role_id
 JOIN `permissions` p ON p.id = rp.permission_id
-WHERE p.code = 'clients.qr' AND r.nom <> 'proprietaire';
+WHERE p.code IN ('clients.qr', 'admin.backup') AND r.nom <> 'proprietaire';
 
 COMMIT;
 

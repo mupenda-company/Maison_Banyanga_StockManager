@@ -782,14 +782,49 @@ class StockController extends Controller
                         continue;
                     }
 
-                    $stockSource = $this->stockModel->getStock($produitId, $data['emplacement_source']);
-                    if (!$stockSource || (int) ($stockSource['quantite_pleine'] ?? 0) < $quantite) {
-                        $produit = $this->produitModel->find($produitId);
-                        throw new Exception('Stock insuffisant pour ' . ($produit['nom'] ?? ('produit #' . $produitId)));
+                    $produit = $this->produitModel->find($produitId);
+                    if (!$produit) {
+                        throw new Exception('Produit introuvable');
+                    }
+                    $bouteillesParCaisse = max(1, (int) ($produit['bouteilles_par_caisses'] ?? 24));
+                    if ($quantite % $bouteillesParCaisse !== 0) {
+                        throw new Exception('La quantite de ' . ($produit['nom'] ?? ('produit #' . $produitId)) . ' doit etre saisie en caisses completes');
+                    }
+                    $caisses = intdiv($quantite, $bouteillesParCaisse);
+
+                    $stockSource = $this->db->fetch(
+                        "SELECT * FROM stocks
+                         WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id
+                         LIMIT 1 FOR UPDATE",
+                        [
+                            'produit_id' => $produitId,
+                            'emplacement_id' => (int) $data['emplacement_source']
+                        ]
+                    );
+                    $champQuantite = $mode === 'emballage' ? 'quantite_vide' : 'quantite_pleine';
+                    $champCaisses = $mode === 'emballage' ? 'caisses_vide' : 'caisses_pleine';
+                    $quantiteDisponible = max(0, (int) ($stockSource[$champQuantite] ?? 0));
+                    $caissesDisponibles = max(0, (int) ($stockSource[$champCaisses] ?? 0));
+                    if (!$stockSource || $quantiteDisponible < $quantite || $caissesDisponibles < $caisses) {
+                        throw new Exception(sprintf(
+                            'Stock insuffisant pour %s : disponible %d cs (%d %s), demande %d cs.',
+                            $produit['nom'] ?? ('produit #' . $produitId),
+                            $caissesDisponibles,
+                            $quantiteDisponible,
+                            $mode === 'emballage' ? 'emballages' : 'bouteilles',
+                            $caisses
+                        ));
                     }
 
-                    $this->stockModel->updateOrCreate($produitId, $data['emplacement_source'], ['quantite_pleine' => -$quantite]);
-                    $this->stockModel->updateOrCreate($produitId, $data['emplacement_dest'], ['quantite_pleine' => $quantite]);
+                    $variationSource = $mode === 'emballage'
+                        ? ['quantite_vide' => -$quantite, 'caisses_vide' => -$caisses]
+                        : ['quantite_pleine' => -$quantite, 'caisses_pleine' => -$caisses];
+                    $variationDestination = $mode === 'emballage'
+                        ? ['quantite_vide' => $quantite, 'caisses_vide' => $caisses]
+                        : ['quantite_pleine' => $quantite, 'caisses_pleine' => $caisses];
+
+                    $this->stockModel->updateOrCreate($produitId, $data['emplacement_source'], $variationSource);
+                    $this->stockModel->updateOrCreate($produitId, $data['emplacement_dest'], $variationDestination);
 
                     $this->mouvementModel->create([
                         'produit_id' => $produitId,
@@ -798,7 +833,8 @@ class StockController extends Controller
                         'quantite' => -$quantite,
                         'reference_type' => 'transfert',
                         'reference_id' => $data['emplacement_dest'],
-                        'motif' => $data['motif'] ?? 'Transfert multi-produits',
+                        'motif' => ($mode === 'emballage' ? '[Emballages vides] ' : '')
+                            . ($data['motif'] ?? 'Transfert multi-produits'),
                         'created_by' => $_SESSION['user_id']
                     ]);
                     $totalLignes++;
@@ -838,24 +874,51 @@ class StockController extends Controller
             $this->db->beginTransaction();
             
             // Vérifier le stock source
-            $stockSource = $this->stockModel->getStock($data['produit_id'], $data['emplacement_source']);
-            
-            if (!$stockSource || $stockSource['quantite_pleine'] < $data['quantite']) {
-                throw new Exception('Stock insuffisant dans l\'emplacement source');
+            $produit = $this->produitModel->find((int) $data['produit_id']);
+            if (!$produit) {
+                throw new Exception('Produit introuvable');
+            }
+            $bouteillesParCaisse = max(1, (int) ($produit['bouteilles_par_caisses'] ?? 24));
+            $quantite = max(0, (int) $data['quantite']);
+            if ($quantite <= 0 || $quantite % $bouteillesParCaisse !== 0) {
+                throw new Exception('La quantite doit etre saisie en caisses completes');
+            }
+            $caisses = intdiv($quantite, $bouteillesParCaisse);
+
+            $stockSource = $this->db->fetch(
+                "SELECT * FROM stocks
+                 WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id
+                 LIMIT 1 FOR UPDATE",
+                [
+                    'produit_id' => (int) $data['produit_id'],
+                    'emplacement_id' => (int) $data['emplacement_source']
+                ]
+            );
+
+            $quantiteDisponible = max(0, (int) ($stockSource['quantite_pleine'] ?? 0));
+            $caissesDisponibles = max(0, (int) ($stockSource['caisses_pleine'] ?? 0));
+            if (!$stockSource || $quantiteDisponible < $quantite || $caissesDisponibles < $caisses) {
+                throw new Exception(sprintf(
+                    'Stock insuffisant pour %s : disponible %d cs (%d bouteilles), demande %d cs.',
+                    $produit['nom'] ?? ('produit #' . (int) $data['produit_id']),
+                    $caissesDisponibles,
+                    $quantiteDisponible,
+                    $caisses
+                ));
             }
             
             // Déduire de la source
             $this->stockModel->updateOrCreate(
                 $data['produit_id'],
                 $data['emplacement_source'],
-                ['quantite_pleine' => -$data['quantite']]
+                ['quantite_pleine' => -$quantite, 'caisses_pleine' => -$caisses]
             );
             
             // Ajouter à la destination
             $this->stockModel->updateOrCreate(
                 $data['produit_id'],
                 $data['emplacement_dest'],
-                ['quantite_pleine' => $data['quantite']]
+                ['quantite_pleine' => $quantite, 'caisses_pleine' => $caisses]
             );
             
             // Enregistrer les mouvements
@@ -863,9 +926,9 @@ class StockController extends Controller
                 'produit_id' => $data['produit_id'],
                 'emplacement_id' => $data['emplacement_source'],
                 'type_mouvement' => 'transfert',
-                'quantite' => -$data['quantite'],
+                'quantite' => -$quantite,
                 'quantite_avant' => $stockSource['quantite_pleine'],
-                'quantite_apres' => $stockSource['quantite_pleine'] - $data['quantite'],
+                'quantite_apres' => $stockSource['quantite_pleine'] - $quantite,
                 'reference_type' => 'transfert',
                 'reference_id' => $data['emplacement_dest'],
                 'motif' => $data['motif'] ?? 'Transfert vers un autre emplacement',
@@ -890,6 +953,10 @@ class StockController extends Controller
         $data = $this->getJsonInput();
         $mode = ($data['mode'] ?? 'stock') === 'emballage' ? 'emballage' : 'stock';
         $this->requirePermission($mode === 'emballage' ? 'emballages.inventaire' : 'stock.inventaire');
+
+        if (!empty($data['lignes']) && is_array($data['lignes'])) {
+            return $this->ajustementMultiple($data, $mode);
+        }
         
         
         $errors = $this->validate($data, [
@@ -954,6 +1021,121 @@ class StockController extends Controller
             
         } catch (Exception $e) {
             $this->db->rollBack();
+            return $this->error($e->getMessage(), 400);
+        }
+    }
+
+    private function ajustementMultiple(array $data, string $mode)
+    {
+        $emplacementId = (int) ($data['emplacement_id'] ?? 0);
+        $motif = trim((string) ($data['motif'] ?? ''));
+        $lignes = $data['lignes'] ?? [];
+
+        if ($emplacementId <= 0 || $motif === '') {
+            return $this->error('L emplacement et le motif sont obligatoires', 422);
+        }
+
+        usort($lignes, static function ($a, $b) {
+            return (int) ($a['produit_id'] ?? 0) <=> (int) ($b['produit_id'] ?? 0);
+        });
+
+        try {
+            $this->db->beginTransaction();
+            $produitsVus = [];
+            $details = [];
+            $nbAjustements = 0;
+
+            foreach ($lignes as $ligne) {
+                $produitId = (int) ($ligne['produit_id'] ?? 0);
+                $quantiteReelleBrute = $ligne['quantite_reelle'] ?? null;
+                if ($produitId <= 0 || !is_numeric($quantiteReelleBrute) || (float) $quantiteReelleBrute < 0) {
+                    throw new Exception('Chaque ligne doit contenir un produit et une quantite reelle valide');
+                }
+                if (isset($produitsVus[$produitId])) {
+                    throw new Exception('Un produit ne peut apparaitre qu une seule fois dans le meme ajustement');
+                }
+                $produitsVus[$produitId] = true;
+
+                $produit = $this->produitModel->find($produitId);
+                if (!$produit) {
+                    throw new Exception('Produit #' . $produitId . ' introuvable');
+                }
+                $btlParCaisse = max(1, (int) ($produit['bouteilles_par_caisses'] ?? 24));
+                $quantiteReelle = (int) round((float) $quantiteReelleBrute);
+                if ($quantiteReelle % $btlParCaisse !== 0) {
+                    throw new Exception(
+                        'La quantite de ' . ($produit['nom'] ?? ('produit #' . $produitId))
+                        . ' doit correspondre a des caisses completes'
+                    );
+                }
+                $caissesReelles = intdiv($quantiteReelle, $btlParCaisse);
+
+                $stock = $this->db->fetch(
+                    "SELECT * FROM stocks
+                     WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id
+                     LIMIT 1 FOR UPDATE",
+                    ['produit_id' => $produitId, 'emplacement_id' => $emplacementId]
+                );
+
+                $champQuantite = $mode === 'emballage' ? 'quantite_vide' : 'quantite_pleine';
+                $quantiteTheorique = max(0, (int) ($stock[$champQuantite] ?? 0));
+                $ecart = $quantiteReelle - $quantiteTheorique;
+
+                if ($ecart !== 0) {
+                    $stockFinal = [
+                        'quantite_pleine' => (int) ($stock['quantite_pleine'] ?? 0),
+                        'quantite_vide' => (int) ($stock['quantite_vide'] ?? 0),
+                        'caisses_pleine' => (int) ($stock['caisses_pleine'] ?? 0),
+                        'caisses_vide' => (int) ($stock['caisses_vide'] ?? 0),
+                    ];
+                    if ($mode === 'emballage') {
+                        $stockFinal['quantite_vide'] = $quantiteReelle;
+                        $stockFinal['caisses_vide'] = $caissesReelles;
+                    } else {
+                        $stockFinal['quantite_pleine'] = $quantiteReelle;
+                        $stockFinal['caisses_pleine'] = $caissesReelles;
+                    }
+
+                    $this->stockModel->setInitialStock($produitId, $emplacementId, $stockFinal);
+                    $this->mouvementModel->create([
+                        'produit_id' => $produitId,
+                        'emplacement_id' => $emplacementId,
+                        'type_mouvement' => 'inventaire',
+                        'quantite' => $ecart,
+                        'quantite_avant' => $quantiteTheorique,
+                        'quantite_apres' => $quantiteReelle,
+                        'reference_type' => 'inventaire',
+                        'reference_id' => null,
+                        'motif' => ($mode === 'emballage' ? '[Emballages vides] ' : '') . $motif,
+                        'created_by' => $_SESSION['user_id']
+                    ]);
+                    $nbAjustements++;
+                }
+
+                $details[] = [
+                    'produit_id' => $produitId,
+                    'ecart' => $ecart,
+                    'quantite_avant' => $quantiteTheorique,
+                    'quantite_apres' => $quantiteReelle,
+                ];
+            }
+
+            if (empty($details)) {
+                throw new Exception('Ajoutez au moins un produit a ajuster');
+            }
+
+            $this->db->commit();
+            return $this->success([
+                'total_lignes' => count($details),
+                'total_ajustements' => $nbAjustements,
+                'details' => $details,
+            ], $nbAjustements > 0
+                ? $nbAjustements . ' ajustement(s) enregistre(s) avec succes'
+                : 'Aucun ecart detecte');
+        } catch (Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
             return $this->error($e->getMessage(), 400);
         }
     }

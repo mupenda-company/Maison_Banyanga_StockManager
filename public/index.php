@@ -224,6 +224,7 @@ $routes = [
     // Ristournes
     'GET::/ristournes' => ['RistourneController', 'index'],
     'GET::/ristournes/calculer' => ['RistourneController', 'calculer'],
+    'POST::/api/ristournes/calculer' => ['RistourneController', 'calculer'],
     'POST::/api/ristournes' => ['RistourneController', 'store'],
     'POST::/api/ristournes/(\d+)/payer' => ['RistourneController', 'payer'],
     
@@ -242,6 +243,8 @@ $routes = [
     'POST::/api/admin/settings' => ['AdminController', 'updateSettings'],
     'POST::/api/admin/logo' => ['AdminController', 'uploadLogo'],
     'GET::/api/admin/taux-change' => ['AdminController', 'getTauxChange'],
+    'GET::/admin/backup' => ['BackupController', 'index'],
+    'POST::/admin/backup/download' => ['BackupController', 'download'],
 
     // Rôles et permissions
     'GET::/admin/roles' => ['RoleController', 'index'],

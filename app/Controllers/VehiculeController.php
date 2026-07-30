@@ -137,7 +137,8 @@ class VehiculeController extends Controller
         $disponibles = isset($_GET['disponibles']) && $_GET['disponibles'] === 'true';
         
         if ($disponibles) {
-            $vehicules = $this->vehiculeModel->getDisponibles();
+            $typeMission = ($_GET['type_mission'] ?? 'vente') === 'ristourne' ? 'ristourne' : 'vente';
+            $vehicules = $this->vehiculeModel->getDisponibles($typeMission);
         } else {
             $vehicules = $this->vehiculeModel->getWithAgent();
         }

@@ -2,6 +2,8 @@
 
 class RoleController extends Controller
 {
+    private const OWNER_ONLY_PERMISSIONS = ['clients.qr', 'admin.backup'];
+
     private $roleModel;
     private $permissionModel;
 
@@ -41,8 +43,10 @@ class RoleController extends Controller
     {
         if (is_owner()) return;
         foreach ($permissionIds as $permissionId) {
-            if ($this->permissionModel->idHasCode((int) $permissionId, 'clients.qr')) {
-                $this->error('La permission QR clients est reservee au proprietaire.', 403);
+            foreach (self::OWNER_ONLY_PERMISSIONS as $permissionCode) {
+                if ($this->permissionModel->idHasCode((int) $permissionId, $permissionCode)) {
+                    $this->error('Cette permission ne peut etre attribuee que par le proprietaire.', 403);
+                }
             }
         }
     }
@@ -57,7 +61,11 @@ class RoleController extends Controller
             foreach ($roles as &$visibleRole) {
                 $visibleRole['permissions'] = array_values(array_filter(
                     $visibleRole['permissions'] ?? [],
-                    fn($permission) => ($permission['code'] ?? '') !== 'clients.qr'
+                    fn($permission) => !in_array(
+                        $permission['code'] ?? '',
+                        self::OWNER_ONLY_PERMISSIONS,
+                        true
+                    )
                 ));
             }
             unset($visibleRole);
@@ -67,7 +75,11 @@ class RoleController extends Controller
             foreach ($permissionsGrouped as &$modulePermissions) {
                 $modulePermissions = array_values(array_filter(
                     $modulePermissions,
-                    fn($permission) => ($permission['code'] ?? '') !== 'clients.qr'
+                    fn($permission) => !in_array(
+                        $permission['code'] ?? '',
+                        self::OWNER_ONLY_PERMISSIONS,
+                        true
+                    )
                 ));
             }
             unset($modulePermissions);
@@ -226,6 +238,19 @@ class RoleController extends Controller
         $this->requirePermission('admin.roles');
 
         $grouped = $this->permissionModel->getAllGroupedByModule();
+        if (!is_owner()) {
+            foreach ($grouped as &$modulePermissions) {
+                $modulePermissions = array_values(array_filter(
+                    $modulePermissions,
+                    fn($permission) => !in_array(
+                        $permission['code'] ?? '',
+                        self::OWNER_ONLY_PERMISSIONS,
+                        true
+                    )
+                ));
+            }
+            unset($modulePermissions);
+        }
         return $this->success($grouped);
     }
 }

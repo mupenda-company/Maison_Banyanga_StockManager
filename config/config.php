@@ -136,6 +136,7 @@ function getDefaultRoute() {
         'finance.voir'             => 'finance',
         'rapports.voir'            => 'rapports',
         'admin.voir'               => 'admin',
+        'admin.backup'             => 'admin/backup',
     ];
     foreach ($routeMap as $perm => $route) {
         if (in_array($perm, $perms)) return $route;

@@ -30,6 +30,7 @@ ob_start();
                     zones: [],
                     loading: false,
                     loadingVehiculeStock: false,
+                    vehiculeDetail: null,
                     getProduit(produitId) {
                         return this.produits.find(p => String(p.id) === String(produitId)) || null;
                     },
@@ -46,12 +47,35 @@ ob_start();
                         const vehicule = Math.round(parseFloat(chargement.stock_depart_caisses || 0));
                         return Math.max(0, final - vehicule);
                     },
+                    getVehiculeSelectionne() {
+                        return this.vehicules.find(v => String(v.id) === String(this.vehicule_id)) || null;
+                    },
+                    getStockPhysiqueActuel() {
+                        const vehicule = this.getVehiculeSelectionne();
+                        return vehicule ? Math.round(parseFloat(vehicule.stock_caisses_pleine || 0)) : 0;
+                    },
+                    getVariationMission() {
+                        return this.chargements.reduce((total, chargement) => {
+                            if (!chargement.produit_id) return total;
+                            const final = Math.max(0, Math.round(parseFloat(chargement.quantite_caisses || 0)));
+                            const depart = Math.max(0, Math.round(parseFloat(chargement.stock_depart_caisses || 0)));
+                            return total + final - depart;
+                        }, 0);
+                    },
+                    getTotalFinalVehicule() {
+                        return Math.max(0, this.getStockPhysiqueActuel() + this.getVariationMission());
+                    },
+                    getCapaciteVehicule() {
+                        const vehicule = this.getVehiculeSelectionne();
+                        return vehicule ? Math.round(parseFloat(vehicule.capacite || 0)) : 0;
+                    },
                     newChargement() {
                         return { produit_id: '', quantite_caisses: 0, stock_depart_caisses: 0, stock_entrepot_caisses: 0, auto_vehicle_stock: false };
                     },
                     async loadVehiculeStock() {
                         if (!this.vehicule_id) {
                             this.chargements = [this.newChargement()];
+                            this.vehiculeDetail = null;
                             return;
                         }
 
@@ -59,19 +83,25 @@ ob_start();
                         try {
                             const response = await App.api('/api/vehicules/' + this.vehicule_id);
                             const vehicule = response.data || response;
+                            this.vehiculeDetail = vehicule;
                             const stockVehicule = Array.isArray(vehicule.stock) ? vehicule.stock : [];
 
                             this.chargements = stockVehicule
-                                .filter((item) => parseFloat(item.caisses_pleine || 0) > 0 || parseFloat(item.quantite_pleine || 0) > 0)
-                                .map((item) => ({
-                                    produit_id: String(item.produit_id),
-                                    produit_nom: item.produit_nom || '',
-                                    produit_code: item.produit_code || '',
-                                    quantite_caisses: parseFloat(item.caisses_pleine || 0),
-                                    stock_depart_caisses: parseFloat(item.caisses_pleine || 0),
-                                    stock_entrepot_caisses: this.getStockEntrepot(item.produit_id),
-                                    auto_vehicle_stock: true
-                                }));
+                                .map((item) => {
+                                    const stockPhysique = Math.max(0, parseFloat(item.caisses_pleine || 0));
+                                    const reserveRistourne = Math.max(0, parseFloat(item.reserve_ristourne_caisses || 0));
+                                    const stockVenteDisponible = Math.max(0, stockPhysique - reserveRistourne);
+                                    return {
+                                        produit_id: String(item.produit_id),
+                                        produit_nom: item.produit_nom || '',
+                                        produit_code: item.produit_code || '',
+                                        quantite_caisses: stockVenteDisponible,
+                                        stock_depart_caisses: stockVenteDisponible,
+                                        stock_entrepot_caisses: this.getStockEntrepot(item.produit_id),
+                                        auto_vehicle_stock: true
+                                    };
+                                })
+                                .filter((item) => item.stock_depart_caisses > 0);
 
                             if (this.chargements.length === 0) {
                                 this.chargements = [this.newChargement()];
@@ -93,7 +123,7 @@ ob_start();
                     }
                 }"
                 x-init="
-                    App.api('/api/vehicules?disponibles=true').then(r => { vehicules = r.data || r; });
+                    App.api('/api/vehicules?disponibles=true&type_mission=vente').then(r => { vehicules = r.data || r; });
                     App.api('/api/produits?actifs=true&with_stock=true').then(r => { produits = r.data || r; });
                 "
                 @submit.prevent="async () => {
@@ -108,12 +138,11 @@ ob_start();
                             stock_depart_caisses: parseInt(c.stock_depart_caisses || 0)
                         }));
 
-                        const selectedVehicule = vehicules.find(v => String(v.id) === String(vehicule_id));
-                        const capaciteVehicule = parseInt(selectedVehicule?.capacite || 0);
-                        const totalMissionCaisses = chargementsValides.reduce((total, ligne) => total + Math.max(0, parseInt(ligne.quantite_caisses || 0)), 0);
+                        const capaciteVehicule = getCapaciteVehicule();
+                        const totalMissionCaisses = getTotalFinalVehicule();
 
                         if (capaciteVehicule > 0 && totalMissionCaisses > capaciteVehicule) {
-                            throw new Error(`La mission dépasse la capacité du véhicule. Capacité: ${capaciteVehicule} caisses, stock final demandé: ${totalMissionCaisses} caisses.`);
+                            throw new Error(`La mission dépasse la capacité du véhicule. Capacité: ${capaciteVehicule} caisses, total final dans le véhicule: ${totalMissionCaisses} caisses.`);
                         }
 
                         // Vérifier le stock disponible dans l'entrepôt
@@ -309,6 +338,24 @@ ob_start();
                     </div>
                 </div>
                 
+                <template x-if="vehicule_id">
+                    <div class="mb-6 p-5 rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-800">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <div>
+                                <p class="text-xs uppercase tracking-wider text-gray-500 font-semibold">Total final dans le véhicule</p>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">
+                                    Stock physique après le chargement de cette mission de vente
+                                </p>
+                            </div>
+                            <p class="text-3xl font-bold"
+                               :class="getCapaciteVehicule() > 0 && getTotalFinalVehicule() > getCapaciteVehicule() ? 'text-red-600' : 'text-emerald-700'"
+                               x-text="getTotalFinalVehicule() + ' cs' + (getCapaciteVehicule() > 0 ? ' / ' + getCapaciteVehicule() + ' cs' : '')"></p>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2"
+                           x-text="getStockPhysiqueActuel() + ' cs actuellement, variation de la mission : ' + (getVariationMission() >= 0 ? '+' : '') + getVariationMission() + ' cs'"></p>
+                    </div>
+                </template>
+
                 <!-- Notes -->
                 <div class="mb-6">
                     <label class="label">Notes</label>

@@ -30,24 +30,36 @@ class RistourneController extends Controller
             'client_id' => $_GET['client_id'] ?? null
         ];
 
+        $recolteLocaleActive = $this->isRecolteLocaleActive();
+        $avecRecolteLocale = isset($_GET['recolte_locale'])
+            && (string) $_GET['recolte_locale'] === '1';
+        if ($avecRecolteLocale && !$recolteLocaleActive) {
+            http_response_code(404);
+            exit('Le rapport avec recolte locale est desactive.');
+        }
+
         $ristournes = $this->ristourneModel->getAllWithDetails($filters);
-        $report = $this->buildLivraisonReport($ristournes);
+        $ristournesRapport = $avecRecolteLocale
+            ? $this->applyRecolteLocaleToReport($ristournes)
+            : $ristournes;
+        $report = $this->buildLivraisonReport($ristournesRapport);
         $clients = $this->clientModel->all();
         $produits = $this->produitModel->getActive();
         $printMode = isset($_GET['print']) && (string) $_GET['print'] === '1';
 
         if (isset($_GET['export']) && $_GET['export'] === 'excel') {
             $this->requirePermission('ristournes.exporter');
-            $this->exportExcel($report, $filters);
+            $this->exportExcel($report, $filters, $avecRecolteLocale);
             return;
         }
 
         if ($printMode) {
             $this->requirePermission('ristournes.imprimer');
             $this->view('ristournes/print', [
-                'ristournes' => $ristournes,
+                'ristournes' => $ristournesRapport,
                 'report' => $report,
-                'filters' => $filters
+                'filters' => $filters,
+                'avec_recolte_locale' => $avecRecolteLocale,
             ]);
             return;
         }
@@ -58,8 +70,35 @@ class RistourneController extends Controller
             'produits' => $produits,
             'report' => $report,
             'filters' => $filters,
-            'print_mode' => $printMode
+            'print_mode' => $printMode,
+            'recolte_locale_active' => $recolteLocaleActive,
         ]);
+    }
+
+    private function isRecolteLocaleActive(): bool
+    {
+        return defined('APPLIQUER_RECOLTE_LOCALE') && APPLIQUER_RECOLTE_LOCALE === true;
+    }
+
+    private function applyRecolteLocaleToReport(array $ristournes): array
+    {
+        foreach ($ristournes as &$row) {
+            $caBrut = max(0, (float) ($row['ca_total'] ?? 0));
+            $deduction = $this->ristourneModel->calculerDeductionLocale(
+                (int) ($row['total_caisses'] ?? 0)
+            );
+            $recolteLocale = max(0, (float) ($deduction['deduction_locale'] ?? 0));
+
+            $row['ca_total_brut'] = $caBrut;
+            $row['recolte_locale'] = $recolteLocale;
+            $row['taux_recolte_locale'] = (float) ($deduction['taux_local'] ?? 0);
+            $row['palier_recolte_locale'] = $deduction['palier_local'] ?? '';
+            $row['ca_total_apres_recolte'] = max(0, $caBrut - $recolteLocale);
+            $row['ca_total'] = $row['ca_total_apres_recolte'];
+        }
+        unset($row);
+
+        return $ristournes;
     }
 
     private function styleHeaderRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $nbCols): void
@@ -100,7 +139,74 @@ class RistourneController extends Controller
         exit;
     }
 
-    private function exportExcel($report, $filters)
+    private function validateSelectedProducts(array $productIds, int $complementProductId): array
+    {
+        $productIds = array_values(array_unique(array_filter(array_map('intval', $productIds))));
+        if (empty($productIds)) {
+            return ['success' => false, 'message' => 'Selectionnez au moins un produit a livrer comme ristourne.'];
+        }
+        if ($complementProductId <= 0) {
+            return ['success' => false, 'message' => 'Selectionnez le produit de complement.'];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($productIds), '?'));
+        $products = $this->db->fetchAll(
+            "SELECT id, nom, prix_vente_caisses, prix_vente_unitaire, bouteilles_par_caisses
+             FROM produits WHERE actif = 1 AND id IN ({$placeholders})",
+            $productIds
+        );
+        if (count($products) !== count($productIds)) {
+            return ['success' => false, 'message' => 'Un des produits selectionnes est introuvable ou inactif.'];
+        }
+
+        $referencePriceCents = null;
+        foreach ($products as &$product) {
+            $bottles = max(1, (int) ($product['bouteilles_par_caisses'] ?? 24));
+            $casePrice = (float) ($product['prix_vente_caisses'] ?? 0);
+            if ($casePrice <= 0) {
+                $casePrice = (float) ($product['prix_vente_unitaire'] ?? 0) * $bottles;
+            }
+            $priceCents = (int) round($casePrice * 100);
+            if ($priceCents <= 0) {
+                return ['success' => false, 'message' => 'Tous les produits selectionnes doivent avoir un prix caisse valide.'];
+            }
+            if ($referencePriceCents === null) {
+                $referencePriceCents = $priceCents;
+            } elseif ($priceCents !== $referencePriceCents) {
+                return ['success' => false, 'message' => 'Les produits de ristourne selectionnes doivent avoir exactement le meme prix par caisse.'];
+            }
+            $product['prix_caisse'] = $casePrice;
+        }
+        unset($product);
+
+        $complementProduct = $this->db->fetch(
+            "SELECT id, nom, prix_vente_caisses, prix_vente_unitaire, bouteilles_par_caisses
+             FROM produits WHERE actif = 1 AND id = :id LIMIT 1",
+            ['id' => $complementProductId]
+        );
+        if (!$complementProduct) {
+            return ['success' => false, 'message' => 'Le produit de complement est introuvable ou inactif.'];
+        }
+        $complementBottles = max(1, (int) ($complementProduct['bouteilles_par_caisses'] ?? 24));
+        $complementCasePrice = (float) ($complementProduct['prix_vente_caisses'] ?? 0);
+        if ($complementCasePrice <= 0) {
+            $complementCasePrice = (float) ($complementProduct['prix_vente_unitaire'] ?? 0) * $complementBottles;
+        }
+        if ($complementCasePrice <= 0) {
+            return ['success' => false, 'message' => 'Le produit de complement doit avoir un prix caisse valide.'];
+        }
+        $complementProduct['prix_caisse'] = $complementCasePrice;
+
+        return [
+            'success' => true,
+            'products' => $products,
+            'case_price' => ($referencePriceCents ?? 0) / 100,
+            'complement_product' => $complementProduct,
+            'complement_case_price' => $complementCasePrice,
+        ];
+    }
+
+    private function exportExcel($report, $filters, bool $avecRecolteLocale = false)
     {
         $this->requireAuth();
 
@@ -111,7 +217,7 @@ class RistourneController extends Controller
         foreach ($report['produits'] as $produit) {
             $headers[] = $produit['nom'];
         }
-        $headers = array_merge($headers, ['Montant restant', 'Montant a completer', 'Observation', 'Signature client']);
+        $headers = array_merge($headers, ['Produit du complement', 'Montant restant', 'Montant a completer', 'Observation', 'Signature client']);
         $sheet->fromArray($headers, null, 'A1');
 
         $row = 2;
@@ -126,6 +232,7 @@ class RistourneController extends Controller
             foreach ($report['produits'] as $produit) {
                 $line[] = (int) ($r['produits'][$produit['id']]['caisses'] ?? 0);
             }
+            $line[] = $r['produit_complement_nom'] ?? '';
             $line[] = (float) ($r['montant_restant'] ?? 0);
             $line[] = (float) ($r['montant_a_completer'] ?? 0);
             $line[] = '';
@@ -137,12 +244,14 @@ class RistourneController extends Controller
 
         $mois = $filters['mois'] ?? date('n');
         $annee = $filters['annee'] ?? date('Y');
-        $this->sendXlsx($spreadsheet, 'ristournes_' . $mois . '_' . $annee . '_' . date('Y-m-d_H-i') . '.xlsx');
+        $suffix = $avecRecolteLocale ? '_avec_recolte_locale' : '_normal';
+        $this->sendXlsx($spreadsheet, 'ristournes_' . $mois . '_' . $annee . $suffix . '_' . date('Y-m-d_H-i') . '.xlsx');
     }
 
     private function buildLivraisonReport(array $ristournes): array
     {
         $productIds = [];
+        $complementProductIds = [];
         foreach ($ristournes as $row) {
             $ids = json_decode((string) ($row['produits_ristourne'] ?? '[]'), true);
             if (!is_array($ids)) {
@@ -153,6 +262,10 @@ class RistourneController extends Controller
                 if ($id > 0) {
                     $productIds[$id] = true;
                 }
+            }
+            $complementId = (int) ($row['produit_complement_id'] ?? 0);
+            if ($complementId > 0) {
+                $complementProductIds[$complementId] = true;
             }
         }
 
@@ -179,6 +292,24 @@ class RistourneController extends Controller
             $produit['prix_caisse'] = max(0, $prixCaisse);
             $produitsById[(int) $produit['id']] = $produit;
         }
+        $missingComplementIds = array_diff(array_keys($complementProductIds), array_keys($produitsById));
+        if (!empty($missingComplementIds)) {
+            $complementPlaceholders = implode(',', array_fill(0, count($missingComplementIds), '?'));
+            $complementProducts = $this->db->fetchAll(
+                "SELECT id, nom, code, prix_vente_caisses, prix_vente_unitaire, bouteilles_par_caisses
+                 FROM produits WHERE id IN ({$complementPlaceholders})",
+                array_values($missingComplementIds)
+            );
+            foreach ($complementProducts as $produit) {
+                $btl = max(1, (int) ($produit['bouteilles_par_caisses'] ?? 24));
+                $prixCaisse = (float) ($produit['prix_vente_caisses'] ?? 0);
+                if ($prixCaisse <= 0) {
+                    $prixCaisse = (float) ($produit['prix_vente_unitaire'] ?? 0) * $btl;
+                }
+                $produit['prix_caisse'] = max(0, $prixCaisse);
+                $produitsById[(int) $produit['id']] = $produit;
+            }
+        }
 
         $rows = [];
         foreach ($ristournes as $row) {
@@ -186,35 +317,44 @@ class RistourneController extends Controller
             if (!is_array($selected)) {
                 $selected = [];
             }
+            $selected = array_values(array_unique(array_map('intval', $selected)));
             $montant = (float) ($row['montant_ristourne'] ?? 0);
             $row['produits'] = [];
-            $firstSelectedProduct = null;
+            $complementProductId = (int) ($row['produit_complement_id'] ?? 0);
+            if ($complementProductId <= 0 || empty($produitsById[$complementProductId])) {
+                $complementProductId = 0;
+            }
+
+            $referencePrice = 0;
+            foreach ($selected as $selectedId) {
+                if (!empty($produitsById[$selectedId]['prix_caisse'])) {
+                    $referencePrice = (float) $produitsById[$selectedId]['prix_caisse'];
+                    break;
+                }
+            }
+            $baseCases = $referencePrice > 0 ? (int) floor($montant / $referencePrice) : 0;
+            $remaining = $referencePrice > 0 ? max(0, $montant - ($baseCases * $referencePrice)) : $montant;
+            $complementPrice = (float) ($produitsById[$complementProductId]['prix_caisse'] ?? 0);
+            $amountToComplete = $complementPrice > 0 ? max(0, $complementPrice - $remaining) : 0;
 
             foreach ($produits as $produit) {
                 $produitId = (int) $produit['id'];
                 $prixCaisse = (float) ($produitsById[$produitId]['prix_caisse'] ?? 0);
-                $isSelected = in_array($produitId, array_map('intval', $selected), true);
-                $caisses = ($isSelected && $prixCaisse > 0) ? (int) floor($montant / $prixCaisse) : 0;
+                $isSelected = in_array($produitId, $selected, true);
+                $caissesSansComplement = ($isSelected && $prixCaisse > 0) ? (int) floor($montant / $prixCaisse) : 0;
                 $row['produits'][$produitId] = [
-                    'caisses' => $caisses,
+                    'caisses' => $caissesSansComplement,
+                    'caisses_sans_complement' => $caissesSansComplement,
                     'prix_caisse' => $prixCaisse,
+                    'avec_complement' => false,
                 ];
-
-                if ($isSelected && $firstSelectedProduct === null && $prixCaisse > 0) {
-                    $firstSelectedProduct = ['caisses' => $caisses, 'prix_caisse' => $prixCaisse];
-                }
             }
-
-            if ($firstSelectedProduct) {
-                $prix = (float) $firstSelectedProduct['prix_caisse'];
-                $caisses = (int) $firstSelectedProduct['caisses'];
-                $reste = max(0, $montant - ($caisses * $prix));
-                $row['montant_restant'] = $reste;
-                $row['montant_a_completer'] = $prix > 0 && $reste > 0 ? max(0, $prix - $reste) : 0;
-            } else {
-                $row['montant_restant'] = $montant;
-                $row['montant_a_completer'] = 0;
-            }
+            $row['produit_complement_id'] = $complementProductId ?: null;
+            $row['produit_complement_nom'] = $produitsById[$complementProductId]['nom'] ?? '';
+            $row['produit_complement_prix_caisse'] = $complementPrice;
+            $row['caisses_complement'] = $complementProductId > 0 ? 1 : 0;
+            $row['montant_restant'] = $remaining;
+            $row['montant_a_completer'] = $amountToComplete;
             $rows[] = $row;
         }
 
@@ -227,13 +367,23 @@ class RistourneController extends Controller
     public function calculer()
     {
         $this->requirePermission('ristournes.calculer');
-        
-        $mois = $_GET['mois'] ?? date('n');
-        $annee = $_GET['annee'] ?? date('Y');
-        $produitIds = array_values(array_unique(array_filter(array_map('intval', explode(',', (string) ($_GET['produit_ids'] ?? ''))))));
 
-        if (empty($produitIds)) {
-            return $this->error('Selectionnez au moins un produit a livrer comme ristourne.', 422);
+        $input = (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') ? $this->getJsonInput() : $_GET;
+        $mois = $input['mois'] ?? date('n');
+        $annee = $input['annee'] ?? date('Y');
+        $rawProductIds = $input['produit_ids'] ?? [];
+        if (!is_array($rawProductIds)) {
+            $rawProductIds = explode(',', (string) $rawProductIds);
+        }
+        $produitIds = array_values(array_unique(array_filter(array_map('intval', $rawProductIds))));
+        $produitComplementId = (int) ($input['produit_complement_id'] ?? 0);
+        if ($produitComplementId <= 0 && !empty($produitIds)) {
+            $produitComplementId = (int) $produitIds[0];
+        }
+
+        $productValidation = $this->validateSelectedProducts($produitIds, $produitComplementId);
+        if (!$productValidation['success']) {
+            return $this->error($productValidation['message'], 422);
         }
 
         $clients = $this->clientModel->all();
@@ -262,6 +412,7 @@ class RistourneController extends Controller
                 'montant_ristourne' => $calcul['montant_ristourne'],
                 'total_caisses' => $calcul['total_caisses'],
                 'produits_ristourne' => json_encode($produitIds),
+                'produit_complement_id' => $produitComplementId,
             ];
 
             if (!$existe) {

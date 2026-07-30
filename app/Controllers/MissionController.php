@@ -104,7 +104,7 @@ class MissionController extends Controller
     {
         $this->requirePermission('missions.creer');
 
-        $vehicules = $this->vehiculeModel->getDisponibles();
+        $vehicules = $this->vehiculeModel->getDisponibles('ristourne');
         $produits = $this->produitModel->getWithStock();
         $zones = $this->zoneModel->getActive();
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
@@ -152,7 +152,7 @@ class MissionController extends Controller
     {
         $this->requirePermission('missions.creer');
         
-        $vehicules = $this->vehiculeModel->getDisponibles();
+        $vehicules = $this->vehiculeModel->getDisponibles('vente');
         $produits = $this->produitModel->getWithStock();
         $zones = $this->zoneModel->getActive();
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
@@ -189,6 +189,17 @@ class MissionController extends Controller
         $vehicule = $this->vehiculeModel->getWithStock((int) ($data['vehicule_id'] ?? 0));
         if (!$vehicule) {
             return $this->error('Véhicule non trouvé', 404);
+        }
+
+        $missionVenteActive = (int) $this->db->fetchColumn(
+            "SELECT COUNT(*) FROM missions
+             WHERE vehicule_id = :vehicule_id
+               AND statut = 'en_cours'
+               AND COALESCE(type_mission, 'vente') = 'vente'",
+            ['vehicule_id' => (int) $data['vehicule_id']]
+        );
+        if ($missionVenteActive > 0) {
+            return $this->error('Ce vehicule a deja une mission de vente en cours.', 422);
         }
 
         $chargements = [];
@@ -247,18 +258,21 @@ class MissionController extends Controller
 
             // Stock déjà dans le véhicule
             $caissesDejaDansVehicule = 0;
+            $caissesReserveesRistourne = 0;
             foreach (($vehicule['stock'] ?? []) as $vs) {
                 if ((int) ($vs['produit_id'] ?? 0) === $produitId) {
                     $caissesDejaDansVehicule = max(0, (int) ($vs['caisses_pleine'] ?? 0));
                     if ($caissesDejaDansVehicule <= 0) {
                         $caissesDejaDansVehicule = (int) floor(((int) ($vs['quantite_pleine'] ?? 0)) / $bouteillesParCaisse);
                     }
+                    $caissesReserveesRistourne = max(0, (int) ($vs['reserve_ristourne_caisses'] ?? 0));
                     break;
                 }
             }
 
             // Ce qu'on doit réellement sortir de l'entrepôt
-            $caissesASortir = max(0, $caissesDemandees - $caissesDejaDansVehicule);
+            $caissesDisponiblesPourVente = max(0, $caissesDejaDansVehicule - $caissesReserveesRistourne);
+            $caissesASortir = max(0, $caissesDemandees - $caissesDisponiblesPourVente);
 
             if ($caissesASortir <= 0) continue;
 
@@ -294,14 +308,21 @@ class MissionController extends Controller
 
         $capaciteVehicule = (int) ($vehicule['capacite'] ?? 0);
         if ($capaciteVehicule > 0) {
-            $totalMissionCaisses = 0;
-            foreach ($chargements as $chargement) {
-                $totalMissionCaisses += max(0, (int) ($chargement['quantite_caisses'] ?? 0));
+            $totalPhysiqueActuel = 0;
+            foreach (($vehicule['stock'] ?? []) as $stockVehicule) {
+                $totalPhysiqueActuel += max(0, (int) ($stockVehicule['caisses_pleine'] ?? 0));
             }
+
+            $variationPhysique = 0;
+            foreach ($chargements as $chargement) {
+                $variationPhysique += max(0, (int) ($chargement['quantite_caisses'] ?? 0))
+                    - max(0, (int) ($chargement['stock_depart_caisses'] ?? 0));
+            }
+            $totalMissionCaisses = max(0, $totalPhysiqueActuel + $variationPhysique);
 
             if ($totalMissionCaisses > $capaciteVehicule) {
                 return $this->error(
-                    'La mission dépasse la capacité du véhicule. Capacité: ' . $capaciteVehicule . ' caisses, stock final demandé: ' . $totalMissionCaisses . ' caisses.',
+                    'La mission dépasse la capacité du véhicule. Capacité: ' . $capaciteVehicule . ' caisses, total final dans le véhicule: ' . $totalMissionCaisses . ' caisses.',
                     422,
                     [
                         'capacite_vehicule' => $capaciteVehicule,
@@ -394,7 +415,6 @@ class MissionController extends Controller
             'zone_id' => $data['zone_id'] ?? null,
             'notes' => $data['notes'] ?? '',
             'chargements' => $data['chargements'] ?? [],
-            'chargements_vente' => $data['chargements_vente'] ?? [],
             'created_by' => $_SESSION['user_id']
         ];
 

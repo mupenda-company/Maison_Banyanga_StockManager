@@ -25,11 +25,9 @@ ob_start();
                     zones: <?= htmlspecialchars(json_encode($zones ?? []), ENT_QUOTES, 'UTF-8') ?>,
                     selected: {},
                     chargements: [],
-                    chargementsVente: [],
                     init() {
                         this.ristournes.forEach(r => { this.selected[r.id] = false; });
                         this.chargements = this.produits.map(p => ({ produit_id: p.id, quantite_caisses: 0 }));
-                        this.chargementsVente = this.produits.map(p => ({ produit_id: p.id, quantite_caisses: 0 }));
                     },
                     getVisibleRistournes() {
                         if (!this.zone_id) return [];
@@ -56,20 +54,33 @@ ob_start();
                         if (prixCaisse > 0) return prixCaisse;
                         return (parseFloat(produit.prix_vente_unitaire || 0) || 0) * bouteilles;
                     },
-                    getChargementsValides(source = this.chargements, type = 'ristourne') {
-                        return source
-                            .map(c => ({ produit_id: parseInt(c.produit_id), quantite_caisses: parseInt(c.quantite_caisses || 0, 10) || 0, type_chargement: type }))
+                    getChargementsValides() {
+                        return this.chargements
+                            .map(c => ({ produit_id: parseInt(c.produit_id), quantite_caisses: parseInt(c.quantite_caisses || 0, 10) || 0, type_chargement: 'ristourne' }))
                             .filter(c => c.produit_id > 0 && c.quantite_caisses > 0);
                     },
                     getTotalMontantRistourne() {
                         return this.getSelectedRistournes().reduce((sum, r) => sum + parseFloat(r.montant_ristourne || 0), 0);
                     },
-                    getTotalCaissesChargees(type = 'ristourne') {
-                        const source = type === 'vente' ? this.chargementsVente : this.chargements;
-                        return this.getChargementsValides(source, type).reduce((sum, c) => sum + c.quantite_caisses, 0);
+                    getTotalCaissesChargees() {
+                        return this.getChargementsValides().reduce((sum, c) => sum + c.quantite_caisses, 0);
+                    },
+                    getVehiculeSelectionne() {
+                        return this.vehicules.find(v => String(v.id) === String(this.vehicule_id)) || null;
+                    },
+                    getStockActuelVehicule() {
+                        const vehicule = this.getVehiculeSelectionne();
+                        return vehicule ? (parseInt(vehicule.stock_caisses_pleine || 0, 10) || 0) : 0;
+                    },
+                    getTotalDansVehicule() {
+                        return this.getStockActuelVehicule() + this.getTotalCaissesChargees();
+                    },
+                    getCapaciteVehicule() {
+                        const vehicule = this.getVehiculeSelectionne();
+                        return vehicule ? (parseInt(vehicule.capacite || 0, 10) || 0) : 0;
                     },
                     getTotalValeurChargee() {
-                        return this.getChargementsValides(this.chargements, 'ristourne').reduce((sum, c) => {
+                        return this.getChargementsValides().reduce((sum, c) => {
                             const p = this.getProduit(c.produit_id);
                             return sum + (p ? c.quantite_caisses * this.getPrixCaisse(p) : 0);
                         }, 0);
@@ -86,11 +97,16 @@ ob_start();
                         if (chargements.length === 0) { App.notify('Selectionnez au moins un produit a envoyer', 'error'); return; }
                         const insuffisant = chargements.find(c => {
                             const p = this.getProduit(c.produit_id);
-                            return p && this.getStockProduit(p) > 0 && c.quantite_caisses > this.getStockProduit(p);
+                            return p && c.quantite_caisses > this.getStockProduit(p);
                         });
                         if (insuffisant) {
                             const p = this.getProduit(insuffisant.produit_id);
                             App.notify('Stock insuffisant pour ' + (p?.nom || 'produit'), 'error');
+                            return;
+                        }
+                        const capacite = this.getCapaciteVehicule();
+                        if (capacite > 0 && this.getTotalDansVehicule() > capacite) {
+                            App.notify('Capacite depassee : ' + this.getTotalDansVehicule() + ' cs dans le vehicule pour une capacite de ' + capacite + ' cs', 'error');
                             return;
                         }
 
@@ -146,8 +162,9 @@ ob_start();
                         <p class="text-xl font-bold text-blue-700" x-text="getSelectedRistournes().length"></p>
                     </div>
                     <div class="p-4 rounded-lg border bg-green-50 border-green-100">
-                        <p class="text-xs uppercase tracking-wider text-gray-500">Caisses envoyees</p>
-                        <p class="text-xl font-bold text-green-700" x-text="getTotalCaissesChargees('ristourne') + ' cs ristourne / ' + getTotalCaissesChargees('vente') + ' cs vente'"></p>
+                        <p class="text-xs uppercase tracking-wider text-gray-500">Total final dans le vehicule</p>
+                        <p class="text-xl font-bold text-green-700" x-text="getTotalDansVehicule() + ' cs' + (getCapaciteVehicule() > 0 ? ' / ' + getCapaciteVehicule() + ' cs' : '')"></p>
+                        <p class="text-xs text-gray-500 mt-1" x-text="getStockActuelVehicule() + ' cs deja presentes + ' + getTotalCaissesChargees() + ' cs ristourne'"></p>
                     </div>
                     <div class="p-4 rounded-lg border bg-amber-50 border-amber-100">
                         <p class="text-xs uppercase tracking-wider text-gray-500">Total ristournes</p>
@@ -165,7 +182,6 @@ ob_start();
                                     <th class="p-3 text-right">Prix caisse</th>
                                     <th class="p-3 text-right">Stock</th>
                                     <th class="p-3 text-right w-44">Caisses ristourne</th>
-                                    <th class="p-3 text-right w-44">Caisses vente</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -180,15 +196,12 @@ ob_start();
                                         <td class="p-3 text-right">
                                             <input type="number" min="0" step="1" class="input text-right" x-model.number="chargements[index].quantite_caisses">
                                         </td>
-                                        <td class="p-3 text-right">
-                                            <input type="number" min="0" step="1" class="input text-right" x-model.number="chargementsVente[index].quantite_caisses">
-                                        </td>
                                     </tr>
                                 </template>
                             </tbody>
                         </table>
                     </div>
-                    <p class="text-xs text-gray-500 mt-2">Les caisses ristourne servent uniquement aux livraisons de ristourne. Les caisses vente restent separees pour les ventes terrain.</p>
+                    <p class="text-xs text-gray-500 mt-2">Ce formulaire charge uniquement la mission de ristourne. La mission de vente se cree separement dans son propre formulaire.</p>
                 </div>
 
                 <div class="mb-6">

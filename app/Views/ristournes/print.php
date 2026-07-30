@@ -1,4 +1,6 @@
-<?php require_once ROOT_PATH . '/app/Views/layouts/print_helpers.php'; ?>
+<?php
+require_once ROOT_PATH . '/app/Views/layouts/print_helpers.php';
+?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -84,6 +86,7 @@
             <?php foreach ($produitsRistourne as $_): ?>
                 <col style="min-width: 90px">
             <?php endforeach; ?>
+            <col style="min-width: 140px">
             <col style="min-width: 115px">
             <col style="min-width: 125px">
             <col style="min-width: 150px">
@@ -99,6 +102,7 @@
                 <?php foreach ($produitsRistourne as $produit): ?>
                     <th class="num"><?= htmlspecialchars($produit['nom'] ?? '') ?></th>
                 <?php endforeach; ?>
+                <th>Produit du<br>complement</th>
                 <th class="num">Montant restant</th>
                 <th class="num">Montant a<br>completer</th>
                 <th>Observation</th>
@@ -107,7 +111,7 @@
         </thead>
         <tbody>
             <?php if (empty($rowsRistourne)): ?>
-                <tr><td colspan="<?= 9 + count($produitsRistourne) ?>" class="center">Aucune ristourne calculee pour cette periode</td></tr>
+                <tr><td colspan="<?= 10 + count($produitsRistourne) ?>" class="center">Aucune ristourne calculee pour cette periode</td></tr>
             <?php else: foreach ($rowsRistourne as $row): ?>
                 <tr>
                     <td><?= htmlspecialchars($row['zone_nom'] ?? '') ?></td>
@@ -116,8 +120,15 @@
                     <td class="num"><?= format_money_converted($row['ca_total'] ?? 0) ?></td>
                     <td class="num"><?= format_money_converted($row['montant_ristourne'] ?? 0) ?></td>
                     <?php foreach ($produitsRistourne as $produit): ?>
-                        <td class="num"><?= number_format((int) ($row['produits'][(int) $produit['id']]['caisses'] ?? 0), 0, ',', ' ') ?></td>
+                        <?php $productResult = $row['produits'][(int) $produit['id']] ?? []; ?>
+                        <td class="num">
+                            <?= number_format((int) ($productResult['caisses'] ?? 0), 0, ',', ' ') ?>
+                        </td>
                     <?php endforeach; ?>
+                    <td>
+                        <?= htmlspecialchars($row['produit_complement_nom'] ?? '') ?>
+                        <?php if (!empty($row['produit_complement_id'])): ?><br><small>1 caisse</small><?php endif; ?>
+                    </td>
                     <td class="num"><?= format_money_converted($row['montant_restant'] ?? 0) ?></td>
                     <td class="num"><?= format_money_converted($row['montant_a_completer'] ?? 0) ?></td>
                     <td class="obs-cell"></td>
@@ -130,7 +141,7 @@
                 <td colspan="3">TOTAL</td>
                 <td class="num"><?= format_money_converted($totalCa) ?></td>
                 <td class="num"><?= format_money_converted($totalRistourne) ?></td>
-                <td colspan="<?= 4 + count($produitsRistourne) ?>"></td>
+                <td colspan="<?= 5 + count($produitsRistourne) ?>"></td>
             </tr>
         </tfoot>
     </table>

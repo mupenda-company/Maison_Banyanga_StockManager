@@ -30,8 +30,10 @@ class Vehicule extends Model
     /**
      * Récupérer les véhicules disponibles (pas en mission)
      */
-    public function getDisponibles()
+    public function getDisponibles($typeMission = 'vente')
     {
+        $typeMission = $typeMission === 'ristourne' ? 'ristourne' : 'vente';
+
         return $this->db->fetchAll(
             "SELECT v.*, u.nom as agent_nom, u.prenom as agent_prenom,
                     COALESCE((SELECT SUM(s.quantite_pleine) FROM stocks s WHERE s.emplacement_id = v.emplacement_id), 0) as stock_plein,
@@ -44,9 +46,12 @@ class Vehicule extends Model
              WHERE v.actif = 1 
              AND NOT EXISTS (
                  SELECT 1 FROM missions m 
-                 WHERE m.vehicule_id = v.id AND m.statut = 'en_cours' AND COALESCE(m.type_mission, 'vente') = 'vente'
+                 WHERE m.vehicule_id = v.id
+                   AND m.statut = 'en_cours'
+                   AND COALESCE(m.type_mission, 'vente') = :type_mission
              )
-             ORDER BY v.immatriculation"
+             ORDER BY v.immatriculation",
+            ['type_mission' => $typeMission]
         );
     }
     
@@ -70,6 +75,37 @@ class Vehicule extends Model
         if ($vehicule && $vehicule['emplacement_id']) {
             $stockModel = new Stock();
             $vehicule['stock'] = $stockModel->getByEmplacement($vehicule['emplacement_id']);
+
+            $reservations = $this->db->fetchAll(
+                "SELECT mc.produit_id,
+                        COALESCE(m.type_mission, 'vente') AS type_mission,
+                        SUM(GREATEST(
+                            0,
+                            COALESCE(mc.quantite_caisses, 0)
+                            - FLOOR(COALESCE(mc.quantite_vendue, 0) / COALESCE(NULLIF(p.bouteilles_par_caisses, 0), 24))
+                        )) AS caisses_restantes
+                 FROM missions m
+                 JOIN mission_chargements mc ON mc.mission_id = m.id
+                 JOIN produits p ON p.id = mc.produit_id
+                 WHERE m.vehicule_id = :vehicule_id
+                   AND m.statut = 'en_cours'
+                 GROUP BY mc.produit_id, COALESCE(m.type_mission, 'vente')",
+                ['vehicule_id' => $id]
+            );
+
+            $reservationsParProduit = [];
+            foreach ($reservations as $reservation) {
+                $produitId = (int) ($reservation['produit_id'] ?? 0);
+                $typeMission = ($reservation['type_mission'] ?? 'vente') === 'ristourne' ? 'ristourne' : 'vente';
+                $reservationsParProduit[$produitId][$typeMission] = max(0, (int) ($reservation['caisses_restantes'] ?? 0));
+            }
+
+            foreach ($vehicule['stock'] as &$stock) {
+                $produitId = (int) ($stock['produit_id'] ?? 0);
+                $stock['reserve_vente_caisses'] = $reservationsParProduit[$produitId]['vente'] ?? 0;
+                $stock['reserve_ristourne_caisses'] = $reservationsParProduit[$produitId]['ristourne'] ?? 0;
+            }
+            unset($stock);
         }
         
         return $vehicule;

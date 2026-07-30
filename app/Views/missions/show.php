@@ -145,15 +145,11 @@ ob_start();
                         foreach ($mission['ristournes'] ?? [] as $mrItem) {
                             $csLiv = (int)($mrItem['caisses_livrees'] ?? 0);
                             $csPrev = (int)($mrItem['caisses_prevues'] ?? 0);
-                            $totalCaissesLivrees += $csLiv;
-                            $totalCaissesPrevues += $csPrev;
+                            $totalCaissesLivrees += $csLiv + (int)($mrItem['caisses_complement_livrees'] ?? 0);
+                            $totalCaissesPrevues += $csPrev + (int)($mrItem['caisses_complement_prevues'] ?? 0);
                             $totalVidesRecues += (int)($mrItem['caisses_vides_recues'] ?? 0);
-                            if (!empty($mrItem['complement_confirme']) && $csLiv > 0) {
-                                $btlPerCs = (int)($mrItem['bouteilles_par_caisses'] ?? 24);
-                                if ($btlPerCs <= 0) $btlPerCs = 24;
-                                $prixCS = (float)($mrItem['prix_vente_caisses'] ?? 0);
-                                if ($prixCS <= 0) $prixCS = (float)($mrItem['prix_vente_unitaire'] ?? 0) * $btlPerCs;
-                                $totalMontantAjoute += max(0, round($csLiv * $prixCS - (float)($mrItem['montant_ristourne'] ?? 0), 2));
+                            if (!empty($mrItem['complement_confirme'])) {
+                                $totalMontantAjoute += max(0, (float)($mrItem['proposition_montant'] ?? 0));
                             }
                         }
                     ?>
@@ -220,7 +216,10 @@ ob_start();
                                     $caissesPrevuesMr = (int)($mr['caisses_prevues'] ?? $mr['caisses_livrees'] ?? 0);
                                     $caissesLivreesMr = (int)($mr['caisses_livrees'] ?? 0);
                                 ?>
-                                <p class="text-xs text-gray-500"><?= htmlspecialchars($mr['produit_nom'] ?? 'N/A') ?> — Prévu: <?= $caissesPrevuesMr ?> cs · Livré: <?= $caissesLivreesMr ?> cs · Vides reçues: <?= (int)($mr['caisses_vides_recues'] ?? 0) ?></p>
+                                <p class="text-xs text-gray-500"><?= htmlspecialchars($mr['produit_nom'] ?? 'À choisir sur terrain') ?> — Prévu: <?= $caissesPrevuesMr ?> cs · Livré: <?= $caissesLivreesMr ?> cs · Vides reçues: <?= (int)($mr['caisses_vides_recues'] ?? 0) ?></p>
+                                <?php if (!empty($mr['produit_complement_id'])): ?>
+                                <p class="text-xs text-amber-600">Complément: 1 cs de <?= htmlspecialchars($mr['produit_complement_nom'] ?? 'produit') ?> · Ajout: <?= format_money_converted($mr['proposition_montant'] ?? 0) ?></p>
+                                <?php endif; ?>
                                 <?php if (!empty($mr['proposition_montant']) && (float)$mr['proposition_montant'] > 0): ?>
                                 <p class="text-xs text-blue-500">Complément: <?= format_money_converted($mr['proposition_montant']) ?><?php if (!empty($mr['complement_confirme'])): ?> <span class="text-green-600 font-semibold">✓ Confirmé</span><?php else: ?> <span class="text-orange-500">(en attente)</span><?php endif; ?></p>
                                 <?php endif; ?>
@@ -345,6 +344,9 @@ ob_start();
                                         <?php endif; ?>
                                     </p>
                                     <p class="text-sm text-gray-500">Produit choisi: <?= htmlspecialchars($mr['produit_nom'] ?? 'A choisir sur terrain') ?></p>
+                                    <?php if (!empty($mr['produit_complement_id'])): ?>
+                                    <p class="text-sm text-amber-600">Complément: 1 cs de <?= htmlspecialchars($mr['produit_complement_nom'] ?? 'produit') ?> · Montant à ajouter: <?= format_money_converted($mr['proposition_montant'] ?? 0) ?></p>
+                                    <?php endif; ?>
                                     <?php
                                         $caissesPrevuesMr2 = (int)($mr['caisses_prevues'] ?? $mr['caisses_livrees'] ?? 0);
                                         $caissesLivreesMr2 = (int)($mr['caisses_livrees'] ?? 0);

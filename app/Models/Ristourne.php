@@ -9,7 +9,8 @@ class Ristourne extends Model
     protected $fillable = [
         'client_id', 'periode_debut', 'periode_fin', 'total_caisses',
         'ca_total', 'palier_id', 'taux_applique', 
-        'montant_ristourne', 'produits_ristourne', 'statut', 'date_paiement', 'notes'
+        'montant_ristourne', 'produits_ristourne', 'produit_complement_id',
+        'statut', 'date_paiement', 'notes'
     ];
 
     private static bool $columnsChecked = false;
@@ -29,6 +30,7 @@ class Ristourne extends Model
         $columns = [
             'total_caisses' => "ALTER TABLE ristournes ADD total_caisses INT NOT NULL DEFAULT 0 AFTER periode_fin",
             'produits_ristourne' => "ALTER TABLE ristournes ADD produits_ristourne TEXT NULL AFTER montant_ristourne",
+            'produit_complement_id' => "ALTER TABLE ristournes ADD produit_complement_id INT UNSIGNED NULL AFTER produits_ristourne",
         ];
 
         foreach ($columns as $column => $sql) {
@@ -180,10 +182,12 @@ class Ristourne extends Model
         }
 
         return $this->db->fetchAll(
-            "SELECT r.*, c.nom as client_nom, c.numero_client, z.nom as zone_nom
+            "SELECT r.*, c.nom as client_nom, c.numero_client, z.nom as zone_nom,
+                    pc.nom as produit_complement_nom
              FROM {$this->table} r
              JOIN clients c ON r.client_id = c.id
              LEFT JOIN zones z ON c.zone_id = z.id
+             LEFT JOIN produits pc ON pc.id = r.produit_complement_id
              WHERE {$where}
              ORDER BY z.nom ASC, c.nom ASC, r.id DESC",
             $params

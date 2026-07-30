@@ -9,6 +9,9 @@ foreach (['mois', 'annee', 'client_id'] as $key) {
 }
 $printUrl = '?' . http_build_query(array_merge($baseQuery, ['print' => 1]));
 $exportUrl = '?' . http_build_query(array_merge($baseQuery, ['export' => 'excel']));
+$printRecolteUrl = '?' . http_build_query(array_merge($baseQuery, ['print' => 1, 'recolte_locale' => 1]));
+$exportRecolteUrl = '?' . http_build_query(array_merge($baseQuery, ['export' => 'excel', 'recolte_locale' => 1]));
+$recolteLocaleActive = isset($recolte_locale_active) ? (bool) $recolte_locale_active : false;
 ob_start();
 ?>
 
@@ -18,9 +21,15 @@ ob_start();
         <p class="text-gray-500 dark:text-gray-400">Calcul et suivi des remises sur volume</p>
     </div>
     
-    <div class="flex gap-3">
+    <div class="flex flex-wrap justify-end gap-3">
         <?php if (can('ristournes.imprimer')): ?><button type="button" onclick="window.open('<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>','_blank')" class="btn btn-secondary">Imprimer</button><?php endif; ?>
-        <?php if (can('ristournes.exporter')): ?><a href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary">Exporter Excel</a><?php endif; ?>
+        <?php if (can('ristournes.exporter')): ?><a href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary">Exporter</a><?php endif; ?>
+        <?php if ($recolteLocaleActive && can('ristournes.imprimer')): ?>
+            <button type="button" onclick="window.open('<?= htmlspecialchars($printRecolteUrl, ENT_QUOTES, 'UTF-8') ?>','_blank')" class="btn btn-warning">Imprimer locale</button>
+        <?php endif; ?>
+        <?php if ($recolteLocaleActive && can('ristournes.exporter')): ?>
+            <a href="<?= htmlspecialchars($exportRecolteUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-warning">Exporter locale</a>
+        <?php endif; ?>
         <?php if (can('ristournes.calculer')): ?>
         <button onclick="calculerRistournes(this)" class="btn btn-primary">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
@@ -83,13 +92,14 @@ ob_start();
                         <th>Période</th>
                         <th class="text-right">Volume (cs)</th>
                         <th class="text-right">Montant</th>
+                        <th>Produit du complément</th>
                         <th>Statut</th>
                         <th class="text-right no-print">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($ristournes)): ?>
-                        <tr><td colspan="6" class="text-center p-8 text-gray-500">Aucune ristourne calculée pour cette période.</td></tr>
+                        <tr><td colspan="7" class="text-center p-8 text-gray-500">Aucune ristourne calculée pour cette période.</td></tr>
                     <?php else: ?>
                         <?php foreach($ristournes as $r): ?>
                             <tr>
@@ -97,8 +107,9 @@ ob_start();
                                     <div class="font-bold text-gray-900 dark:text-white"><?= htmlspecialchars($r['client_nom']) ?></div>
                                 </td>
                                 <td><?= date('M Y', strtotime($r['periode_debut'])) ?></td>
-                                <td class="text-right font-medium"><?= format_money_converted($r['ca_total'] ?? 0) ?></td>
+                                <td class="text-right font-medium"><?= number_format((int) ($r['total_caisses'] ?? 0), 0, ',', ' ') ?></td>
                                 <td class="text-right font-black text-green-600"><?= format_money_converted($r['montant_ristourne'] ?? 0) ?></td>
+                                <td><?= htmlspecialchars($r['produit_complement_nom'] ?? '-') ?></td>
                                 <td>
                                     <?php if ($r['statut'] === 'payee'): ?>
                                         <span class="badge-success">Payé</span>
@@ -138,7 +149,7 @@ ob_start();
         <div class="fixed inset-0 bg-black/50" onclick="closeRistourneProductModal()"></div>
         <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-5xl w-full p-6">
             <h3 class="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Calculer les ristournes</h3>
-            <p class="text-sm text-gray-500 mb-4">Choisissez la periode a calculer et les produits qui peuvent etre livres comme ristourne.</p>
+            <p class="text-sm text-gray-500 mb-4">Choisissez les produits principaux ayant exactement le meme prix par caisse, puis un produit de complement independant.</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
                 <div>
                     <label class="label">Mois a calculer</label>
@@ -157,14 +168,46 @@ ob_start();
             </div>
             <div class="max-h-[60vh] overflow-y-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
                 <?php foreach (($produits ?? []) as $produit): ?>
+                <?php
+                    $bouteillesParCaisse = max(1, (int) ($produit['bouteilles_par_caisses'] ?? 24));
+                    $prixCaisse = (float) ($produit['prix_vente_caisses'] ?? 0);
+                    if ($prixCaisse <= 0) {
+                        $prixCaisse = (float) ($produit['prix_vente_unitaire'] ?? 0) * $bouteillesParCaisse;
+                    }
+                    $prixCents = (int) round($prixCaisse * 100);
+                ?>
                 <label class="flex items-start gap-3 p-3 cursor-pointer border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/40">
-                    <input type="checkbox" class="ristourne-product-checkbox rounded border-gray-300" value="<?= (int) $produit['id'] ?>">
+                    <input type="checkbox"
+                           class="ristourne-product-checkbox rounded border-gray-300"
+                           value="<?= (int) $produit['id'] ?>"
+                           data-name="<?= htmlspecialchars($produit['nom'], ENT_QUOTES, 'UTF-8') ?>"
+                           data-price-cents="<?= $prixCents ?>"
+                           onchange="onRistourneProductChange()">
                     <span class="min-w-0">
                         <span class="block font-medium text-sm text-gray-900 dark:text-white leading-tight"><?= htmlspecialchars($produit['nom']) ?></span>
-                        <span class="block text-xs text-gray-500"><?= htmlspecialchars($produit['code'] ?? '') ?> - <?= format_money_converted($produit['prix_vente_caisses'] ?? 0) ?> / cs</span>
+                        <span class="block text-xs text-gray-500"><?= htmlspecialchars($produit['code'] ?? '') ?> - <?= format_money_converted($prixCaisse) ?> / cs</span>
                     </span>
                 </label>
                 <?php endforeach; ?>
+            </div>
+            <div class="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-4 mb-5">
+                <label class="label">Produit sur lequel le client ajoutera le complément</label>
+                <select id="ristourneComplementProduct" class="input">
+                    <option value="">Utiliser automatiquement le premier produit principal</option>
+                    <?php foreach (($produits ?? []) as $produit): ?>
+                        <?php
+                        $bouteillesParCaisse = max(1, (int) ($produit['bouteilles_par_caisses'] ?? 24));
+                        $prixCaisse = (float) ($produit['prix_vente_caisses'] ?? 0);
+                        if ($prixCaisse <= 0) {
+                            $prixCaisse = (float) ($produit['prix_vente_unitaire'] ?? 0) * $bouteillesParCaisse;
+                        }
+                        ?>
+                        <option value="<?= (int) $produit['id'] ?>">
+                            <?= htmlspecialchars($produit['nom']) ?> - <?= format_money_converted($prixCaisse) ?> / cs
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="text-xs text-amber-700 dark:text-amber-300 mt-2">Facultatif : sans choix, le premier produit principal sélectionné sera aussi utilisé comme produit de complément.</p>
             </div>
             <div class="flex justify-end gap-3">
                 <button type="button" class="btn btn-secondary" onclick="closeRistourneProductModal()">Annuler</button>
@@ -187,10 +230,25 @@ function closeRistourneProductModal() {
     document.getElementById('ristourneProductModal')?.classList.add('hidden');
 }
 
+function onRistourneProductChange() {
+    const checkboxes = Array.from(document.querySelectorAll('.ristourne-product-checkbox'));
+    const selected = checkboxes.filter(el => el.checked);
+    const selectedPrice = selected.length > 0 ? selected[0].dataset.priceCents : null;
+
+    checkboxes.forEach(el => {
+        const incompatible = selectedPrice !== null && el.dataset.priceCents !== selectedPrice && !el.checked;
+        el.disabled = incompatible;
+        el.closest('label')?.classList.toggle('opacity-40', incompatible);
+        el.closest('label')?.classList.toggle('cursor-not-allowed', incompatible);
+    });
+
+}
+
 async function confirmCalculRistournes() {
     const mois = document.getElementById('ristourneCalcMonth')?.value || document.querySelector('select[name="mois"]').value;
     const annee = document.getElementById('ristourneCalcYear')?.value || document.querySelector('input[name="annee"]').value;
     const productIds = Array.from(document.querySelectorAll('.ristourne-product-checkbox:checked')).map(el => el.value);
+    const complementProductId = document.getElementById('ristourneComplementProduct')?.value || '';
     if (productIds.length === 0) {
         App.notify('Selectionnez au moins un produit a livrer comme ristourne', 'error');
         return;
@@ -206,11 +264,17 @@ async function confirmCalculRistournes() {
         loadingText.classList.remove('hidden');
         normalText.classList.add('hidden');
         
-        const result = await App.api(`/ristournes/calculer?mois=${mois}&annee=${annee}&produit_ids=${productIds.join(',')}`, 'GET');
+        const payload = {
+            mois,
+            annee,
+            produit_ids: productIds,
+            produit_complement_id: complementProductId || productIds[0]
+        };
+        const result = await App.api('/api/ristournes/calculer', 'POST', payload);
         App.notify(result.message || 'Calcul terminé avec succès', 'success');
         
-        // Forcer le rafraîchissement immédiat
-        window.location.reload(true);
+        // Afficher la liste de la période réellement choisie dans le calcul.
+        window.location.href = `?mois=${encodeURIComponent(mois)}&annee=${encodeURIComponent(annee)}`;
     } catch (e) {
         App.notify(e.message, 'error');
         btn.disabled = false;

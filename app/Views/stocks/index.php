@@ -374,7 +374,7 @@ ob_start();
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
                                     <label class="label">Source *</label>
-                                    <select x-model="form.emplacement_source" class="input" required>
+                                    <select x-model="form.emplacement_source" @change="loadStockSource()" class="input" required>
                                         <option value="">Sélectionner</option>
                                         <?php foreach ($emplacements as $emp): ?>
                                         <option value="<?= $emp['id'] ?>"><?= htmlspecialchars($emp['nom']) ?></option>
@@ -399,20 +399,51 @@ ob_start();
                             <div>
                                 <div class="flex items-center justify-between mb-2">
                                     <label class="label mb-0">Produits a transferer</label>
-                                    <button type="button" class="btn btn-secondary btn-sm" @click="form.lignes.push({ produit_id: '', caisses: 1 })">Ajouter produit</button>
+                                    <button type="button" class="btn btn-secondary btn-sm" @click="form.lignes.push(newLigne())">Ajouter produit</button>
                                 </div>
                                 <template x-for="(ligne, index) in form.lignes" :key="index">
-                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2 items-center">
-                                        <select x-model="ligne.produit_id" class="input min-w-0" required>
-                                            <option value="">Selectionner</option>
-                                            <template x-for="p in produits" :key="p.id">
-                                                <option :value="String(p.id)" x-text="p.nom + ' (' + p.code + ')'"></option>
-                                            </template>
-                                        </select>
-                                        <input type="number" x-model.number="ligne.caisses" class="input" min="0.01" step="0.01" required>
-                                        <button type="button" class="btn btn-danger btn-sm h-10 w-11 px-0" @click="form.lignes.splice(index, 1)" :disabled="form.lignes.length === 1">X</button>
+                                    <div class="mb-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                                        <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_8rem_3rem] gap-2 items-center">
+                                            <select x-model="ligne.produit_id" class="input min-w-0" required>
+                                                <option value="">Selectionner</option>
+                                                <template x-for="p in produits" :key="p.id">
+                                                    <option :value="String(p.id)" x-text="p.nom + ' (' + p.code + ')'"></option>
+                                                </template>
+                                            </select>
+                                            <input type="number" x-model.number="ligne.caisses" class="input" min="1" step="1"
+                                                   :max="getDisponibleCaisses(ligne)" required>
+                                            <button type="button" class="btn btn-danger btn-sm h-10 w-11 px-0" @click="form.lignes.splice(index, 1)" :disabled="form.lignes.length === 1">X</button>
+                                        </div>
+
+                                        <template x-if="ligne.produit_id">
+                                            <div class="mt-2">
+                                                <template x-if="!form.emplacement_source">
+                                                    <p class="text-xs text-amber-600">Selectionnez d'abord l'emplacement source.</p>
+                                                </template>
+                                                <template x-if="form.emplacement_source">
+                                                    <div>
+                                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                            <div class="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 dark:bg-emerald-900/20 dark:border-emerald-800">
+                                                                <p class="text-[10px] uppercase tracking-wider text-gray-500">Produits disponibles</p>
+                                                                <p class="font-bold text-emerald-700"
+                                                                   x-text="formatStock(getStockLigne(ligne.produit_id), 'plein')"></p>
+                                                            </div>
+                                                            <div class="rounded border border-purple-200 bg-purple-50 px-3 py-2 dark:bg-purple-900/20 dark:border-purple-800">
+                                                                <p class="text-[10px] uppercase tracking-wider text-gray-500">Emballages disponibles</p>
+                                                                <p class="font-bold text-purple-700"
+                                                                   x-text="formatStock(getStockLigne(ligne.produit_id), 'vide')"></p>
+                                                            </div>
+                                                        </div>
+                                                        <p x-show="getTotalDemandeProduit(ligne.produit_id) > getDisponibleCaisses(ligne)"
+                                                           class="text-xs font-semibold text-red-600 mt-2"
+                                                           x-text="'Quantite demandee pour ce produit : ' + getTotalDemandeProduit(ligne.produit_id) + ' cs, disponible : ' + getDisponibleCaisses(ligne) + ' cs.'"></p>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </template>
                                     </div>
                                 </template>
+                                <p x-show="loadingStockSource" class="text-xs text-gray-500">Chargement du stock de la source...</p>
                             </div>
                             <div>
                                 <label class="label">Motif</label>
@@ -440,6 +471,9 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('transfertModal', () => ({
         isOpen: false,
         produits: <?= json_encode($allProduits) ?>,
+        mode: <?= json_encode($emballageMode ? 'emballage' : 'stock') ?>,
+        stockSource: [],
+        loadingStockSource: false,
         form: {
             emplacement_source: '',
             emplacement_dest: '',
@@ -447,6 +481,57 @@ document.addEventListener('alpine:init', () => {
             motif: ''
         },
         loading: false,
+
+        newLigne() {
+            return { produit_id: '', caisses: 1 };
+        },
+
+        getProduit(produitId) {
+            return this.produits.find(p => String(p.id) === String(produitId)) || null;
+        },
+
+        getStockLigne(produitId) {
+            return this.stockSource.find(s => String(s.produit_id) === String(produitId)) || null;
+        },
+
+        getDisponibleCaisses(ligne) {
+            const stock = this.getStockLigne(ligne?.produit_id);
+            if (!stock) return 0;
+            const produit = this.getProduit(ligne?.produit_id);
+            const btlParCaisse = Math.max(1, parseInt(produit?.bouteilles_par_caisses || 24, 10));
+            const fieldCaisses = this.mode === 'emballage' ? 'caisses_vide' : 'caisses_pleine';
+            const fieldQuantite = this.mode === 'emballage' ? 'quantite_vide' : 'quantite_pleine';
+            const caisses = Math.max(0, parseInt(stock[fieldCaisses] || 0, 10));
+            const caissesSelonQuantite = Math.floor(Math.max(0, parseInt(stock[fieldQuantite] || 0, 10)) / btlParCaisse);
+            return Math.min(caisses, caissesSelonQuantite);
+        },
+
+        getTotalDemandeProduit(produitId) {
+            return (this.form.lignes || [])
+                .filter(l => String(l.produit_id) === String(produitId))
+                .reduce((total, l) => total + Math.max(0, parseInt(l.caisses || 0, 10)), 0);
+        },
+
+        formatStock(stock, type) {
+            if (!stock) return '0 cs / 0 bouteilles';
+            const caisses = Math.max(0, parseInt(stock[type === 'vide' ? 'caisses_vide' : 'caisses_pleine'] || 0, 10));
+            const quantite = Math.max(0, parseInt(stock[type === 'vide' ? 'quantite_vide' : 'quantite_pleine'] || 0, 10));
+            return caisses + ' cs / ' + quantite + (type === 'vide' ? ' emballages' : ' bouteilles');
+        },
+
+        async loadStockSource() {
+            this.stockSource = [];
+            if (!this.form.emplacement_source) return;
+            this.loadingStockSource = true;
+            try {
+                const response = await App.api('/api/stocks/emplacement/' + this.form.emplacement_source);
+                this.stockSource = response.data || response || [];
+            } catch (e) {
+                App.notify('Impossible de charger le stock de cet emplacement', 'error');
+            } finally {
+                this.loadingStockSource = false;
+            }
+        },
         
         open() {
             this.form = {
@@ -455,6 +540,7 @@ document.addEventListener('alpine:init', () => {
                 lignes: [{ produit_id: '', caisses: 1 }],
                 motif: ''
             };
+            this.stockSource = [];
             this.isOpen = true;
         },
         
@@ -465,6 +551,19 @@ document.addEventListener('alpine:init', () => {
         async save() {
             if (this.form.emplacement_source === this.form.emplacement_dest) {
                 App.notify('Les emplacements doivent être différents', 'error');
+                return;
+            }
+
+            const ligneDepassee = (this.form.lignes || []).find(l =>
+                l.produit_id && this.getTotalDemandeProduit(l.produit_id) > this.getDisponibleCaisses(l)
+            );
+            if (ligneDepassee) {
+                const produit = this.getProduit(ligneDepassee.produit_id);
+                App.notify(
+                    'Stock insuffisant pour ' + (produit?.nom || 'ce produit')
+                    + ' : disponible ' + this.getDisponibleCaisses(ligneDepassee) + ' cs.',
+                    'error'
+                );
                 return;
             }
 
@@ -489,6 +588,7 @@ document.addEventListener('alpine:init', () => {
                     emplacement_source: this.form.emplacement_source,
                     emplacement_dest: this.form.emplacement_dest,
                     lignes: lignes,
+                    mode: this.mode,
                     motif: this.form.motif
                 };
 

@@ -58,7 +58,7 @@ class MobileController extends Controller {
 
             // Récupérer la mission en cours pour ce vendeur
 
-            $mission = $this->db->fetch(
+            $missions = $this->db->fetchAll(
 
                 "SELECT m.*, 
 
@@ -78,9 +78,8 @@ class MobileController extends Controller {
 
                  AND (m.chauffeur_id = :chauffeur_id OR v.agent_responsable_id = :agent_id)
 
-                 ORDER BY m.date_depart DESC
-
-                 LIMIT 1",
+                 ORDER BY CASE WHEN COALESCE(m.type_mission, 'vente') = 'vente' THEN 0 ELSE 1 END,
+                          m.date_depart DESC",
 
                 [
 
@@ -125,6 +124,7 @@ class MobileController extends Controller {
                 'user' => $user,
 
                 'mission' => $mission,
+                'missions' => $missions,
 
                 'settings' => $settings
 
@@ -487,23 +487,9 @@ class MobileController extends Controller {
             $nbClientsRistourne = count($ristourneRows);
 
             foreach ($ristourneRows as $mrRow) {
-
-                $csLiv = (int) ($mrRow['caisses_livrees'] ?? 0);
-
-                if (!empty($mrRow['complement_confirme']) && $csLiv > 0) {
-
-                    $btlPerCs = (int) ($mrRow['bouteilles_par_caisses'] ?? 24);
-
-                    if ($btlPerCs <= 0) $btlPerCs = 24;
-
-                    $prixCS = (float) ($mrRow['prix_vente_caisses'] ?? 0);
-
-                    if ($prixCS <= 0) $prixCS = (float) ($mrRow['prix_vente_unitaire'] ?? 0) * $btlPerCs;
-
-                    $complementRecolte += max(0, round($csLiv * $prixCS - (float) ($mrRow['montant_ristourne'] ?? 0), 2));
-
+                if (!empty($mrRow['complement_confirme'])) {
+                    $complementRecolte += max(0, (float) ($mrRow['proposition_montant'] ?? 0));
                 }
-
             }
 
         }
@@ -542,11 +528,22 @@ class MobileController extends Controller {
 
                 $rows = $this->db->fetchAll(
 
-                    "SELECT mr.id, mr.ristourne_id, mr.client_id, mr.produit_id, mr.montant_ristourne, mr.caisses_prevues, mr.bouteilles_prevues, mr.caisses_livrees, mr.bouteilles_livrees, mr.caisses_vides_recues, mr.montant_livre, mr.proposition_montant, mr.complement_confirme, mr.statut, p.nom as produit_nom, p.code as produit_code, p.prix_vente_caisses, p.prix_vente_unitaire, p.bouteilles_par_caisses, c.nom as client_nom, c.numero_client
+                    "SELECT mr.*, r.produits_ristourne,
+                            p.nom as produit_nom, p.code as produit_code, p.prix_vente_caisses,
+                            p.prix_vente_unitaire, p.bouteilles_par_caisses,
+                            pc.nom as produit_complement_nom, pc.code as produit_complement_code,
+                            pc.prix_vente_caisses as prix_complement_caisses,
+                            pc.prix_vente_unitaire as prix_complement_unitaire,
+                            pc.bouteilles_par_caisses as bouteilles_par_caisse_complement,
+                            c.nom as client_nom, c.numero_client
 
                      FROM mission_ristournes mr
 
+                     JOIN ristournes r ON r.id = mr.ristourne_id
+
                      LEFT JOIN produits p ON mr.produit_id = p.id
+
+                     LEFT JOIN produits pc ON mr.produit_complement_id = pc.id
 
                      JOIN clients c ON mr.client_id = c.id
 
@@ -822,7 +819,13 @@ class MobileController extends Controller {
 
 
 
-        $row = $this->db->fetch("SELECT * FROM mission_ristournes WHERE id = :id", ['id' => $mrId]);
+        $row = $this->db->fetch(
+            "SELECT mr.*, r.produits_ristourne
+             FROM mission_ristournes mr
+             JOIN ristournes r ON r.id = mr.ristourne_id
+             WHERE mr.id = :id",
+            ['id' => $mrId]
+        );
 
         if (!$row) {
 
@@ -845,6 +848,14 @@ class MobileController extends Controller {
 
         if ($produitId <= 0) {
             return $this->error('Selectionnez le produit choisi par le client', 422);
+        }
+
+        $allowedProductIds = json_decode((string) ($row['produits_ristourne'] ?? '[]'), true);
+        $allowedProductIds = is_array($allowedProductIds)
+            ? array_values(array_unique(array_map('intval', $allowedProductIds)))
+            : [];
+        if (!empty($allowedProductIds) && !in_array($produitId, $allowedProductIds, true)) {
+            return $this->error('Ce produit ne fait pas partie des produits de ristourne autorises', 422);
         }
 
         $chargement = $this->db->fetch(
@@ -871,7 +882,42 @@ class MobileController extends Controller {
 
         $complementConfirme = !empty($data['complement_confirme']) ? 1 : 0;
 
-        $propositionMontant = (float) ($data['proposition_montant'] ?? $row['proposition_montant'] ?? 0);
+        $propositionMontant = 0;
+        $complementProductId = (int) ($row['produit_complement_id'] ?? 0);
+        $complementChargement = null;
+        $complementBottlesPerCase = 0;
+        $complementCasePrice = 0;
+
+        if ($complementConfirme) {
+            if ($complementProductId <= 0) {
+                return $this->error('Aucun produit de complement n est configure pour cette ristourne', 422);
+            }
+            $complementChargement = $this->db->fetch(
+                "SELECT mc.*, p.prix_vente_caisses, p.prix_vente_unitaire, p.bouteilles_par_caisses, p.nom as produit_nom
+                 FROM mission_chargements mc
+                 JOIN produits p ON mc.produit_id = p.id
+                 WHERE mc.mission_id = :mission_id AND mc.produit_id = :produit_id
+                   AND COALESCE(mc.type_chargement, 'vente') = 'ristourne'
+                 LIMIT 1",
+                ['mission_id' => $missionId, 'produit_id' => $complementProductId]
+            );
+            $mission = $missions[0] ?? null;
+            if (!$complementChargement) {
+                return $this->error('Le produit de complement ne fait pas partie du chargement de la mission', 422);
+            }
+            $complementBottlesPerCase = max(1, (int) ($complementChargement['bouteilles_par_caisses'] ?? 24));
+            $complementCasePrice = (float) ($complementChargement['prix_vente_caisses'] ?? 0);
+            if ($complementCasePrice <= 0) {
+                $complementCasePrice = (float) ($complementChargement['prix_vente_unitaire'] ?? 0) * $complementBottlesPerCase;
+            }
+            if ($complementCasePrice <= 0) {
+                return $this->error('Prix caisse invalide pour le produit de complement', 422);
+            }
+
+            $coveredCases = (int) floor($montantRistourne / $prixCaisse);
+            $remainder = max(0, $montantRistourne - ($coveredCases * $prixCaisse));
+            $propositionMontant = max(0, round($complementCasePrice - $remainder, 2));
+        }
 
 
 
@@ -887,21 +933,8 @@ class MobileController extends Controller {
 
         } elseif ($prixCaisse > 0) {
 
-            // Calcul automatique
-
-            if ($complementConfirme && $propositionMontant > 0) {
-
-                // Avec complément : ceil((ristourne + complément) / prix)
-
-                $caissesLivrees = (int) ceil(($montantRistourne + $propositionMontant) / $prixCaisse);
-
-            } else {
-
-                // Sans complément : floor(ristourne / prix) â€” on ne donne que ce que couvre le montant
-
-                $caissesLivrees = (int) floor($montantRistourne / $prixCaisse);
-
-            }
+            // Le produit principal utilise uniquement la part couverte par la ristourne.
+            $caissesLivrees = (int) floor($montantRistourne / $prixCaisse);
 
         }
 
@@ -909,20 +942,19 @@ class MobileController extends Controller {
 
         $caissesPrevuesEffectives = $caissesPrevues;
 
-        if ($complementConfirme && $propositionMontant > 0 && $prixCaisse > 0) {
-
-            $caissesPrevuesEffectives = max($caissesPrevuesEffectives, (int) ceil(($montantRistourne + $propositionMontant) / $prixCaisse));
-
-        }
-
 
 
         // Ne pas livrer plus que ce qui est couvert par la ristourne + complement confirme.
 
-        if ($caissesPrevuesEffectives > 0 && $caissesLivrees > $caissesPrevuesEffectives) {
+        if ($caissesLivrees > $caissesPrevuesEffectives) {
 
             $caissesLivrees = $caissesPrevuesEffectives;
 
+        }
+
+        if ($complementConfirme) {
+            $remainder = max(0, $montantRistourne - ($caissesLivrees * $prixCaisse));
+            $propositionMontant = max(0, round($complementCasePrice - $remainder, 2));
         }
 
 
@@ -933,6 +965,18 @@ class MobileController extends Controller {
 
             return $this->error('Stock mission insuffisant pour le produit choisi', 422);
 
+        }
+
+        if ($complementConfirme) {
+            $complementStockRestant = ((float) ($complementChargement['quantite_caisses'] ?? 0) * $complementBottlesPerCase)
+                - (float) ($complementChargement['quantite_vendue'] ?? 0);
+            $requiredComplementBottles = $complementBottlesPerCase;
+            if ($complementProductId === $produitId) {
+                $requiredComplementBottles += $caissesLivrees * $bouteillesParCaisse;
+            }
+            if ($requiredComplementBottles > $complementStockRestant) {
+                return $this->error('Stock mission insuffisant pour le produit de complement', 422);
+            }
         }
 
 
@@ -950,6 +994,9 @@ class MobileController extends Controller {
         // Montant livré = caisses_livrees * prix
 
         $montantLivre = $caissesLivrees > 0 && $prixCaisse > 0 ? round($caissesLivrees * $prixCaisse, 2) : 0;
+        if ($complementConfirme) {
+            $montantLivre = round($montantLivre + $complementCasePrice, 2);
+        }
 
 
 
@@ -957,9 +1004,9 @@ class MobileController extends Controller {
 
         $montantAjoute = 0;
 
-        if ($complementConfirme && $caissesLivrees > 0 && $prixCaisse > 0) {
+        if ($complementConfirme) {
 
-            $montantAjoute = max(0, round($caissesLivrees * $prixCaisse - $montantRistourne, 2));
+            $montantAjoute = $propositionMontant;
 
         }
 
@@ -974,6 +1021,14 @@ class MobileController extends Controller {
         $updates[] = 'bouteilles_livrees = :bouteilles_livrees';
 
         $params['bouteilles_livrees'] = $bouteillesLivrees;
+
+        $updates[] = 'caisses_complement_livrees = :caisses_complement_livrees';
+
+        $params['caisses_complement_livrees'] = $complementConfirme ? 1 : 0;
+
+        $updates[] = 'bouteilles_complement_livrees = :bouteilles_complement_livrees';
+
+        $params['bouteilles_complement_livrees'] = $complementConfirme ? $complementBottlesPerCase : 0;
 
         $updates[] = 'caisses_vides_recues = :caisses_vides_recues';
 
@@ -998,28 +1053,6 @@ class MobileController extends Controller {
         $updates[] = 'statut = :statut';
 
         $params['statut'] = 'livree';
-
-
-
-        // Si complement confirme, recalculer caisses_prevues pour refleter le montant total couvert.
-
-        if ($complementConfirme && $propositionMontant > 0 && $prixCaisse > 0) {
-
-            $newPrevues = $caissesPrevuesEffectives;
-
-            if ($newPrevues != $caissesPrevues) {
-
-                $updates[] = 'caisses_prevues = :new_caisses_prevues';
-
-                $params['new_caisses_prevues'] = $newPrevues;
-
-                $updates[] = 'bouteilles_prevues = :new_bouteilles_prevues';
-
-                $params['new_bouteilles_prevues'] = $newPrevues * $bouteillesParCaisse;
-
-            }
-
-        }
 
 
 
@@ -1073,6 +1106,15 @@ class MobileController extends Controller {
 
                 );
 
+            }
+
+            if ($missionId > 0 && $complementConfirme && $complementProductId > 0) {
+                $this->db->query(
+                    "UPDATE mission_chargements
+                     SET quantite_vendue = IFNULL(quantite_vendue, 0) + :bv
+                     WHERE mission_id = :mid AND produit_id = :pid AND COALESCE(type_chargement, 'vente') = 'ristourne'",
+                    ['bv' => $complementBottlesPerCase, 'mid' => $missionId, 'pid' => $complementProductId]
+                );
             }
 
 
@@ -1135,6 +1177,23 @@ class MobileController extends Controller {
 
                         }
 
+                        if ($complementConfirme && $complementProductId > 0) {
+                            $stockModel->updateOrCreate($complementProductId, $emplacementVehiculeId, [
+                                'quantite_pleine' => -$complementBottlesPerCase,
+                                'caisses_pleine' => -1,
+                            ]);
+                            $mouvementModel->create([
+                                'produit_id' => $complementProductId,
+                                'emplacement_id' => $emplacementVehiculeId,
+                                'type_mouvement' => 'sortie',
+                                'quantite' => -$complementBottlesPerCase,
+                                'reference_type' => 'ristourne',
+                                'reference_id' => $mrId,
+                                'motif' => 'Livraison produit de complement ristourne',
+                                'created_by' => (int) ($data['user_id'] ?? 0),
+                            ]);
+                        }
+
 
 
                         // Ajouter les caisses vides reçues du client au stock véhicule
@@ -1185,6 +1244,8 @@ class MobileController extends Controller {
 
                 'caisses_livrees' => $caissesLivrees,
 
+                'caisses_complement_livrees' => $complementConfirme ? 1 : 0,
+
                 'caisses_vides_recues' => $caissesVidesRecues,
 
                 'montant_livre' => $montantLivre,
@@ -1193,7 +1254,7 @@ class MobileController extends Controller {
 
                 'complement_confirme' => $complementConfirme,
 
-                'reste_ristourne' => max(0, $montantRistourne - ($caissesLivrees > 0 ? round($caissesLivrees * $prixCaisse, 2) : 0)),
+                'reste_ristourne' => max(0, $montantRistourne - $montantLivre),
 
             ], 'Ristourne livrée et encaissement enregistré');
 
