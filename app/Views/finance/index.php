@@ -143,7 +143,7 @@ ob_start();
     </div>
 
     <!-- Récolté ce mois (local) -->
-    <div class="stat-card">
+    <!-- <div class="stat-card">
         <div class="flex items-center justify-between">
             <div class="min-w-0 flex-1 mr-2">
                 <p class="stat-label">Récolte locale</p>
@@ -158,7 +158,7 @@ ob_start();
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
             Deduction locale ristournes
         </p>
-    </div>
+    </div> -->
 </div>
 
 <!-- Deuxième rangée : Dettes + Panier -->
