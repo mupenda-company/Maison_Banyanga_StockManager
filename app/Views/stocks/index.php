@@ -497,13 +497,8 @@ document.addEventListener('alpine:init', () => {
         getDisponibleCaisses(ligne) {
             const stock = this.getStockLigne(ligne?.produit_id);
             if (!stock) return 0;
-            const produit = this.getProduit(ligne?.produit_id);
-            const btlParCaisse = Math.max(1, parseInt(produit?.bouteilles_par_caisses || 24, 10));
             const fieldCaisses = this.mode === 'emballage' ? 'caisses_vide' : 'caisses_pleine';
-            const fieldQuantite = this.mode === 'emballage' ? 'quantite_vide' : 'quantite_pleine';
-            const caisses = Math.max(0, parseInt(stock[fieldCaisses] || 0, 10));
-            const caissesSelonQuantite = Math.floor(Math.max(0, parseInt(stock[fieldQuantite] || 0, 10)) / btlParCaisse);
-            return Math.min(caisses, caissesSelonQuantite);
+            return Math.max(0, parseInt(stock[fieldCaisses] || 0, 10));
         },
 
         getTotalDemandeProduit(produitId) {

@@ -358,8 +358,15 @@ document.addEventListener('alpine:init', () => {
                     throw new Error('Le billetage ne correspond pas au total TTC.');
                 }
 
-                if (this.allEmballagesRecusZero() && !window.confirm('Aucun emballage vide nâ€™a été déclaré pour cette vente. Confirmez-vous cette saisie ?')) {
-                    return;
+                if (this.allEmballagesRecusZero()) {
+                    const ok = await App.confirm({
+                        title: 'Aucun emballage reçu',
+                        message: 'Aucun emballage vide n’a été déclaré pour cette vente. Voulez-vous continuer ?',
+                        confirmText: 'Continuer',
+                        cancelText: 'Vérifier',
+                        type: 'warning'
+                    });
+                    if (!ok) return;
                 }
 
                 const details = detailsLignes.map(l => {
@@ -405,4 +412,3 @@ document.addEventListener('alpine:init', () => {
 $content = ob_get_clean();
 require_once ROOT_PATH . '/app/Views/layouts/app.php';
 ?>
-

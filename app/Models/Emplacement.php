@@ -7,6 +7,27 @@ class Emplacement extends Model
 {
     protected $table = 'emplacements';
     protected $fillable = ['code', 'nom', 'type', 'capacite', 'actif'];
+
+    /**
+     * Les listes opérationnelles ne doivent pas contenir les emplacements
+     * mobiles dont le véhicule a été supprimé ou désactivé.
+     */
+    public function all($orderBy = null)
+    {
+        $sql = "SELECT e.*
+                FROM {$this->table} e
+                LEFT JOIN vehicules v
+                    ON v.emplacement_id = e.id
+                   AND v.actif = 1
+                WHERE e.actif = 1
+                  AND (e.type != 'mobile' OR v.id IS NOT NULL)";
+
+        if ($orderBy) {
+            $sql .= " ORDER BY {$orderBy}";
+        }
+
+        return $this->db->fetchAll($sql);
+    }
     
     /**
      * Récupérer les emplacements fixes
@@ -24,7 +45,14 @@ class Emplacement extends Model
     public function getMobiles()
     {
         return $this->db->fetchAll(
-            "SELECT * FROM {$this->table} WHERE type = 'mobile' AND actif = 1 ORDER BY nom"
+            "SELECT e.*
+             FROM {$this->table} e
+             INNER JOIN vehicules v
+                ON v.emplacement_id = e.id
+               AND v.actif = 1
+             WHERE e.type = 'mobile'
+               AND e.actif = 1
+             ORDER BY e.nom"
         );
     }
     

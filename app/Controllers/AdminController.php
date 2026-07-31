@@ -50,7 +50,7 @@ class AdminController extends Controller
             'users' => count($this->userModel->getManageableUsers(is_owner())),
             'produits' => (new Produit())->count(),
             'clients' => (new Client())->count(),
-            'vehicules' => (new Vehicule())->count()
+            'vehicules' => (new Vehicule())->count('actif = 1')
         ];
         
         $this->view('admin/index', [

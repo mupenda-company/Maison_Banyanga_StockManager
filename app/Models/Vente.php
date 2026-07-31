@@ -375,7 +375,7 @@ class Vente extends Model
     /**
      * Ventes validées par agent sur une période donnée
      */
-    public function getVentesParAgent($dateDebut, $dateFin = null)
+    public function getVentesParAgent($dateDebut, $dateFin = null, $agentId = null)
     {
         if ($dateFin === null) {
             $dateFin = $dateDebut;
@@ -388,6 +388,16 @@ class Vente extends Model
         $dateFin = str_contains((string) $dateFin, ':')
             ? (string) $dateFin
             : ((string) $dateFin . ' 23:59:59');
+
+        $agentClause = '';
+        $params = [
+            'date_debut' => $dateDebut,
+            'date_fin' => $dateFin,
+        ];
+        if (!empty($agentId)) {
+            $agentClause = ' AND v.created_by = :agent_id';
+            $params['agent_id'] = (int) $agentId;
+        }
 
         return $this->db->fetchAll(
             "SELECT v.id, v.numero_facture, v.date_vente, v.total_ht, v.total_tva, v.total_ttc,
@@ -409,11 +419,9 @@ class Vente extends Model
              ) vd_totaux ON vd_totaux.vente_id = v.id
              WHERE v.statut = 'validee'
                AND v.date_vente BETWEEN :date_debut AND :date_fin
+               {$agentClause}
              ORDER BY COALESCE(u.prenom, ''), COALESCE(u.nom, ''), v.date_vente ASC",
-            [
-                'date_debut' => $dateDebut,
-                'date_fin' => $dateFin,
-            ]
+            $params
         );
     }
     public function annuler($id)
@@ -711,17 +719,20 @@ class Vente extends Model
 
             $missionId = (int)($ancienneVente['mission_id'] ?? 0);
             $emplacementId = (int)($data['emplacement_id'] ?? $ancienneVente['emplacement_id'] ?? 0);
+            $dateFacture = date('Y-m-d', strtotime((string) ($ancienneVente['date_vente'] ?? 'now')));
+            $affecterStockActuel = $dateFacture === date('Y-m-d');
 
             // Sécurité : une facture mobile doit toujours impacter l'emplacement du véhicule de la mission.
             if ($missionId > 0) {
-                $vehiculeEmplacementId = (int)$this->db->fetchColumn(
-                    "SELECT v.emplacement_id
+                $missionStock = $this->db->fetch(
+                    "SELECT v.emplacement_id, m.statut
                      FROM missions m
                      JOIN vehicules v ON m.vehicule_id = v.id
                      WHERE m.id = :mission_id
                      LIMIT 1",
                     ['mission_id' => $missionId]
                 );
+                $vehiculeEmplacementId = (int) ($missionStock['emplacement_id'] ?? 0);
 
                 if ($vehiculeEmplacementId <= 0) {
                     throw new Exception('Emplacement du véhicule introuvable pour cette mission.');
@@ -729,6 +740,9 @@ class Vente extends Model
 
                 $emplacementId = $vehiculeEmplacementId;
                 $data['emplacement_id'] = $vehiculeEmplacementId;
+                if (($missionStock['statut'] ?? '') !== 'en_cours') {
+                    $affecterStockActuel = false;
+                }
             }
 
             if ($emplacementId <= 0) {
@@ -789,6 +803,11 @@ class Vente extends Model
                 $diffCaisses = $nouvelleCaisses - $ancienneCaisses;
 
                 if ($diffQte === 0 && $diffCaisses === 0) {
+                    continue;
+                }
+
+                // Une facture historique est corrigée sans toucher au stock actuel.
+                if (!$affecterStockActuel) {
                     continue;
                 }
 
@@ -865,6 +884,10 @@ class Vente extends Model
                 $diffCaissesVides = $nouvellesCaissesVides - $anciennesCaissesVides;
 
                 if ($diffCaissesVides === 0) {
+                    continue;
+                }
+
+                if (!$affecterStockActuel) {
                     continue;
                 }
 
@@ -953,10 +976,15 @@ class Vente extends Model
                 ]);
             }
 
-            (new Alerte())->checkStockAlerts();
+            if ($affecterStockActuel) {
+                (new Alerte())->checkStockAlerts();
+            }
 
             $this->db->commit();
-            return ['success' => true];
+            return [
+                'success' => true,
+                'stock_modifie' => $affecterStockActuel,
+            ];
 
         } catch (Exception $e) {
             $this->db->rollBack();

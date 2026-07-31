@@ -7,6 +7,16 @@
     <title><?= $isRistourne ? 'Bon de ristourne' : 'Bon de sortie' ?> <?= htmlspecialchars($mission['numero_mission'] ?? '') ?> - <?= htmlspecialchars($params['nom_entreprise'] ?? APP_NAME) ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+
+        body,
+        button,
+        input,
+        select,
+        textarea {
+            font-family: 'Poppins', Arial, sans-serif;
+        }
+
         @page {
             size: A4;
             margin: 8mm;
@@ -155,12 +165,13 @@
                     <tr class="border-b-2 border-gray-200">
                         <th class="text-left py-2 font-semibold text-gray-500 uppercase">Produit</th>
                         <th class="text-right py-2 font-semibold text-gray-500 uppercase">Stock départ</th>
-                        <th class="text-right py-2 font-semibold text-gray-500 uppercase">Ajout mission</th>
+                        <th class="text-right py-2 font-semibold text-gray-500 uppercase">Chargement initial</th>
+                        <th class="text-right py-2 font-semibold text-gray-500 uppercase">Réapprovisionnement</th>
                         <th class="text-right py-2 font-semibold text-gray-500 uppercase">Total réel</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
-                    <?php $totalCaisses = 0; $totalStockDepart = 0; $totalAjoutMission = 0; ?>
+            <?php $totalCaisses = 0; $totalStockDepart = 0; $totalAjoutMission = 0; $totalReapprovisionnement = 0; ?>
                     <?php foreach ($chargementsAffiches as $chargement): ?>
                     <?php
                         $btlParCaisse = (int)($chargement['bouteilles_par_caisses'] ?? 24);
@@ -173,15 +184,19 @@
                         if ($totalReelCaisses <= 0) {
                             continue;
                         }
-                        $ajoutMissionCaisses = $totalReelCaisses - $stockDepartCaisses;
+                        $reapprovisionnementCaisses = max(0, (int) ($chargement['caisses_reapprovisionnees'] ?? 0));
+                        $ajoutMissionCaisses = max(0, (int) ($chargement['caisses_chargees_initiales']
+                            ?? ($totalReelCaisses - $stockDepartCaisses - $reapprovisionnementCaisses)));
                         $totalStockDepart += $stockDepartCaisses;
                         $totalAjoutMission += $ajoutMissionCaisses;
+                        $totalReapprovisionnement += $reapprovisionnementCaisses;
                         $totalCaisses += $totalReelCaisses;
                     ?>
                     <tr>
                         <td class="py-2 font-medium"><?= htmlspecialchars($chargement['produit_nom']) ?></td>
                         <td class="py-2 text-right font-medium"><?= number_format($stockDepartCaisses, 1, ',', ' ') ?> cs</td>
                         <td class="py-2 text-right font-medium"><?= number_format($ajoutMissionCaisses, 1, ',', ' ') ?> cs</td>
+                        <td class="py-2 text-right font-medium"><?= number_format($reapprovisionnementCaisses, 1, ',', ' ') ?> cs</td>
                         <td class="py-2 text-right font-bold text-blue-600"><?= number_format($totalReelCaisses, 1, ',', ' ') ?> cs</td>
                     </tr>
                     <?php endforeach; ?>
@@ -191,6 +206,7 @@
                         <td class="py-2 font-bold">Total</td>
                         <td class="py-2 text-right font-bold"><?= number_format($totalStockDepart, 1, ',', ' ') ?> cs</td>
                         <td class="py-2 text-right font-bold"><?= number_format($totalAjoutMission, 1, ',', ' ') ?> cs</td>
+                        <td class="py-2 text-right font-bold"><?= number_format($totalReapprovisionnement, 1, ',', ' ') ?> cs</td>
                         <td class="py-2 text-right font-bold text-blue-600"><?= number_format($totalCaisses, 1, ',', ' ') ?> cs</td>
                     </tr>
                 </tfoot>

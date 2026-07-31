@@ -18,7 +18,8 @@ if (!function_exists('print_report_css')) {
         return <<<CSS
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: Arial, sans-serif; color: #222; font-size: 10px; line-height: 1.35; background: #fff; }
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+body { font-family: 'Poppins', Arial, sans-serif; color: #222; font-size: 10px; line-height: 1.35; background: #fff; }
 .page { padding: 12px; }
 .page-header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 10px; }
 .page-header h1 { font-size: 16px; text-transform: uppercase; margin-bottom: 3px; }

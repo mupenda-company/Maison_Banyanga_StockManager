@@ -52,10 +52,21 @@ CREATE TABLE `approvisionnements` (
   `fournisseur` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `notes` text COLLATE utf8mb4_unicode_ci,
   `total_ht` decimal(15,2) DEFAULT '0.00',
+  `solde_fournisseur_avant` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `montant_depose_fournisseur` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `montant_utilise_fournisseur` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `solde_fournisseur_apres` decimal(15,2) NOT NULL DEFAULT '0.00',
   `statut` enum('en_attente','valide','annule') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'en_attente',
   `created_by` int UNSIGNED DEFAULT NULL,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `soldes_fournisseurs` (
+  `fournisseur` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `solde` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`fournisseur`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 

@@ -162,9 +162,14 @@ ob_start();
                     <?php foreach ($mouvements as $mvt): 
                         // Conversion en caisses pour l'affichage
                         $bouteillesParCaisse = (int)($mvt['bouteilles_par_caisses'] ?? 24);
-                        $caisses = isset($mvt['quantite_caisses_reference']) && $mvt['quantite_caisses_reference'] !== null
-                            ? (float) $mvt['quantite_caisses_reference']
-                            : ((float) $mvt['quantite'] / max(1, $bouteillesParCaisse));
+                        $isInventaire = ($mvt['type_mouvement'] ?? '') === 'inventaire';
+                        if ($isInventaire && $mvt['quantite_apres'] !== null) {
+                            $caisses = (float) $mvt['quantite_apres'] / max(1, $bouteillesParCaisse);
+                        } else {
+                            $caisses = isset($mvt['quantite_caisses_reference']) && $mvt['quantite_caisses_reference'] !== null
+                                ? (float) $mvt['quantite_caisses_reference']
+                                : ((float) $mvt['quantite'] / max(1, $bouteillesParCaisse));
+                        }
                     ?>
                     <tr>
                         <td><?= date('d/m/Y H:i', strtotime($mvt['created_at'])) ?></td>
@@ -215,7 +220,11 @@ ob_start();
                         </td>
                         <td class="text-right font-bold <?= $mvt['quantite'] > 0 ? 'text-green-600' : 'text-red-600' ?>">
                             <?= number_format(abs($caisses), 2, '.', ' ') ?> cs
+                            <?php if ($isInventaire): ?>
+                            <div class="text-[10px] font-normal opacity-50">Stock final après ajustement</div>
+                            <?php else: ?>
                             <div class="text-[10px] font-normal opacity-50"><?= abs($mvt['quantite']) ?> btl</div>
+                            <?php endif; ?>
                         </td>
                         <td class="no-print text-sm">
                             <?php
@@ -535,11 +544,7 @@ document.addEventListener('alpine:init', () => {
         getDisponibleCaisses(produitId = this.form.produit_id) {
             const stock = this.getStockLigne(produitId);
             if (!stock) return 0;
-            const produit = this.getProduit(produitId);
-            const btlParCaisse = Math.max(1, parseInt(produit?.bouteilles_par_caisses || 24, 10));
-            const caisses = Math.max(0, parseInt(stock.caisses_pleine || 0, 10));
-            const caissesSelonQuantite = Math.floor(Math.max(0, parseInt(stock.quantite_pleine || 0, 10)) / btlParCaisse);
-            return Math.min(caisses, caissesSelonQuantite);
+            return Math.max(0, parseInt(stock.caisses_pleine || 0, 10));
         },
         formatStock(produitId, type = null) {
             if (type === null) {

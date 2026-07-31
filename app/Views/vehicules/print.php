@@ -17,6 +17,16 @@ ob_start();
     <title>Détail véhicule <?= htmlspecialchars($vehicule['immatriculation'] ?? '') ?> - <?= htmlspecialchars($params['nom_entreprise'] ?? APP_NAME) ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+
+        body,
+        button,
+        input,
+        select,
+        textarea {
+            font-family: 'Poppins', Arial, sans-serif;
+        }
+
         @page {
             size: A4;
             margin: 8mm;

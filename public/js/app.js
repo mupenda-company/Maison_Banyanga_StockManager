@@ -475,7 +475,52 @@ const App = {
         const store = (typeof Alpine !== 'undefined' && Alpine.store) ? Alpine.store('confirm') : null;
         const ok = store && typeof store.ask === 'function'
             ? await store.ask(options)
-            : window.confirm(options.message || 'Confirmer ?');
+            : await new Promise(resolve => {
+                const overlay = document.createElement('div');
+                overlay.className = 'fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4';
+                overlay.innerHTML = `
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6 text-center">
+                        <div data-confirm-icon class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            </svg>
+                        </div>
+                        <h3 data-confirm-title class="text-xl font-bold text-gray-900 dark:text-white mb-2"></h3>
+                        <p data-confirm-message class="text-gray-500 dark:text-gray-400 mb-6"></p>
+                        <div class="flex gap-3 justify-center">
+                            <button data-confirm-cancel type="button" class="btn btn-secondary px-6"></button>
+                            <button data-confirm-ok type="button" class="btn px-6"></button>
+                        </div>
+                    </div>`;
+
+                const type = options.type || 'danger';
+                const icon = overlay.querySelector('[data-confirm-icon]');
+                const confirmButton = overlay.querySelector('[data-confirm-ok]');
+                overlay.querySelector('[data-confirm-title]').textContent = options.title || 'Confirmation';
+                overlay.querySelector('[data-confirm-message]').textContent = options.message || '';
+                overlay.querySelector('[data-confirm-cancel]').textContent = options.cancelText || 'Annuler';
+                confirmButton.textContent = options.confirmText || 'Confirmer';
+                icon.className += type === 'warning'
+                    ? ' bg-yellow-100 text-yellow-700'
+                    : (type === 'info' ? ' bg-blue-100 text-blue-600' : ' bg-red-100 text-red-600');
+                confirmButton.classList.add(type === 'warning' ? 'btn-warning' : (type === 'info' ? 'btn-primary' : 'btn-danger'));
+
+                const finish = result => {
+                    document.removeEventListener('keydown', onKeydown);
+                    overlay.remove();
+                    resolve(result);
+                };
+                const onKeydown = event => {
+                    if (event.key === 'Escape') finish(false);
+                };
+                overlay.querySelector('[data-confirm-cancel]').addEventListener('click', () => finish(false));
+                confirmButton.addEventListener('click', () => finish(true));
+                overlay.addEventListener('click', event => {
+                    if (event.target === overlay) finish(false);
+                });
+                document.addEventListener('keydown', onKeydown);
+                document.body.appendChild(overlay);
+            });
 
         if (typeof callback === 'function') {
             if (ok) callback();

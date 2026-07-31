@@ -6,6 +6,8 @@
     <title><?= htmlspecialchars($vente['numero_facture']) ?> - <?= htmlspecialchars($params['nom_entreprise']) ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+
         @page {
             size: 80mm auto;
             margin: 3mm;
@@ -14,7 +16,7 @@
             margin: 0;
             background: #f3f4f6;
             color: #111827;
-            font-family: Arial, Helvetica, sans-serif;
+            font-family: 'Poppins', Arial, Helvetica, sans-serif;
             font-size: 12px;
             line-height: 1.4;
         }

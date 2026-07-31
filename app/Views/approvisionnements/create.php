@@ -53,6 +53,8 @@ $approvisionnementsUrl = url('approvisionnements');
                 x-data="{
                     date: '<?= date('Y-m-d') ?>',
                     fournisseur: 'BdGL',
+                    soldeFournisseur: 0,
+                    montantDeposeFournisseur: 0,
                     type_achat: 'enlever',
                     notes: '',
                     lignes: [{ produit_id: '', emballage_source_produit_id: '', type_chargement: 'produit', quantite_achat: 0, unite_achat: 'caisse', prix_emballage_usd: '' }],
@@ -85,6 +87,26 @@ $approvisionnementsUrl = url('approvisionnements');
                                 this.total += getQuantiteCaisses(l, p) * getPrixLigne(l, p, this.type_achat);
                             }
                         });
+                    },
+                    montantManquant() {
+                        return Math.max(0, this.total - this.soldeFournisseur);
+                    },
+                    soldeApres() {
+                        return Math.max(0, this.soldeFournisseur + parseFloat(this.montantDeposeFournisseur || 0) - this.total);
+                    },
+                    async loadSoldeFournisseur() {
+                        const nom = String(this.fournisseur || '').trim();
+                        if (!nom) {
+                            this.soldeFournisseur = 0;
+                            return;
+                        }
+                        try {
+                            const r = await App.api('<?= url('api/approvisionnements/solde-fournisseur') ?>?fournisseur=' + encodeURIComponent(nom));
+                            const data = r.data || r;
+                            this.soldeFournisseur = parseFloat(data.solde || 0);
+                        } catch (e) {
+                            this.soldeFournisseur = 0;
+                        }
                     }
                 }"
                 x-init="
@@ -95,6 +117,7 @@ $approvisionnementsUrl = url('approvisionnements');
                         }
                     }).catch(() => App.notify('Erreur lors du chargement des produits', 'error'));
                     $watch('lignes', () => recalc(), { deep: true });
+                    loadSoldeFournisseur();
                 "
                 @submit.prevent="async () => {
                     loading = true;
@@ -117,10 +140,14 @@ $approvisionnementsUrl = url('approvisionnements');
                         if (details.length === 0) {
                             throw new Error('Ajoutez au moins un produit');
                         }
+                        if (soldeFournisseur + parseFloat(montantDeposeFournisseur || 0) < total) {
+                            throw new Error('Le solde fournisseur et le nouveau dépôt ne couvrent pas cet approvisionnement');
+                        }
 
                         await App.api('<?= $approvisionnementsApiUrl ?>', 'POST', {
                             date_approvisionnement: date,
                             fournisseur: fournisseur,
+                            montant_depose_fournisseur: parseFloat(montantDeposeFournisseur || 0),
                             notes: notes,
                             details: details
                         });
@@ -141,7 +168,7 @@ $approvisionnementsUrl = url('approvisionnements');
                     </div>
                     <div>
                         <label class="label">Fournisseur</label>
-                        <input type="text" x-model="fournisseur" class="input" placeholder="Bralima">
+                        <input type="text" x-model="fournisseur" @change="loadSoldeFournisseur()" class="input" placeholder="Bralima">
                     </div>
                     <div>
                         <label class="label">N Bon</label>
@@ -153,6 +180,25 @@ $approvisionnementsUrl = url('approvisionnements');
                             <option value="deposer">Prix achat a deposer</option>
                             <option value="enlever">Prix achat a enlever</option>
                         </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-900/20">
+                    <div>
+                        <p class="text-xs uppercase text-gray-500">Solde déjà chez le fournisseur</p>
+                        <p class="text-lg font-bold text-blue-700" x-text="App.formatMoneyConverted(soldeFournisseur, (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></p>
+                    </div>
+                    <div>
+                        <label class="label">Nouveau montant déposé</label>
+                        <input type="number" x-model.number="montantDeposeFournisseur" min="0" step="0.01" class="input">
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase text-gray-500">Complément minimum nécessaire</p>
+                        <p class="text-lg font-bold text-orange-700" x-text="App.formatMoneyConverted(montantManquant(), (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase text-gray-500">Solde restant après achat</p>
+                        <p class="text-lg font-bold text-green-700" x-text="App.formatMoneyConverted(soldeApres(), (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></p>
                     </div>
                 </div>
 

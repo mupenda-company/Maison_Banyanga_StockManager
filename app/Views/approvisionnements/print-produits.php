@@ -12,7 +12,8 @@ $periode = ($dateDebut ?: 'Debut') . ' au ' . ($dateFin ?: 'Fin');
     <title>Etat approvisionnements par produit</title>
     <style>
         @page { size: A4 landscape; margin: 8mm; }
-        body { font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 10px; }
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Poppins', Arial, Helvetica, sans-serif; color: #111; font-size: 10px; }
         .no-print { margin-bottom: 10px; text-align: center; }
         h1 { margin: 0; font-size: 18px; }
         p { margin: 2px 0; }

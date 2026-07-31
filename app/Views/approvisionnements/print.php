@@ -9,7 +9,8 @@ $numeroBon = $approvisionnement['numero_bon'] ?? $approvisionnement['id'];
     <title>Approvisionnement <?= htmlspecialchars($numeroBon) ?></title>
     <style>
         @page { size: A4 landscape; margin: 8mm; }
-        body { font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 10px; }
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Poppins', Arial, Helvetica, sans-serif; color: #111; font-size: 10px; }
         .no-print { margin-bottom: 10px; text-align: center; }
         h1 { margin: 0; font-size: 18px; }
         p { margin: 2px 0; }
@@ -34,6 +35,9 @@ $numeroBon = $approvisionnement['numero_bon'] ?? $approvisionnement['id'];
         <p>Fournisseur: <?= htmlspecialchars($approvisionnement['fournisseur'] ?? 'Bralima') ?></p>
         <p>Taux systeme: 1 USD = <?= number_format(get_taux_change(), 2, ',', ' ') ?> CDF</p>
         <p><strong>Total prix achat: <?= format_money_dual($rows['totals']['pt']) ?></strong></p>
+        <p>Solde fournisseur avant: <?= format_money_converted($approvisionnement['solde_fournisseur_avant'] ?? 0) ?></p>
+        <p>Nouveau dépôt: <?= format_money_converted($approvisionnement['montant_depose_fournisseur'] ?? 0) ?></p>
+        <p><strong>Solde fournisseur restant: <?= format_money_converted($approvisionnement['solde_fournisseur_apres'] ?? 0) ?></strong></p>
     </header>
 
     <table>

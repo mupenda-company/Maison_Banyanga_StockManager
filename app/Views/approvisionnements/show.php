@@ -191,6 +191,24 @@ ob_start();
                         <p class="text-sm text-gray-500">Valeur totale du stock</p>
                         <p class="text-xl font-bold"><?= format_money_converted($totalGeneral) ?></p>
                     </div>
+                    <div class="pt-4 border-t border-gray-100 dark:border-gray-700 space-y-2">
+                        <div class="flex justify-between gap-3">
+                            <span class="text-sm text-gray-500">Solde avant</span>
+                            <strong><?= format_money_converted($approvisionnement['solde_fournisseur_avant'] ?? 0) ?></strong>
+                        </div>
+                        <div class="flex justify-between gap-3">
+                            <span class="text-sm text-gray-500">Nouveau dépôt</span>
+                            <strong><?= format_money_converted($approvisionnement['montant_depose_fournisseur'] ?? 0) ?></strong>
+                        </div>
+                        <div class="flex justify-between gap-3">
+                            <span class="text-sm text-gray-500">Montant utilisé</span>
+                            <strong><?= format_money_converted($approvisionnement['montant_utilise_fournisseur'] ?? $totalGeneral) ?></strong>
+                        </div>
+                        <div class="flex justify-between gap-3 text-green-700">
+                            <span class="text-sm">Solde restant</span>
+                            <strong><?= format_money_converted($approvisionnement['solde_fournisseur_apres'] ?? 0) ?></strong>
+                        </div>
+                    </div>
                     
                     <div class="pt-4 border-t border-gray-100 dark:border-gray-700">
                         <p class="text-sm text-gray-500 dark:text-gray-400">Enregistré par</p>

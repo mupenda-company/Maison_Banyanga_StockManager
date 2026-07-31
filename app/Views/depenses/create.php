@@ -88,10 +88,10 @@ document.addEventListener('alpine:init', () => {
                 if (data.success) {
                     window.location.href = BASE_URL + '/depenses';
                 } else {
-                    alert(data.message || 'Erreur lors de l\'enregistrement');
+                    App.notify(data.message || 'Erreur lors de l\'enregistrement', 'error');
                 }
             } catch (e) {
-                alert('Erreur réseau');
+                App.notify('Erreur réseau', 'error');
             } finally {
                 this.loading = false;
             }

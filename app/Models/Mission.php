@@ -428,6 +428,32 @@ class Mission extends Model
                 ['id' => $id]
             );
 
+            $mouvementsChargement = $this->db->fetchAll(
+                "SELECT produit_id,
+                        COALESCE(SUM(CASE
+                            WHEN quantite < 0 AND motif LIKE 'Modification mission %'
+                            THEN ABS(quantite) ELSE 0 END), 0) AS bouteilles_reapprovisionnees,
+                        COALESCE(SUM(CASE
+                            WHEN quantite < 0
+                             AND (motif LIKE 'Chargement véhicule pour mission %'
+                                  OR motif LIKE 'Mission de ristourne %')
+                            THEN ABS(quantite) ELSE 0 END), 0) AS bouteilles_chargees_initiales
+                 FROM mouvements_stock
+                 WHERE reference_type = 'mission'
+                   AND reference_id = :mission_id
+                 GROUP BY produit_id",
+                ['mission_id' => $id]
+            );
+            $reapprovisionnementsParProduit = [];
+            $chargementsInitiauxParProduit = [];
+            foreach ($mouvementsChargement as $mouvementChargement) {
+                $produitIdMouvement = (int) $mouvementChargement['produit_id'];
+                $reapprovisionnementsParProduit[$produitIdMouvement] =
+                    (int) $mouvementChargement['bouteilles_reapprovisionnees'];
+                $chargementsInitiauxParProduit[$produitIdMouvement] =
+                    (int) $mouvementChargement['bouteilles_chargees_initiales'];
+            }
+
             $mission['clients'] = $this->db->fetchAll(
                 "SELECT c.id, c.nom, c.telephone, c.adresse,
                         COALESCE((
@@ -579,6 +605,18 @@ class Mission extends Model
                 $prixCaisse = $item['prix_vente_caisses'] ?: ($item['prix_vente_unitaire'] * $item['bouteilles_par_caisses']);
                 $stockDepartCaisses = (int) ($item['caisses_deja_dans_vehicule'] ?? 0);
                 $item['quantite_caisses'] = max(0, (int) ($item['quantite_caisses'] ?? intdiv((int) $item['quantite_chargee'], $btlParCaisse)));
+                $item['caisses_reapprovisionnees'] = (int) floor(
+                    ($reapprovisionnementsParProduit[$produitId] ?? 0) / $btlParCaisse
+                );
+                $chargementInitialMouvement = (int) floor(
+                    ($chargementsInitiauxParProduit[$produitId] ?? 0) / $btlParCaisse
+                );
+                $item['caisses_chargees_initiales'] = $chargementInitialMouvement > 0
+                    ? $chargementInitialMouvement
+                    : max(0, $item['quantite_caisses'] - $item['caisses_reapprovisionnees']);
+                if ($item['caisses_reapprovisionnees'] > 0 && $chargementInitialMouvement > 0) {
+                    $item['quantite_caisses'] = $item['caisses_chargees_initiales'] + $item['caisses_reapprovisionnees'];
+                }
                 $item['delta_caisses'] = $item['quantite_caisses'] - $stockDepartCaisses;
                 $item['caisses_vendues'] = (int) intdiv((int) ($item['quantite_vendue'] ?? 0), $btlParCaisse);
                 $item['caisses_vendues_auto'] = (int) ($venteProduit['caisses_vendues'] ?? $item['caisses_vendues']);

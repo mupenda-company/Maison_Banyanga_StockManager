@@ -53,6 +53,18 @@ ob_start();
     </div>
 </div>
 
+<div class="card mb-8">
+    <div class="card-body flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Synthèse globale des agents</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Une ligne par agent : sorti, retourné, vendu et montant des ventes.</p>
+        </div>
+        <a href="<?= url('rapports/synthese-agents?date_debut=' . $dateDebut . '&date_fin=' . $dateFin) ?>" class="btn btn-secondary">
+            Ouvrir la synthèse
+        </a>
+    </div>
+</div>
+
 <div class="card mb-8"><div class="card-body flex items-center justify-between gap-4"><div><h3 class="text-lg font-semibold">Rapport des manquants par agent</h3><p class="text-sm text-gray-500">Filtrer, imprimer et exporter les manquants pour chaque agent.</p></div><a href="<?= url('manquants?date_debut=' . $dateDebut . '&date_fin=' . $dateFin) ?>" class="btn btn-secondary">Ouvrir le rapport</a></div></div>
 
 <!-- KPI Emballages -->

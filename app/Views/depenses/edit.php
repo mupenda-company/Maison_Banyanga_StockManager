@@ -95,10 +95,10 @@ document.addEventListener('alpine:init', () => {
                 if (data.success) {
                     window.location.href = BASE_URL + '/depenses';
                 } else {
-                    alert(data.message || 'Erreur lors de la modification');
+                    App.notify(data.message || 'Erreur lors de la modification', 'error');
                 }
             } catch (e) {
-                alert('Erreur réseau');
+                App.notify('Erreur réseau', 'error');
             } finally {
                 this.loading = false;
             }

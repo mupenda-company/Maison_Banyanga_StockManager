@@ -209,9 +209,14 @@ ob_start();
 
 <script>
 async function retourEmballagesVehicule() {
-    if (!confirm('Rentrer tous les emballages vides de ce vehicule vers l\'entrepot ?')) {
-        return;
-    }
+    const ok = await App.confirm({
+        title: 'Rentrer les emballages ?',
+        message: 'Tous les emballages vides de ce véhicule seront transférés vers l’entrepôt principal.',
+        confirmText: 'Rentrer les emballages',
+        cancelText: 'Annuler',
+        type: 'warning'
+    });
+    if (!ok) return;
 
     try {
         const result = await App.api('<?= url('api/vehicules/' . $vehicule['id'] . '/retour-emballages') ?>', 'POST', {});

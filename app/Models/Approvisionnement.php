@@ -6,14 +6,71 @@
 class Approvisionnement extends Model
 {
     protected $table = 'approvisionnements';
-    protected $fillable = ['numero_bon', 'date_approvisionnement', 'fournisseur', 'notes', 'total_ht', 'statut', 'created_by'];
+    protected $fillable = [
+        'numero_bon', 'date_approvisionnement', 'fournisseur', 'notes', 'total_ht',
+        'solde_fournisseur_avant', 'montant_depose_fournisseur',
+        'montant_utilise_fournisseur', 'solde_fournisseur_apres',
+        'statut', 'created_by'
+    ];
 
     private static bool $detailMoneyColumnsChecked = false;
+    private static bool $supplierBalanceChecked = false;
 
     public function __construct()
     {
         parent::__construct();
         $this->ensureDetailMoneyColumns();
+        $this->ensureSupplierBalanceStorage();
+    }
+
+    private function ensureSupplierBalanceStorage(): void
+    {
+        if (self::$supplierBalanceChecked) {
+            return;
+        }
+
+        $this->db->query(
+            "CREATE TABLE IF NOT EXISTS soldes_fournisseurs (
+                fournisseur VARCHAR(150) NOT NULL,
+                solde DECIMAL(15,2) NOT NULL DEFAULT 0,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (fournisseur)
+             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+
+        $columns = [
+            'solde_fournisseur_avant' => "DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER total_ht",
+            'montant_depose_fournisseur' => "DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER solde_fournisseur_avant",
+            'montant_utilise_fournisseur' => "DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER montant_depose_fournisseur",
+            'solde_fournisseur_apres' => "DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER montant_utilise_fournisseur",
+        ];
+        foreach ($columns as $column => $definition) {
+            $exists = (bool) $this->db->fetchColumn(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'approvisionnements'
+                   AND COLUMN_NAME = :column_name",
+                ['column_name' => $column]
+            );
+            if (!$exists) {
+                $this->db->query("ALTER TABLE approvisionnements ADD {$column} {$definition}");
+            }
+        }
+
+        self::$supplierBalanceChecked = true;
+    }
+
+    public function getSupplierBalance(string $fournisseur): float
+    {
+        $fournisseur = trim($fournisseur);
+        if ($fournisseur === '') {
+            return 0;
+        }
+
+        return (float) ($this->db->fetchColumn(
+            "SELECT solde FROM soldes_fournisseurs WHERE fournisseur = :fournisseur",
+            ['fournisseur' => $fournisseur]
+        ) ?: 0);
     }
 
     private function ensureDetailMoneyColumns(): void
@@ -157,7 +214,44 @@ class Approvisionnement extends Model
     {
         try {
             $this->db->beginTransaction();
-            
+
+            $fournisseur = trim((string) ($data['fournisseur'] ?? 'Bralima'));
+            if ($fournisseur === '') {
+                $fournisseur = 'Bralima';
+            }
+            $montantDepose = max(0, (float) ($data['montant_depose_fournisseur'] ?? 0));
+            $totalApprovisionnement = max(0, (float) ($data['total_ht'] ?? 0));
+            $this->db->query(
+                "INSERT IGNORE INTO soldes_fournisseurs (fournisseur, solde)
+                 VALUES (:fournisseur, 0)",
+                ['fournisseur' => $fournisseur]
+            );
+            $soldeAvant = (float) $this->db->fetchColumn(
+                "SELECT solde FROM soldes_fournisseurs
+                 WHERE fournisseur = :fournisseur FOR UPDATE",
+                ['fournisseur' => $fournisseur]
+            );
+            $soldeDisponible = $soldeAvant + $montantDepose;
+            if ($soldeDisponible + 0.001 < $totalApprovisionnement) {
+                throw new Exception(
+                    'Montant fournisseur insuffisant : disponible '
+                    . number_format($soldeDisponible, 2, ',', ' ')
+                    . ', approvisionnement '
+                    . number_format($totalApprovisionnement, 2, ',', ' ')
+                );
+            }
+            $soldeApres = round($soldeDisponible - $totalApprovisionnement, 2);
+            $this->db->query(
+                "UPDATE soldes_fournisseurs SET solde = :solde
+                 WHERE fournisseur = :fournisseur",
+                ['solde' => $soldeApres, 'fournisseur' => $fournisseur]
+            );
+            $data['fournisseur'] = $fournisseur;
+            $data['solde_fournisseur_avant'] = $soldeAvant;
+            $data['montant_depose_fournisseur'] = $montantDepose;
+            $data['montant_utilise_fournisseur'] = $totalApprovisionnement;
+            $data['solde_fournisseur_apres'] = $soldeApres;
+
             // Créer l'approvisionnement
             $approvisionnementId = $this->create($data);
             
@@ -310,6 +404,12 @@ class Approvisionnement extends Model
                 throw new Exception('Seuls les approvisionnements validés peuvent être modifiés');
             }
 
+            $ancienFournisseur = trim((string) ($ancienAppro['fournisseur'] ?? 'Bralima'));
+            $nouveauFournisseur = trim((string) ($data['fournisseur'] ?? $ancienFournisseur));
+            if (strcasecmp($ancienFournisseur, $nouveauFournisseur) !== 0) {
+                throw new Exception('Le fournisseur ne peut pas être changé après validation.');
+            }
+
             $stockModel = new Stock();
 
             $ancien = [];
@@ -391,11 +491,37 @@ class Approvisionnement extends Model
                 $stockModel->updateOrCreate($produitId, $emplacementPrincipalId, $delta);
             }
 
+            $this->db->query(
+                "INSERT IGNORE INTO soldes_fournisseurs (fournisseur, solde)
+                 VALUES (:fournisseur, 0)",
+                ['fournisseur' => $ancienFournisseur]
+            );
+            $soldeCourant = (float) $this->db->fetchColumn(
+                "SELECT solde FROM soldes_fournisseurs
+                 WHERE fournisseur = :fournisseur FOR UPDATE",
+                ['fournisseur' => $ancienFournisseur]
+            );
+            $nouveauSolde = round(
+                $soldeCourant + (float) ($ancienAppro['total_ht'] ?? 0) - (float) $data['total_ht'],
+                2
+            );
+            if ($nouveauSolde < -0.001) {
+                throw new Exception('Le solde fournisseur est insuffisant pour augmenter cet approvisionnement.');
+            }
+            $nouveauSolde = max(0, $nouveauSolde);
+            $this->db->query(
+                "UPDATE soldes_fournisseurs SET solde = :solde
+                 WHERE fournisseur = :fournisseur",
+                ['solde' => $nouveauSolde, 'fournisseur' => $ancienFournisseur]
+            );
+
             $this->update($id, [
                 'date_approvisionnement' => $data['date_approvisionnement'],
                 'fournisseur' => $data['fournisseur'] ?? 'Bralima',
                 'notes' => $data['notes'] ?? '',
-                'total_ht' => $data['total_ht']
+                'total_ht' => $data['total_ht'],
+                'montant_utilise_fournisseur' => $data['total_ht'],
+                'solde_fournisseur_apres' => $nouveauSolde
             ]);
 
             $this->db->query(
@@ -439,12 +565,32 @@ class Approvisionnement extends Model
             if (!$approvisionnement) {
                 throw new Exception('Approvisionnement non trouvé');
             }
+
+            if (($approvisionnement['statut'] ?? '') === 'annule') {
+                throw new Exception('Cet approvisionnement est déjà annulé');
+            }
             
             // Annuler l'approvisionnement
             $this->update($id, ['statut' => 'annule']);
             
             // Annuler les dettes associées
             $this->db->update('dettes_emballages', ['statut' => 'solde'], 'approvisionnement_id = :id', ['id' => $id]);
+
+            $fournisseur = trim((string) ($approvisionnement['fournisseur'] ?? 'Bralima'));
+            $this->db->query(
+                "INSERT IGNORE INTO soldes_fournisseurs (fournisseur, solde)
+                 VALUES (:fournisseur, 0)",
+                ['fournisseur' => $fournisseur]
+            );
+            $this->db->query(
+                "UPDATE soldes_fournisseurs
+                 SET solde = solde + :montant
+                 WHERE fournisseur = :fournisseur",
+                [
+                    'montant' => (float) ($approvisionnement['montant_utilise_fournisseur'] ?? $approvisionnement['total_ht'] ?? 0),
+                    'fournisseur' => $fournisseur,
+                ]
+            );
             
             // Reverser le stock
             $stockModel = new Stock();

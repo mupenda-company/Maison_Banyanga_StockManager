@@ -10,6 +10,9 @@ ob_start();
         <p class="text-gray-500 dark:text-gray-400">Gestion des ventes et factures</p>
     </div>
     <div class="flex flex-wrap gap-2">
+        <?php if (can('ventes.imprimer')): ?><a href="<?= url('ventes/print?' . http_build_query($filters)) ?>" target="_blank" class="btn btn-secondary">
+            Imprimer
+        </a><?php endif; ?>
         <?php if (can('ventes.exporter')): ?><a href="<?= url('ventes/export?' . http_build_query($filters)) ?>" class="btn btn-success">
             Exporter
         </a><?php endif; ?>

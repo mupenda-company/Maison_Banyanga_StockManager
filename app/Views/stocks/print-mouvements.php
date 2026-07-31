@@ -51,9 +51,13 @@
                 <tr><td colspan="7" class="center">Aucun mouvement trouve</td></tr>
             <?php else: foreach ($mouvements as $mvt):
                 $bouteillesParCaisse = (int) ($mvt['bouteilles_par_caisses'] ?? 24);
-                $caisses = isset($mvt['quantite_caisses_reference']) && $mvt['quantite_caisses_reference'] !== null
-                    ? (float) $mvt['quantite_caisses_reference']
-                    : ((float) ($mvt['quantite'] ?? 0) / max(1, $bouteillesParCaisse));
+                if (($mvt['type_mouvement'] ?? '') === 'inventaire' && $mvt['quantite_apres'] !== null) {
+                    $caisses = (float) $mvt['quantite_apres'] / max(1, $bouteillesParCaisse);
+                } else {
+                    $caisses = isset($mvt['quantite_caisses_reference']) && $mvt['quantite_caisses_reference'] !== null
+                        ? (float) $mvt['quantite_caisses_reference']
+                        : ((float) ($mvt['quantite'] ?? 0) / max(1, $bouteillesParCaisse));
+                }
                 $emplacement = $mvt['emplacement_source'] ?? ($mvt['emplacement_nom'] ?? '-');
                 if (($mvt['type_mouvement'] ?? '') === 'transfert' && !empty($mvt['emplacement_dest'])) {
                     $emplacement .= ' -> ' . $mvt['emplacement_dest'];

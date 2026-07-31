@@ -78,6 +78,7 @@ $routes = [
     'GET::/approvisionnements/(\d+)/print' => ['ApprovisionnementController', 'print'],
     'GET::/approvisionnements/(\d+)/export' => ['ApprovisionnementController', 'exportDetail'],
     'POST::/api/approvisionnements' => ['ApprovisionnementController', 'store'],
+    'GET::/api/approvisionnements/solde-fournisseur' => ['ApprovisionnementController', 'soldeFournisseur'],
     'POST::/api/approvisionnements/(\d+)/annuler' => ['ApprovisionnementController', 'annuler'],
     'GET::/approvisionnements/dettes' => ['ApprovisionnementController', 'dettes'],
     'POST::/api/dettes/(\d+)/rembourser' => ['ApprovisionnementController', 'rembourserDette'],
@@ -113,6 +114,7 @@ $routes = [
     'GET::/ventes/par-vehicule/print' => ['VenteController', 'printParVehicule'],
     'GET::/ventes/par-vehicule/export' => ['VenteController', 'exportParVehicule'],
     'GET::/ventes/export' => ['VenteController', 'exportAll'],
+    'GET::/ventes/print' => ['VenteController', 'printAll'],
     'GET::/ventes/(\d+)/edit' => ['VenteController', 'edit'],
     'PUT::/api/ventes/(\d+)' => ['VenteController', 'update'],
     
@@ -214,6 +216,8 @@ $routes = [
     'GET::/rapports' => ['ReportController', 'index'],
     'GET::/rapports/ventes-par-agent' => ['ReportController', 'ventesParAgent'],
     'GET::/rapports/ventes-par-agent/export' => ['ReportController', 'exportVentesParAgent'],
+    'GET::/rapports/synthese-agents' => ['ReportController', 'syntheseAgents'],
+    'GET::/rapports/synthese-agents/export' => ['ReportController', 'exportSyntheseAgents'],
     
     // Finance
     'GET::/finance' => ['FinanceController', 'index'],

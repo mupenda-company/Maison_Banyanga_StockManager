@@ -323,6 +323,9 @@ class VehiculeController extends Controller
         }
         
         $data = $this->getJsonInput();
+        if (isset($data['immatriculation']) && trim((string) $data['immatriculation']) === '') {
+            return $this->error('L immatriculation est obligatoire', 422);
+        }
         
         // Vérifier l'immatriculation unique si modifiée
         if (isset($data['immatriculation']) && $data['immatriculation'] !== $vehicule['immatriculation']) {
@@ -342,9 +345,34 @@ class VehiculeController extends Controller
             'immatriculation', 'marque', 'modele', 'agent_responsable_id', 'capacite'
         ]));
         
-        $this->vehiculeModel->update($id, $updateData);
-        
-        return $this->success(null, 'Véhicule mis à jour avec succès');
+        try {
+            $this->db->beginTransaction();
+            $this->vehiculeModel->update($id, $updateData);
+
+            if (!empty($vehicule['emplacement_id'])) {
+                $immatriculation = trim((string) ($updateData['immatriculation'] ?? $vehicule['immatriculation']));
+                $capacite = max(0, (int) ($updateData['capacite'] ?? $vehicule['capacite'] ?? 0));
+                $this->db->query(
+                    "UPDATE emplacements
+                     SET code = :code, nom = :nom, capacite = :capacite, actif = 1, updated_at = NOW()
+                     WHERE id = :id",
+                    [
+                        'code' => 'VEH-' . str_replace(' ', '', $immatriculation),
+                        'nom' => 'Véhicule ' . $immatriculation,
+                        'capacite' => $capacite,
+                        'id' => (int) $vehicule['emplacement_id'],
+                    ]
+                );
+            }
+
+            $this->db->commit();
+            return $this->success(null, 'Véhicule et emplacement mis à jour avec succès');
+        } catch (Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            return $this->error($e->getMessage(), 400);
+        }
     }
     
     /**
@@ -688,7 +716,16 @@ class VehiculeController extends Controller
             $totalCaisses = 0;
 
             foreach (($vehicule['stock'] ?? []) as $ligne) {
-                $caissesVides = (int) ($ligne['caisses_vide'] ?? 0);
+                $stockVehicule = $this->db->fetch(
+                    "SELECT * FROM stocks
+                     WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id
+                     LIMIT 1 FOR UPDATE",
+                    [
+                        'produit_id' => (int) $ligne['produit_id'],
+                        'emplacement_id' => (int) $vehicule['emplacement_id'],
+                    ]
+                );
+                $caissesVides = max(0, (int) ($stockVehicule['caisses_vide'] ?? 0));
                 if ($caissesVides <= 0) {
                     continue;
                 }
@@ -700,6 +737,36 @@ class VehiculeController extends Controller
                 }
 
                 $quantiteBouteilles = $caissesVides * $btlParCaisse;
+
+                /*
+                 * Les caisses sont l'unité de référence. Certaines anciennes
+                 * lignes peuvent contenir 2 caisses mais seulement 22 bouteilles
+                 * au lieu de 24. Le retour physique confirme ici les caisses
+                 * réellement présentes : resynchroniser avant de les retirer.
+                 */
+                if ((int) ($stockVehicule['quantite_vide'] ?? 0) !== $quantiteBouteilles) {
+                    $this->db->query(
+                        "UPDATE stocks SET
+                            quantite_vide = :quantite_vide,
+                            quantite_vide_physique = CASE
+                                WHEN quantite_vide_physique IS NULL THEN NULL
+                                ELSE :quantite_vide_physique
+                            END,
+                            caisses_vide_physique = CASE
+                                WHEN caisses_vide_physique IS NULL THEN NULL
+                                ELSE :caisses_vide_physique
+                            END,
+                            updated_at = NOW()
+                         WHERE id = :id",
+                        [
+                            'quantite_vide' => $quantiteBouteilles,
+                            'quantite_vide_physique' => $quantiteBouteilles,
+                            'caisses_vide_physique' => $caissesVides,
+                            'id' => (int) $stockVehicule['id'],
+                        ]
+                    );
+                }
+
                 $stockModel->updateOrCreate($ligne['produit_id'], $vehicule['emplacement_id'], [
                     'quantite_vide' => -$quantiteBouteilles,
                     'caisses_vide' => -$caissesVides,
@@ -765,8 +832,52 @@ class VehiculeController extends Controller
             return $this->error('Impossible de désactiver ce véhicule car il est en mission', 400);
         }
         
-        $this->vehiculeModel->update($id, ['actif' => 0]);
-        
-        return $this->success(null, 'Véhicule désactivé avec succès');
+        // L'emplacement mobile ne doit pas disparaître tant qu'il contient du stock.
+        // Cela évite de rendre des produits inaccessibles après la suppression du véhicule.
+        if (!empty($vehicule['emplacement_id'])) {
+            $lignesStock = (int) $this->db->fetchColumn(
+                "SELECT COUNT(*)
+                 FROM stocks
+                 WHERE emplacement_id = :emplacement_id
+                   AND (
+                       COALESCE(quantite_pleine, 0) <> 0
+                       OR COALESCE(quantite_vide, 0) <> 0
+                       OR COALESCE(caisses_pleine, 0) <> 0
+                       OR COALESCE(caisses_vide, 0) <> 0
+                   )",
+                ['emplacement_id' => (int) $vehicule['emplacement_id']]
+            );
+
+            if ($lignesStock > 0) {
+                return $this->error(
+                    'Impossible de supprimer ce véhicule : il contient encore du stock. '
+                    . 'Transférez d abord tous les produits et emballages vers l entrepôt.',
+                    400
+                );
+            }
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            $this->vehiculeModel->update($id, ['actif' => 0]);
+
+            if (!empty($vehicule['emplacement_id'])) {
+                $this->db->query(
+                    "UPDATE emplacements
+                     SET actif = 0, updated_at = NOW()
+                     WHERE id = :id",
+                    ['id' => (int) $vehicule['emplacement_id']]
+                );
+            }
+
+            $this->db->commit();
+            return $this->success(null, 'Véhicule supprimé avec succès');
+        } catch (Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            return $this->error($e->getMessage(), 400);
+        }
     }
 }

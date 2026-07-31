@@ -709,9 +709,13 @@ class StockController extends Controller
             $produit     = new Produit();
             $p           = $produit->find($m['produit_id']);
             $btlParCaisse = $p['bouteilles_par_caisses'] ?: 24;
-            $caisses = isset($m['quantite_caisses_reference']) && $m['quantite_caisses_reference'] !== null
-                ? abs((float) $m['quantite_caisses_reference'])
-                : abs($m['quantite'] / $btlParCaisse);
+            if (($m['type_mouvement'] ?? '') === 'inventaire' && $m['quantite_apres'] !== null) {
+                $caisses = abs((float) $m['quantite_apres'] / $btlParCaisse);
+            } else {
+                $caisses = isset($m['quantite_caisses_reference']) && $m['quantite_caisses_reference'] !== null
+                    ? abs((float) $m['quantite_caisses_reference'])
+                    : abs($m['quantite'] / $btlParCaisse);
+            }
 
             $emplacement = $m['emplacement_source'] ?? ($m['emplacement_nom'] ?? '');
             if (($m['type_mouvement'] ?? '') === 'transfert' && !empty($m['emplacement_dest'])) {
@@ -805,7 +809,7 @@ class StockController extends Controller
                     $champCaisses = $mode === 'emballage' ? 'caisses_vide' : 'caisses_pleine';
                     $quantiteDisponible = max(0, (int) ($stockSource[$champQuantite] ?? 0));
                     $caissesDisponibles = max(0, (int) ($stockSource[$champCaisses] ?? 0));
-                    if (!$stockSource || $quantiteDisponible < $quantite || $caissesDisponibles < $caisses) {
+                    if (!$stockSource || $caissesDisponibles < $caisses) {
                         throw new Exception(sprintf(
                             'Stock insuffisant pour %s : disponible %d cs (%d %s), demande %d cs.',
                             $produit['nom'] ?? ('produit #' . $produitId),
@@ -814,6 +818,18 @@ class StockController extends Controller
                             $mode === 'emballage' ? 'emballages' : 'bouteilles',
                             $caisses
                         ));
+                    }
+
+                    // Les caisses sont l'unité métier de référence. Réparer un
+                    // ancien compteur bouteilles désynchronisé avant le transfert.
+                    $quantiteAttendue = $caissesDisponibles * $bouteillesParCaisse;
+                    if ($quantiteDisponible !== $quantiteAttendue) {
+                        $this->db->query(
+                            "UPDATE stocks SET {$champQuantite} = :quantite, updated_at = NOW()
+                             WHERE id = :id",
+                            ['quantite' => $quantiteAttendue, 'id' => (int) $stockSource['id']]
+                        );
+                        $quantiteDisponible = $quantiteAttendue;
                     }
 
                     $variationSource = $mode === 'emballage'
@@ -897,7 +913,7 @@ class StockController extends Controller
 
             $quantiteDisponible = max(0, (int) ($stockSource['quantite_pleine'] ?? 0));
             $caissesDisponibles = max(0, (int) ($stockSource['caisses_pleine'] ?? 0));
-            if (!$stockSource || $quantiteDisponible < $quantite || $caissesDisponibles < $caisses) {
+            if (!$stockSource || $caissesDisponibles < $caisses) {
                 throw new Exception(sprintf(
                     'Stock insuffisant pour %s : disponible %d cs (%d bouteilles), demande %d cs.',
                     $produit['nom'] ?? ('produit #' . (int) $data['produit_id']),
@@ -905,6 +921,17 @@ class StockController extends Controller
                     $quantiteDisponible,
                     $caisses
                 ));
+            }
+
+            $quantiteAttendue = $caissesDisponibles * $bouteillesParCaisse;
+            if ($quantiteDisponible !== $quantiteAttendue) {
+                $this->db->query(
+                    "UPDATE stocks SET quantite_pleine = :quantite, updated_at = NOW()
+                     WHERE id = :id",
+                    ['quantite' => $quantiteAttendue, 'id' => (int) $stockSource['id']]
+                );
+                $stockSource['quantite_pleine'] = $quantiteAttendue;
+                $quantiteDisponible = $quantiteAttendue;
             }
             
             // Déduire de la source

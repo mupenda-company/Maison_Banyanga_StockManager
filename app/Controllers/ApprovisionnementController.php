@@ -327,6 +327,17 @@ class ApprovisionnementController extends Controller
             'numero_bon' => $this->approvisionnementModel->generateNumeroBon()
         ]);
     }
+
+    public function soldeFournisseur()
+    {
+        $this->requirePermission('approvisionnements.creer');
+        $fournisseur = trim((string) ($_GET['fournisseur'] ?? ''));
+
+        return $this->success([
+            'fournisseur' => $fournisseur,
+            'solde' => $this->approvisionnementModel->getSupplierBalance($fournisseur),
+        ]);
+    }
     
     /**
      * Enregistrer un approvisionnement
@@ -354,6 +365,7 @@ class ApprovisionnementController extends Controller
             'fournisseur' => $data['fournisseur'] ?? 'Bralima',
             'notes' => $data['notes'] ?? '',
             'total_ht' => 0,
+            'montant_depose_fournisseur' => max(0, (float) ($data['montant_depose_fournisseur'] ?? 0)),
             'statut' => 'valide',
             'created_by' => $_SESSION['user_id']
         ];

@@ -80,7 +80,22 @@ ob_start();
                         </div>
                         <div>
                             <label class="label">Fournisseur</label>
-                            <input type="text" x-model="form.fournisseur" class="input">
+                            <input type="text" x-model="form.fournisseur" @change="loadSoldeFournisseur()" class="input">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200">
+                        <div>
+                            <p class="text-xs uppercase text-gray-500">Solde fournisseur</p>
+                            <p class="text-lg font-bold text-blue-700" x-text="App.formatMoneyConverted(soldeFournisseur, window.BASE_DEVISE, window.DEVISE)"></p>
+                        </div>
+                        <div>
+                            <label class="label">Nouveau montant déposé</label>
+                            <input type="number" min="0" step="0.01" x-model.number="form.montant_depose_fournisseur" class="input">
+                        </div>
+                        <div>
+                            <p class="text-xs uppercase text-gray-500">Solde après achat</p>
+                            <p class="text-lg font-bold text-green-700" x-text="App.formatMoneyConverted(Math.max(0, soldeFournisseur + parseFloat(form.montant_depose_fournisseur || 0) - total), window.BASE_DEVISE, window.DEVISE)"></p>
                         </div>
                     </div>
 
@@ -192,9 +207,11 @@ document.addEventListener('alpine:init', () => {
         loading: false,
         produits: <?= json_encode((new Produit())->getActive()) ?>,
         total: 0,
+        soldeFournisseur: 0,
         form: {
             date: '<?= date('Y-m-d') ?>',
             fournisseur: 'Bralima',
+            montant_depose_fournisseur: 0,
             notes: '',
             lignes: [{ produit_id: '', quantite_achat: 1, unite_achat: 'caisse', type_achat: 'deposer' }]
         },
@@ -206,6 +223,22 @@ document.addEventListener('alpine:init', () => {
 
         open() {
             this.isOpen = true;
+            this.loadSoldeFournisseur();
+        },
+
+        async loadSoldeFournisseur() {
+            const fournisseur = String(this.form.fournisseur || '').trim();
+            if (!fournisseur) {
+                this.soldeFournisseur = 0;
+                return;
+            }
+            try {
+                const r = await App.api('/api/approvisionnements/solde-fournisseur?fournisseur=' + encodeURIComponent(fournisseur));
+                const data = r.data || r;
+                this.soldeFournisseur = parseFloat(data.solde || 0);
+            } catch (e) {
+                this.soldeFournisseur = 0;
+            }
         },
 
         getProduit(id) {
@@ -255,11 +288,17 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
+            if (this.soldeFournisseur + parseFloat(this.form.montant_depose_fournisseur || 0) < this.total) {
+                App.notify('Le solde fournisseur et le nouveau dépôt ne couvrent pas cet approvisionnement', 'error');
+                return;
+            }
+
             this.loading = true;
             try {
                 await App.api('/api/approvisionnements', 'POST', {
                     date_approvisionnement: this.form.date,
                     fournisseur: this.form.fournisseur,
+                    montant_depose_fournisseur: parseFloat(this.form.montant_depose_fournisseur || 0),
                     notes: this.form.notes,
                     details: validLignes
                 });

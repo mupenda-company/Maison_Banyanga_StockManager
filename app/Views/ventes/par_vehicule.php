@@ -1,5 +1,9 @@
 <?php 
 $pageTitle = 'Ventes par véhicule';
+$totalCaissesVendues = array_sum(array_map(
+    static fn($produit) => (float) ($produit['total_caisses'] ?? 0),
+    $produits ?? []
+));
 ob_start();
 ?>
 
@@ -11,18 +15,18 @@ ob_start();
     </div>
     <div class="flex gap-2">
         <?php if ($vehiculeId): ?>
-        <a href="<?= url('ventes/par-vehicule/export?vehicule_id=' . $vehiculeId . '&date_debut=' . $dateDebut . '&date_fin=' . $dateFin) ?>" class="btn btn-success">
+        <?php if (can('ventes.exporter')): ?><a href="<?= url('ventes/par-vehicule/export?vehicule_id=' . $vehiculeId . '&date_debut=' . $dateDebut . '&date_fin=' . $dateFin) ?>" class="btn btn-success">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
             </svg>
             Exporter CSV
-        </a>
-        <a href="<?= url('ventes/par-vehicule/print?vehicule_id=' . $vehiculeId . '&date_debut=' . $dateDebut . '&date_fin=' . $dateFin) ?>" target="_blank" class="btn btn-secondary">
+        </a><?php endif; ?>
+        <?php if (can('ventes.imprimer')): ?><a href="<?= url('ventes/par-vehicule/print?vehicule_id=' . $vehiculeId . '&date_debut=' . $dateDebut . '&date_fin=' . $dateFin) ?>" target="_blank" class="btn btn-secondary">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
             </svg>
             Imprimer
-        </a>
+        </a><?php endif; ?>
         <?php endif; ?>
         <a href="<?= url('ventes') ?>" class="btn btn-secondary">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -67,7 +71,7 @@ ob_start();
 
 <?php if ($vehiculeId): ?>
 <!-- Summary Cards -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
     <div class="card">
         <div class="card-body">
             <div class="flex items-center">
@@ -79,6 +83,21 @@ ob_start();
                 <div class="ml-4">
                     <p class="text-sm text-gray-500 dark:text-gray-400">Ventes</p>
                     <p class="text-2xl font-bold text-gray-900 dark:text-white"><?= count($ventes) ?></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body">
+            <div class="flex items-center">
+                <div class="p-3 bg-amber-100 dark:bg-amber-900 rounded-lg">
+                    <svg class="w-6 h-6 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Caisses vendues</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white"><?= number_format($totalCaissesVendues, 0, ',', ' ') ?> cs</p>
                 </div>
             </div>
         </div>

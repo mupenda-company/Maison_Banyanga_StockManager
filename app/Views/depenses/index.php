@@ -173,17 +173,24 @@ ob_start();
 
 <script>
 async function deleteDepense(id) {
-    if (!confirm('Supprimer cette dépense ?')) return;
+    const ok = await App.confirm({
+        title: 'Supprimer la dépense ?',
+        message: 'Cette dépense sera supprimée définitivement.',
+        confirmText: 'Supprimer',
+        cancelText: 'Annuler',
+        type: 'danger'
+    });
+    if (!ok) return;
     try {
         const res = await fetch(BASE_URL + '/api/depenses/' + id, { method: 'DELETE' });
         const data = await res.json();
         if (data.success) {
             window.location.reload();
         } else {
-            alert(data.message || 'Erreur lors de la suppression');
+            App.notify(data.message || 'Erreur lors de la suppression', 'error');
         }
     } catch (e) {
-        alert('Erreur réseau');
+        App.notify('Erreur réseau', 'error');
     }
 }
 </script>

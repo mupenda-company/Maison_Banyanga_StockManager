@@ -7,6 +7,9 @@ $totalCa = (float) ($totalCa ?? 0);
 $totalVentes = (int) ($totalVentes ?? 0);
 $totalCaisses = (float) ($totalCaisses ?? 0);
 $nbAgents = (int) ($nbAgents ?? 0);
+$agentId = !empty($agentId) ? (int) $agentId : null;
+$agents = $agents ?? [];
+$syntheseJournaliere = $syntheseJournaliere ?? [];
 
 $dateDebutLabel = !empty($dateDebut) ? date('d/m/Y', strtotime($dateDebut)) : 'N/A';
 $dateFinLabel = !empty($dateFin) ? date('d/m/Y', strtotime($dateFin)) : 'N/A';
@@ -16,6 +19,7 @@ $periodeLabel = $dateDebut === $dateFin
 $exportUrl = url('rapports/ventes-par-agent/export') . '?' . http_build_query([
     'date_debut' => $dateDebut,
     'date_fin' => $dateFin,
+    'agent_id' => $agentId,
 ]);
 ?>
 <!DOCTYPE html>
@@ -26,6 +30,8 @@ $exportUrl = url('rapports/ventes-par-agent/export') . '?' . http_build_query([
     <title>Ventes par agent - <?= htmlspecialchars($periodeLabel) ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+
         @page {
             size: A4 portrait;
             margin: 10mm;
@@ -34,7 +40,7 @@ $exportUrl = url('rapports/ventes-par-agent/export') . '?' . http_build_query([
             margin: 0;
             background: #f3f4f6;
             color: #111827;
-            font-family: Arial, Helvetica, sans-serif;
+            font-family: 'Poppins', Arial, Helvetica, sans-serif;
             font-size: 12px;
             line-height: 1.45;
         }
@@ -209,6 +215,17 @@ $exportUrl = url('rapports/ventes-par-agent/export') . '?' . http_build_query([
                     <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Date fin</label>
                     <input type="date" name="date_fin" value="<?= htmlspecialchars($dateFin) ?>" class="px-3 py-2 border rounded-lg text-sm">
                 </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Agent</label>
+                    <select name="agent_id" class="px-3 py-2 border rounded-lg text-sm min-w-[190px]">
+                        <option value="">Tous les agents</option>
+                        <?php foreach ($agents as $agent): ?>
+                            <option value="<?= (int) $agent['id'] ?>" <?= $agentId === (int) $agent['id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars(trim((string) $agent['nom_complet'])) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
                 <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold">Filtrer</button>
             </form>
 
@@ -234,12 +251,46 @@ $exportUrl = url('rapports/ventes-par-agent/export') . '?' . http_build_query([
                 <div class="summary-value text-purple-700"><?= number_format($nbAgents, 0, ',', ' ') ?></div>
             </div>
             <div class="summary-card">
-                <div class="summary-label">Caisses achetees</div>
+                <div class="summary-label">Caisses vendues</div>
                 <div class="summary-value text-amber-700"><?= number_format($totalCaisses, 0, ',', ' ') ?></div>
             </div>
             <div class="summary-card">
                 <div class="summary-label">Chiffre d'affaires TTC</div>
                 <div class="summary-value text-green-700"><?= format_money_converted($totalCa) ?></div>
+            </div>
+        </div>
+
+        <div class="agent-block">
+            <div class="section-title">Synthèse journalière de tous les agents</div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Agent</th>
+                            <th class="num">Caisses sorties</th>
+                            <th class="num">Caisses vendues</th>
+                            <th class="num">Ventes</th>
+                            <th class="num">Montant vendu</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($syntheseJournaliere)): ?>
+                            <tr><td colspan="6" class="text-center text-gray-500">Aucune activité sur cette période.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($syntheseJournaliere as $ligne): ?>
+                                <tr>
+                                    <td><?= date('d/m/Y', strtotime($ligne['date'])) ?></td>
+                                    <td class="font-semibold"><?= htmlspecialchars($ligne['agent_nom']) ?></td>
+                                    <td class="num"><?= number_format((float) $ligne['caisses_sorties'], 0, ',', ' ') ?> cs</td>
+                                    <td class="num"><?= number_format((float) $ligne['caisses_vendues'], 0, ',', ' ') ?> cs</td>
+                                    <td class="num"><?= number_format((int) $ligne['nombre_ventes'], 0, ',', ' ') ?></td>
+                                    <td class="num font-bold text-green-700"><?= format_money_converted($ligne['montant_ventes']) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
 

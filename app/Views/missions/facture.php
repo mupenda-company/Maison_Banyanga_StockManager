@@ -7,6 +7,8 @@
     <title><?= $isRistourne ? 'Facture de ristourne' : 'Facture de mission' ?> <?= htmlspecialchars($mission['numero_mission'] ?? '') ?> - <?= htmlspecialchars($params['nom_entreprise'] ?? APP_NAME) ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+
         @page {
             size: A4;
             margin: 8mm;
@@ -15,7 +17,7 @@
             margin: 0;
             background: #f8fafc;
             color: #0f172a;
-            font-family: Arial, Helvetica, sans-serif;
+            font-family: 'Poppins', Arial, Helvetica, sans-serif;
         }
         .max-w-4xl { max-width: 56rem; }
         .mx-auto { margin-left: auto; margin-right: auto; }
@@ -410,9 +412,10 @@
                     <tr class="border-b-2 border-gray-200">
                         <th class="text-left py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Produit</th>
                         <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Chargé</th>
+                        <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Réapprovisionné</th>
                         <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase"><?= $isRistourne ? 'Livré' : 'Vendu' ?></th>
-                        <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Restant</th>
-                        <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Emballages</th>
+                        <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Retourné (restant)</th>
+                        <th class="text-center py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Emballages reçus</th>
                         <th class="text-right py-1.5 text-[11px] font-semibold text-gray-500 uppercase">Valeur estimée</th>
                     </tr>
                 </thead>
@@ -422,18 +425,24 @@
                         $btlParCaisse = (int) ($chargement['bouteilles_par_caisses'] ?? 24);
                         $quantiteVendue = (int) ($chargement['quantite_vendue'] ?? 0);
                         $prixCaisse = (float) ($chargement['prix_caisse'] ?? 0);
-                        $caissesChargees = (int) ($chargement['caisses_total'] ?? max(0, (int) ($chargement['quantite_caisses'] ?? 0)));
-                        $caissesVendues = $btlParCaisse > 0 ? round($quantiteVendue / $btlParCaisse, 0) : 0;
-                        $caissesRetournees = $btlParCaisse > 0 ? round((int) ($chargement['quantite_retournee'] ?? 0) / $btlParCaisse, 0) : 0;
-                        $caissesRestantes = max(0, $caissesChargees - $caissesVendues);
-                        $valeurEstimee = $caissesRestantes * $prixCaisse;
+                        $caissesTotalMission = (int) ($chargement['caisses_total'] ?? max(0, (int) ($chargement['quantite_caisses'] ?? 0)));
+                        $caissesReapprovisionnees = max(0, (int) ($chargement['caisses_reapprovisionnees'] ?? 0));
+                        $caissesChargees = max(0, (int) ($chargement['caisses_chargees_initiales']
+                            ?? ($caissesTotalMission - $caissesReapprovisionnees)));
+                        $caissesVendues = (int) ($chargement['caisses_vendues_auto']
+                            ?? ($btlParCaisse > 0 ? round($quantiteVendue / $btlParCaisse, 0) : 0));
+                        $caissesRetournees = (int) ($chargement['caisses_retournees_physiques']
+                            ?? max(0, $caissesTotalMission - $caissesVendues));
+                        $caissesEmballagesRecus = max(0, (int) ($chargement['caisses_vides_recues'] ?? 0));
+                        $valeurEstimee = $caissesRetournees * $prixCaisse;
                     ?>
                     <tr>
                         <td class="py-1.5 font-medium leading-tight"><?= htmlspecialchars($chargement['produit_nom'] ?? '') ?></td>
                         <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesChargees, 0, ',', ' ') ?> cs</td>
+                        <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesReapprovisionnees, 0, ',', ' ') ?> cs</td>
                         <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesVendues, 0, ',', ' ') ?> cs</td>
-                        <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesRestantes, 0, ',', ' ') ?> cs</td>
                         <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesRetournees, 0, ',', ' ') ?> cs</td>
+                        <td class="py-1.5 text-center whitespace-nowrap"><?= number_format($caissesEmballagesRecus, 0, ',', ' ') ?> cs</td>
                         <td class="py-1.5 text-right whitespace-nowrap"><?= format_money_converted($valeurEstimee) ?></td>
                     </tr>
                     <?php endforeach; ?>

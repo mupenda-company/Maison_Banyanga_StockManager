@@ -3,6 +3,7 @@ $pageTitle = 'Modifier vente';
 $autoriserInterchangeEmballages = !empty($autoriser_interchange_emballages);
 $venteEstMobile = !empty($vente['mission_id']);
 $origineVente = is_array($origine_vente) ? $origine_vente : [];
+$factureHistorique = date('Y-m-d', strtotime((string) ($vente['date_vente'] ?? 'now'))) !== date('Y-m-d');
 
 ob_start();
 ?>
@@ -13,6 +14,12 @@ ob_start();
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Modifier la vente <?= htmlspecialchars($vente['numero_facture']) ?></h2>
         </div>
         <div class="card-body">
+            <?php if ($factureHistorique): ?>
+                <div class="mb-5 p-4 rounded-lg border border-amber-300 bg-amber-50 text-amber-900">
+                    <p class="font-semibold">Correction d’une facture historique</p>
+                    <p class="text-sm mt-1">Les produits, emballages et montants de la facture seront corrigés, mais le stock actuel ne sera pas modifié.</p>
+                </div>
+            <?php endif; ?>
             <form 
                 x-data="venteForm()"
                 @submit.prevent="saveVente"
@@ -413,8 +420,15 @@ document.addEventListener('alpine:init', () => {
                     throw new Error('Le billetage ne correspond pas au total TTC.');
                 }
 
-                if (this.allEmballagesRecusZero() && !window.confirm('Aucun emballage vide nâ€™a été déclaré pour cette vente. Confirmez-vous cette saisie ?')) {
-                    return;
+                if (this.allEmballagesRecusZero()) {
+                    const ok = await App.confirm({
+                        title: 'Aucun emballage reçu',
+                        message: 'Aucun emballage vide n’a été déclaré pour cette vente. Voulez-vous continuer ?',
+                        confirmText: 'Continuer',
+                        cancelText: 'Vérifier',
+                        type: 'warning'
+                    });
+                    if (!ok) return;
                 }
 
                 const details = detailsLignes.map(l => {
@@ -435,7 +449,7 @@ document.addEventListener('alpine:init', () => {
                 });
                 const emballagesRecus = this.getEmballagesRecusPayload();
                 
-                await App.api('/api/ventes/<?= (int)$vente['id'] ?>', 'PUT', {
+                const result = await App.api('/api/ventes/<?= (int)$vente['id'] ?>', 'PUT', {
                     client_id: parseInt(this.client_id),
                     emplacement_id: parseInt(this.emplacement_id),
                     notes: this.notes,
@@ -444,7 +458,7 @@ document.addEventListener('alpine:init', () => {
                     billetage: this.billetage
                 });
                 
-                App.notify('Vente modifiée avec succès', 'success');
+                App.notify(result.message || 'Vente modifiée avec succès', 'success');
                 setTimeout(() => window.location.href = '<?= url('ventes') ?>', 1000);
             } catch (e) {
                 App.notify(e.message, 'error');

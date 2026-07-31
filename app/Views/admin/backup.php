@@ -55,9 +55,8 @@ ob_start();
                 </p>
             </div>
 
-            <form method="post"
-                  action="<?= url('admin/backup/download') ?>"
-                  onsubmit="return confirm('Créer et télécharger maintenant une sauvegarde complète ?');">
+            <form id="backupDownloadForm" method="post"
+                  action="<?= url('admin/backup/download') ?>">
                 <input type="hidden" name="backup_token" value="<?= htmlspecialchars($downloadToken, ENT_QUOTES, 'UTF-8') ?>">
                 <button type="submit" class="btn-primary">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -69,6 +68,20 @@ ob_start();
         </div>
     </div>
 </div>
+
+<script>
+document.getElementById('backupDownloadForm')?.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const ok = await App.confirm({
+        title: 'Créer la sauvegarde ?',
+        message: 'Voulez-vous créer et télécharger maintenant une sauvegarde complète de la base de données ?',
+        confirmText: 'Créer et télécharger',
+        cancelText: 'Annuler',
+        type: 'warning'
+    });
+    if (ok) this.submit();
+});
+</script>
 
 <?php
 $content = ob_get_clean();

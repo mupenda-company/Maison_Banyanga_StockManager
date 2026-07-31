@@ -12,17 +12,18 @@ $logo = $params->get('logo');
     <title>QR codes clients</title>
     <style>
         * { box-sizing: border-box; }
-        body { margin: 0; padding: 20px; color: #111827; background: #f3f4f6; font-family: Arial, sans-serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+        body { margin: 0; padding: 20px; color: #111827; background: #f3f4f6; font-family: 'Poppins', Arial, sans-serif; }
         .toolbar { display: flex; justify-content: center; gap: 12px; margin-bottom: 20px; }
         .toolbar button { border: 0; border-radius: 8px; padding: 10px 18px; color: #fff; background: #2563eb; font-weight: 700; cursor: pointer; }
         .cards { display: block; max-width: 190mm; margin: 0 auto; }
         .qr-card { position: relative; width: 100%; min-height: 277mm; margin-bottom: 20px; padding: 10mm; border: 2px solid #111827; border-radius: 12px; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; break-inside: avoid; page-break-inside: avoid; }
         .logo { width: 58px; height: 58px; object-fit: contain; margin-bottom: 5px; }
-        .company { margin: 0; font-size: 18px; font-weight: 800; text-transform: uppercase; }
+        .company { margin: 0; font-size: 30px; line-height: 1.15; font-weight: 800; text-transform: uppercase; color: #1d4ed8; letter-spacing: .04em; }
         .instruction { margin: 4px 0 10px; color: #4b5563; font-size: 12px; }
         .qr { width: 165mm; height: 165mm; aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
         .qr img, .qr canvas { display: block; width: 165mm !important; height: 165mm !important; max-width: 100%; aspect-ratio: 1 / 1; object-fit: contain; image-rendering: pixelated; }
-        .client-name { margin: 10px 0 2px; font-size: 26px; font-weight: 800; }
+        .client-name { margin: 10px 0 2px; font-size: 26px; font-weight: 800; color: #047857; }
         .client-meta { margin: 2px 0; font-size: 13px; color: #374151; }
         .notice { position: absolute; right: 10mm; bottom: 8mm; left: 10mm; margin: 0; font-size: 11px; color: #6b7280; }
         @media print {

@@ -363,7 +363,13 @@ class VenteController extends Controller
         );
 
         if ($result['success']) {
-            return $this->success(['id' => $id], 'Vente modifiée avec succès');
+            $message = !empty($result['stock_modifie'])
+                ? 'Vente modifiée avec succès. Le stock du jour a été ajusté.'
+                : 'Facture historique corrigée avec succès. Le stock actuel n a pas été modifié.';
+            return $this->success([
+                'id' => $id,
+                'stock_modifie' => (bool) ($result['stock_modifie'] ?? false),
+            ], $message);
         }
 
         return $this->error($result['message'], 400);
@@ -540,7 +546,12 @@ class VenteController extends Controller
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
         $dateFin = $_GET['date_fin'] ?? date('Y-m-d');
         
-        $vehicules = $this->db->fetchAll("SELECT id, immatriculation FROM vehicules ORDER BY immatriculation");
+        $vehicules = $this->db->fetchAll(
+            "SELECT id, immatriculation
+             FROM vehicules
+             WHERE actif = 1
+             ORDER BY immatriculation"
+        );
         
         $ventes = [];
         $clients = [];
@@ -828,6 +839,49 @@ class VenteController extends Controller
         $filename = 'ventes_vehicule_' . $vehicule['immatriculation'] . '_' . date('Y-m-d') . '.xlsx';
         $this->sendXlsx($spreadsheet, $filename);
     }       
+    public function printAll()
+    {
+        $this->requirePermission('ventes.imprimer');
+
+        $dateDebut = !empty($_GET['date_debut']) ? $_GET['date_debut'] : date('Y-m-01');
+        $dateFin = !empty($_GET['date_fin']) ? $_GET['date_fin'] : date('Y-m-d');
+        $conditions = [
+            "v.statut = 'validee'",
+            'DATE(v.date_vente) BETWEEN :date_debut AND :date_fin',
+        ];
+        $paramsSql = ['date_debut' => $dateDebut, 'date_fin' => $dateFin];
+
+        if (!empty($_GET['client_id'])) {
+            $conditions[] = 'v.client_id = :client_id';
+            $paramsSql['client_id'] = (int) $_GET['client_id'];
+        }
+        if (!empty($_GET['emplacement_id'])) {
+            $conditions[] = 'v.emplacement_id = :emplacement_id';
+            $paramsSql['emplacement_id'] = (int) $_GET['emplacement_id'];
+        }
+
+        $ventes = $this->db->fetchAll(
+            "SELECT v.id, v.numero_facture, v.date_vente, v.total_ttc,
+                    c.nom AS client_nom, e.nom AS emplacement_nom,
+                    COALESCE(SUM(vd.quantite_caisses), 0) AS total_caisses
+             FROM ventes v
+             JOIN clients c ON c.id = v.client_id
+             LEFT JOIN emplacements e ON e.id = v.emplacement_id
+             LEFT JOIN vente_details vd ON vd.vente_id = v.id
+             WHERE " . implode(' AND ', $conditions) . "
+             GROUP BY v.id, v.numero_facture, v.date_vente, v.total_ttc, c.nom, e.nom
+             ORDER BY v.date_vente ASC",
+            $paramsSql
+        );
+
+        $this->view('ventes/print-all', [
+            'ventes' => $ventes,
+            'dateDebut' => $dateDebut,
+            'dateFin' => $dateFin,
+            'params' => $this->parametreModel->getPersonnalisation(),
+        ]);
+    }
+
     /**
      * Exporter toutes les ventes en Excel avec produits en colonnes
      */
