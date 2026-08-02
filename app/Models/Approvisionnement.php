@@ -232,15 +232,7 @@ class Approvisionnement extends Model
                 ['fournisseur' => $fournisseur]
             );
             $soldeDisponible = $soldeAvant + $montantDepose;
-            if ($soldeDisponible + 0.001 < $totalApprovisionnement) {
-                throw new Exception(
-                    'Montant fournisseur insuffisant : disponible '
-                    . number_format($soldeDisponible, 2, ',', ' ')
-                    . ', approvisionnement '
-                    . number_format($totalApprovisionnement, 2, ',', ' ')
-                );
-            }
-            $soldeApres = round($soldeDisponible - $totalApprovisionnement, 2);
+            $soldeApres = $soldeAvant + $montantDepose - $totalApprovisionnement;
             $this->db->query(
                 "UPDATE soldes_fournisseurs SET solde = :solde
                  WHERE fournisseur = :fournisseur",

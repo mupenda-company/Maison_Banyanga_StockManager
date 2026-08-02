@@ -25,6 +25,9 @@ if (!empty($filters['date_debut'])) {
 if (!empty($filters['date_fin'])) {
     $baseQuery['date_fin'] = $filters['date_fin'];
 }
+if (!empty($_GET['per_page'])) {
+    $baseQuery['per_page'] = $_GET['per_page'];
+}
 $printUrl = '?' . http_build_query(array_merge($baseQuery, ['print' => 1]));
 $exportUrl = '?' . http_build_query(array_merge($baseQuery, ['export' => 'excel']));
 ob_start();
@@ -43,6 +46,7 @@ ob_start();
 <div class="card mb-6 no-print">
     <div class="card-body">
         <form method="GET" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4 items-end">
+            <input type="hidden" name="per_page" value="<?= (int) ($pagination['per_page'] ?? pagination_per_page(5)) ?>">
             <div>
                 <label class="label">Produit</label>
                 <select name="produit_id" class="input">
@@ -267,18 +271,24 @@ ob_start();
         </div>
         
         <!-- Pagination -->
-        <?php if (!$printMode && $pagination['last_page'] > 1): ?>
+        <?php if (!$printMode && !empty($pagination)): ?>
         <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center no-print">
             <p class="text-sm text-gray-500">
                 Page <?= $pagination['current_page'] ?> sur <?= $pagination['last_page'] ?>
             </p>
-            <div class="flex gap-2">
-                <?php if ($pagination['current_page'] > 1): ?>
-                <a href="?<?= http_build_query(array_merge($baseQuery, ['page' => $pagination['current_page'] - 1])) ?>" class="btn btn-sm btn-secondary">Précédent</a>
-                <?php endif; ?>
-                <?php if ($pagination['current_page'] < $pagination['last_page']): ?>
-                <a href="?<?= http_build_query(array_merge($baseQuery, ['page' => $pagination['current_page'] + 1])) ?>" class="btn btn-sm btn-primary">Suivant</a>
-                <?php endif; ?>
+            <div class="flex flex-wrap items-center gap-3">
+            <?= render_per_page_selector($pagination['per_page'] ?? null, $baseQuery) ?>
+            <?= render_pagination(
+                $pagination['current_page'],
+                $pagination['last_page'],
+                $baseQuery,
+                [
+                    'previous_label' => 'Précédent',
+                    'button_class' => 'btn btn-sm btn-secondary',
+                    'active_class' => 'btn btn-sm btn-primary font-bold',
+                    'disabled_class' => 'btn btn-sm btn-secondary opacity-50 cursor-not-allowed'
+                ]
+            ) ?>
             </div>
         </div>
         <?php endif; ?>

@@ -140,9 +140,6 @@ $approvisionnementsUrl = url('approvisionnements');
                         if (details.length === 0) {
                             throw new Error('Ajoutez au moins un produit');
                         }
-                        if (soldeFournisseur + parseFloat(montantDeposeFournisseur || 0) < total) {
-                            throw new Error('Le solde fournisseur et le nouveau dépôt ne couvrent pas cet approvisionnement');
-                        }
 
                         await App.api('<?= $approvisionnementsApiUrl ?>', 'POST', {
                             date_approvisionnement: date,
@@ -193,7 +190,7 @@ $approvisionnementsUrl = url('approvisionnements');
                         <input type="number" x-model.number="montantDeposeFournisseur" min="0" step="0.01" class="input">
                     </div>
                     <div>
-                        <p class="text-xs uppercase text-gray-500">Complément minimum nécessaire</p>
+                        <p class="text-xs uppercase text-gray-500">Ajouter un dépôt (facultatif)</p>
                         <p class="text-lg font-bold text-orange-700" x-text="App.formatMoneyConverted(montantManquant(), (window.BASE_DEVISE || 'CDF'), window.DEVISE)"></p>
                     </div>
                     <div>

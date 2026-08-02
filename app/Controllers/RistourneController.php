@@ -64,12 +64,15 @@ class RistourneController extends Controller
             return;
         }
         
+        $pagination = paginate_array($ristournes, $_GET['page'] ?? 1, pagination_per_page(5));
+
         $this->view('ristournes/index', [
-            'ristournes' => $ristournes,
+            'ristournes' => $pagination['data'],
             'clients' => $clients,
             'produits' => $produits,
             'report' => $report,
             'filters' => $filters,
+            'pagination' => $pagination,
             'print_mode' => $printMode,
             'recolte_locale_active' => $recolteLocaleActive,
         ]);

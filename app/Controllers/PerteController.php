@@ -63,14 +63,18 @@ class PerteController extends Controller
             return;
         }
         
+        $pagination = paginate_array($pertes, $_GET['page'] ?? 1, pagination_per_page(5));
+
         $this->view('pertes/index', [
-            'pertes' => $pertes,
+            'pertes' => $pagination['data'],
+            'allPertes' => $pertes,
             'produits' => $produits,
             'emplacements' => $emplacements,
             'agents' => $agents,
             'filters' => $filters,
             'stats' => $stats,
             'pertesParAgent' => $pertesParAgent,
+            'pagination' => $pagination,
             'print_mode' => $printMode
         ]);
     }

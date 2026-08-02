@@ -289,6 +289,13 @@ ob_start();
                 </tbody>
             </table>
         </div>
+        <?php if (!empty($pagination)): ?>
+            <?= render_pagination_footer($pagination, 'véhicule(s)', $_GET, [
+                'button_class' => 'btn btn-sm btn-secondary',
+                'active_class' => 'btn btn-sm btn-primary font-bold',
+                'disabled_class' => 'btn btn-sm btn-secondary opacity-50 cursor-not-allowed'
+            ]) ?>
+        <?php endif; ?>
     </div>
 </div>
 

@@ -37,6 +37,7 @@ ob_start();
 <div class="card mb-6">
     <div class="card-body">
         <form method="GET" class="flex flex-wrap items-end gap-4">
+            <input type="hidden" name="per_page" value="<?= (int) ($ventes['per_page'] ?? pagination_per_page(5)) ?>">
             <div class="flex-1 min-w-[200px]">
                 <label class="label">Client</label>
                 <select name="client_id" class="input">
@@ -167,7 +168,7 @@ ob_start();
         </div>
         
         <!-- Pagination -->
-        <?php if ($ventes['last_page'] > 1): ?>
+        <?php if (!empty($ventes)): ?>
         <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
             <div class="flex items-center justify-between">
                 <p class="text-sm text-gray-500 dark:text-gray-400">
@@ -175,13 +176,19 @@ ob_start();
                     <?= min($ventes['current_page'] * $ventes['per_page'], $ventes['total']) ?> 
                     sur <?= $ventes['total'] ?> ventes
                 </p>
-                <div class="flex gap-2">
-                    <?php if ($ventes['current_page'] > 1): ?>
-                    <a href="?page=<?= $ventes['current_page'] - 1 ?>" class="btn btn-sm btn-secondary">Précédent</a>
-                    <?php endif; ?>
-                    <?php if ($ventes['current_page'] < $ventes['last_page']): ?>
-                    <a href="?page=<?= $ventes['current_page'] + 1 ?>" class="btn btn-sm btn-primary">Suivant</a>
-                    <?php endif; ?>
+                <div class="flex flex-wrap items-center gap-3">
+                    <?= render_per_page_selector($ventes['per_page'] ?? null, $_GET) ?>
+                <?= render_pagination(
+                    $ventes['current_page'],
+                    $ventes['last_page'],
+                    $_GET,
+                    [
+                        'previous_label' => 'Précédent',
+                        'button_class' => 'btn btn-sm btn-secondary',
+                        'active_class' => 'btn btn-sm btn-primary font-bold',
+                        'disabled_class' => 'btn btn-sm btn-secondary opacity-50 cursor-not-allowed'
+                    ]
+                ) ?>
                 </div>
             </div>
         </div>

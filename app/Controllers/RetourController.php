@@ -27,16 +27,18 @@ class RetourController extends Controller
         $this->requireAuth();
         $this->requirePermission('emballages.gerer');
         
-        $retours = $this->retourModel->getRecents();
+        $retours = $this->retourModel->getRecents(1000);
+        $pagination = paginate_array($retours, $_GET['page'] ?? 1, pagination_per_page(5));
         $clients = $this->clientModel->all('nom');
         $produits = $this->produitModel->getActive();
         $emplacements = $this->emplacementModel->getFixes();
 
         $this->view('retours/index', [
-            'retours' => $retours,
+            'retours' => $pagination['data'],
             'clients' => $clients,
             'produits' => $produits,
-            'emplacements' => $emplacements
+            'emplacements' => $emplacements,
+            'pagination' => $pagination
         ]);
     }
 

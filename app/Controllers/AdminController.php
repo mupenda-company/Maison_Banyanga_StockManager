@@ -75,8 +75,11 @@ class AdminController extends Controller
             $user['role_names'] = array_column($userRoles, 'nom');
         }
         
+        $pagination = paginate_array($users, $_GET['page'] ?? 1, pagination_per_page(5));
+
         $this->view('admin/users', [
-            'users' => $users,
+            'users' => $pagination['data'],
+            'pagination' => $pagination,
             'rolesList' => $roleModel->getVisibleRoles(is_owner())
         ]);
     }

@@ -21,12 +21,23 @@ class ProduitController extends Controller
     public function index()
     {
         $this->requirePermission('produits.voir');
-        $produits = $this->produitModel->getWithStock();
+        $categorie = trim((string) ($_GET['categorie'] ?? ''));
+        $allProduits = $this->produitModel->getWithStock();
+        $produits = $allProduits;
+        if ($categorie !== '') {
+            $produits = array_values(array_filter($produits, static function ($produit) use ($categorie) {
+                return (string) ($produit['categorie'] ?? '') === $categorie;
+            }));
+        }
+        $pagination = paginate_array($produits, $_GET['page'] ?? 1, pagination_per_page(5));
         $categories = $this->produitModel->getCategories();
         
         $this->view('produits/index', [
-            'produits' => $produits,
-            'categories' => $categories
+            'produits' => $pagination['data'],
+            'allProduits' => $allProduits,
+            'categories' => $categories,
+            'selectedCategorie' => $categorie,
+            'pagination' => $pagination
         ]);
     }
     

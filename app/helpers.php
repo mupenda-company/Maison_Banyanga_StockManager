@@ -208,3 +208,205 @@ if (!function_exists('truncate_text')) {
         return substr($text, 0, $length) . '...';
     }
 }
+
+if (!function_exists('pagination_pages')) {
+    /**
+     * Construire une liste compacte de pages: 1 2 ... 8 9 10 ... 20.
+     */
+    function pagination_pages($currentPage, $lastPage, $window = 2)
+    {
+        $currentPage = max(1, (int) $currentPage);
+        $lastPage = max(1, (int) $lastPage);
+        $window = max(1, (int) $window);
+
+        $pages = [];
+        for ($i = 1; $i <= min(2, $lastPage); $i++) {
+            $pages[$i] = $i;
+        }
+        for ($i = max(1, $currentPage - $window); $i <= min($lastPage, $currentPage + $window); $i++) {
+            $pages[$i] = $i;
+        }
+        for ($i = max(1, $lastPage - 1); $i <= $lastPage; $i++) {
+            $pages[$i] = $i;
+        }
+
+        ksort($pages);
+
+        $result = [];
+        $previous = 0;
+        foreach (array_values($pages) as $page) {
+            if ($previous > 0 && $page > $previous + 1) {
+                $result[] = '...';
+            }
+            $result[] = $page;
+            $previous = $page;
+        }
+
+        return $result;
+    }
+}
+
+if (!function_exists('pagination_url')) {
+    /**
+     * Generer une URL de pagination en conservant les filtres actifs.
+     */
+    function pagination_url($page, $query = null)
+    {
+        $query = is_array($query) ? $query : $_GET;
+        unset($query['print'], $query['export']);
+        $query['page'] = max(1, (int) $page);
+
+        return '?' . http_build_query($query);
+    }
+}
+
+if (!function_exists('render_pagination')) {
+    /**
+     * Afficher une pagination numerique reutilisable.
+     */
+    function render_pagination($currentPage, $lastPage, $query = null, $options = [])
+    {
+        $currentPage = max(1, (int) $currentPage);
+        $lastPage = max(1, (int) $lastPage);
+
+        if ($lastPage <= 1) {
+            return '';
+        }
+
+        $previousLabel = $options['previous_label'] ?? 'Precedent';
+        $nextLabel = $options['next_label'] ?? 'Suivant';
+        $buttonClass = $options['button_class'] ?? 'btn-secondary btn-sm';
+        $activeClass = $options['active_class'] ?? 'btn-primary btn-sm font-bold';
+        $disabledClass = $options['disabled_class'] ?? 'btn-secondary btn-sm opacity-50 cursor-not-allowed';
+
+        ob_start();
+        ?>
+        <div class="flex flex-wrap items-center justify-end gap-1">
+            <?php if ($currentPage > 1): ?>
+            <a href="<?= htmlspecialchars(pagination_url($currentPage - 1, $query), ENT_QUOTES, 'UTF-8') ?>" class="<?= htmlspecialchars($buttonClass, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($previousLabel) ?></a>
+            <?php else: ?>
+            <span class="<?= htmlspecialchars($disabledClass, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($previousLabel) ?></span>
+            <?php endif; ?>
+
+            <?php foreach (pagination_pages($currentPage, $lastPage) as $page): ?>
+                <?php if ($page === '...'): ?>
+                <span class="px-2 py-1 text-sm text-gray-400">...</span>
+                <?php else: ?>
+                <a href="<?= htmlspecialchars(pagination_url($page, $query), ENT_QUOTES, 'UTF-8') ?>"
+                   class="<?= $page == $currentPage ? htmlspecialchars($activeClass, ENT_QUOTES, 'UTF-8') : htmlspecialchars($buttonClass, ENT_QUOTES, 'UTF-8') ?>">
+                    <?= (int) $page ?>
+                </a>
+                <?php endif; ?>
+            <?php endforeach; ?>
+
+            <?php if ($currentPage < $lastPage): ?>
+            <a href="<?= htmlspecialchars(pagination_url($currentPage + 1, $query), ENT_QUOTES, 'UTF-8') ?>" class="<?= htmlspecialchars($buttonClass, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($nextLabel) ?></a>
+            <?php else: ?>
+            <span class="<?= htmlspecialchars($disabledClass, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($nextLabel) ?></span>
+            <?php endif; ?>
+        </div>
+        <?php
+        return trim(ob_get_clean());
+    }
+}
+
+if (!function_exists('pagination_per_page')) {
+    /**
+     * Lire le nombre de lignes par page autorise.
+     */
+    function pagination_per_page($default = 5)
+    {
+        $allowed = [5, 10, 20, 50, 100];
+        $perPage = (int) ($_GET['per_page'] ?? $default);
+
+        return in_array($perPage, $allowed, true) ? $perPage : (int) $default;
+    }
+}
+
+if (!function_exists('paginate_array')) {
+    /**
+     * Paginer une liste deja chargee en memoire.
+     */
+    function paginate_array(array $items, $page = null, $perPage = null)
+    {
+        $page = max(1, (int) ($page ?? ($_GET['page'] ?? 1)));
+        $perPage = max(1, (int) ($perPage ?? pagination_per_page()));
+        $total = count($items);
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $lastPage);
+
+        return [
+            'data' => array_slice($items, ($page - 1) * $perPage, $perPage),
+            'total' => $total,
+            'per_page' => $perPage,
+            'current_page' => $page,
+            'last_page' => $lastPage,
+        ];
+    }
+}
+
+if (!function_exists('render_per_page_selector')) {
+    /**
+     * Afficher le selecteur 5-100 lignes par page en conservant les filtres.
+     */
+    function render_per_page_selector($current = null, $query = null)
+    {
+        $current = (int) ($current ?? pagination_per_page());
+        $query = is_array($query) ? $query : $_GET;
+        unset($query['page'], $query['per_page'], $query['print'], $query['export']);
+        $action = strtok($_SERVER['REQUEST_URI'] ?? '', '?') ?: '';
+
+        ob_start();
+        ?>
+        <form method="GET" action="<?= htmlspecialchars($action, ENT_QUOTES, 'UTF-8') ?>" class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            <?php foreach ($query as $key => $value): ?>
+                <?php if (is_array($value)) continue; ?>
+                <input type="hidden" name="<?= htmlspecialchars((string) $key, ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8') ?>">
+            <?php endforeach; ?>
+            <label for="per_page_selector" class="whitespace-nowrap">Lignes par page</label>
+            <select id="per_page_selector" name="per_page" class="input py-1.5 w-24" onchange="this.form.submit()">
+                <?php foreach ([5, 10, 20, 50, 100] as $value): ?>
+                <option value="<?= $value ?>" <?= $current === $value ? 'selected' : '' ?>><?= $value ?></option>
+                <?php endforeach; ?>
+            </select>
+        </form>
+        <?php
+        return trim(ob_get_clean());
+    }
+}
+
+if (!function_exists('render_pagination_footer')) {
+    /**
+     * Footer standard: resume, selecteur lignes par page et pagination.
+     */
+    function render_pagination_footer(array $pagination, $label = 'résultat(s)', $query = null, $options = [])
+    {
+        $total = (int) ($pagination['total'] ?? 0);
+        $perPage = (int) ($pagination['per_page'] ?? pagination_per_page());
+        $currentPage = (int) ($pagination['current_page'] ?? 1);
+        $lastPage = (int) ($pagination['last_page'] ?? 1);
+        $start = $total > 0 ? (($currentPage - 1) * $perPage) + 1 : 0;
+        $end = $total > 0 ? min($currentPage * $perPage, $total) : 0;
+
+        $paginationOptions = array_merge([
+            'previous_label' => 'Précédent',
+            'button_class' => 'btn-secondary btn-sm',
+            'active_class' => 'btn-primary btn-sm font-bold',
+            'disabled_class' => 'btn-secondary btn-sm opacity-50 cursor-not-allowed',
+        ], $options);
+
+        ob_start();
+        ?>
+        <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+                Affichage <?= $start ?> à <?= $end ?> sur <?= $total ?> <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>
+            </p>
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-end">
+                <?= render_per_page_selector($perPage, $query) ?>
+                <?= render_pagination($currentPage, $lastPage, $query, $paginationOptions) ?>
+            </div>
+        </div>
+        <?php
+        return trim(ob_get_clean());
+    }
+}

@@ -89,7 +89,7 @@ class StockController extends Controller
         }
 
         $page = (int) ($_GET['page'] ?? 1);
-        $perPage = 5;
+        $perPage = pagination_per_page(5);
         
         if (!empty($filters['date_stock'])) {
             $allStocks = $this->stockModel->getHistoricalInventory($filters['date_stock'], $filters);
@@ -362,7 +362,7 @@ class StockController extends Controller
         $printMode = isset($_GET['print']) && (string)$_GET['print'] === '1';
         
         $page = (int) ($_GET['page'] ?? 1);
-        $perPage = 5;
+        $perPage = pagination_per_page(5);
 
         // Exporter en Excel
         if (isset($_GET['export']) && $_GET['export'] === 'excel') {
@@ -623,7 +623,7 @@ class StockController extends Controller
         ];
         
         $page = (int) ($_GET['page'] ?? 1);
-        $perPage = 5;
+        $perPage = pagination_per_page(5);
 
         if ($printMode) {
             $mouvements = [];

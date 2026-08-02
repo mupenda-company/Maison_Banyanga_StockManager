@@ -41,6 +41,7 @@ ob_start();
 <div class="card mb-6">
     <div class="card-body">
         <form method="GET" class="flex flex-wrap gap-4 items-end">
+            <input type="hidden" name="per_page" value="<?= (int) ($pagination['per_page'] ?? pagination_per_page(5)) ?>">
             <div>
                 <label class="label">Type</label>
                 <select name="type_mission" class="input">
@@ -188,6 +189,29 @@ ob_start();
         </div>
         <?php endif; ?>
     </div>
+    <?php if (!empty($pagination)): ?>
+    <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+            Affichage <?= (($pagination['current_page'] - 1) * $pagination['per_page']) + 1 ?>
+            à <?= min($pagination['current_page'] * $pagination['per_page'], $pagination['total']) ?>
+            sur <?= $pagination['total'] ?> mission(s)
+        </p>
+        <div class="flex flex-wrap items-center gap-3">
+        <?= render_per_page_selector($pagination['per_page'] ?? null, $_GET) ?>
+        <?= render_pagination(
+            $pagination['current_page'],
+            $pagination['last_page'],
+            $_GET,
+            [
+                'previous_label' => 'Précédent',
+                'button_class' => 'btn btn-sm btn-secondary',
+                'active_class' => 'btn btn-sm btn-primary font-bold',
+                'disabled_class' => 'btn btn-sm btn-secondary opacity-50 cursor-not-allowed'
+            ]
+        ) ?>
+        </div>
+    </div>
+    <?php endif; ?>
 </div>
 
 <script>

@@ -23,9 +23,11 @@ class ZoneController extends Controller
         $this->requirePermission('clients.voir');
         
         $zones = $this->zoneModel->getWithStats();
+        $pagination = paginate_array($zones, $_GET['page'] ?? 1, pagination_per_page(5));
         
         $this->view('zones/index', [
-            'zones' => $zones
+            'zones' => $pagination['data'],
+            'pagination' => $pagination
         ]);
     }
     

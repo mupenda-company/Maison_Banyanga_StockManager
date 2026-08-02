@@ -28,14 +28,16 @@ class DepenseController extends Controller
         ];
         
         $depenses = $this->depenseModel->getAllWithFilters($filters);
+        $pagination = paginate_array($depenses, $_GET['page'] ?? 1, pagination_per_page(5));
         $stats = $this->depenseModel->getStats($filters['date_debut'], $filters['date_fin']);
         $parCategorie = $this->depenseModel->getByCategorie($filters['date_debut'], $filters['date_fin']);
         
         $this->view('depenses/index', [
-            'depenses' => $depenses,
+            'depenses' => $pagination['data'],
             'filters' => $filters,
             'stats' => $stats,
-            'parCategorie' => $parCategorie
+            'parCategorie' => $parCategorie,
+            'pagination' => $pagination
         ]);
     }
     

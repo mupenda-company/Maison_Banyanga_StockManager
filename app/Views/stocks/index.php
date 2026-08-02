@@ -14,6 +14,7 @@ ob_start();
 <div class="card mb-6">
     <div class="card-body py-3">
         <form method="GET" class="flex flex-wrap items-center gap-4">
+            <input type="hidden" name="per_page" value="<?= (int) ($pagination['per_page'] ?? pagination_per_page(5)) ?>">
             <div class="flex items-center gap-2">
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">Produit</label>
                 <select name="produit_id" class="input py-1.5 w-48">
@@ -303,32 +304,25 @@ ob_start();
         </div>
         
         <!-- Pagination -->
-        <?php if ($pagination['last_page'] > 1): ?>
+        <?php if (!empty($pagination)): ?>
         <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <p class="text-sm text-gray-500 dark:text-gray-400">
                 Page <span class="font-bold text-gray-900 dark:text-white"><?= $pagination['current_page'] ?></span> sur <?= $pagination['last_page'] ?>
                 <span class="mx-1">•</span> Total: <?= $pagination['total'] ?>
             </p>
-            <div class="flex space-x-1">
-                <?php if ($pagination['current_page'] > 1): ?>
-                <a href="?<?= http_build_query(array_merge($_GET, ['page' => $pagination['current_page'] - 1])) ?>" class="btn btn-secondary btn-sm">Précédent</a>
-                <?php endif; ?>
-
-                <?php 
-                $start = max(1, $pagination['current_page'] - 2);
-                $end = min($pagination['last_page'], $start + 4);
-                if ($end - $start < 4) $start = max(1, $end - 4);
-                
-                for ($i = $start; $i <= $end; $i++): ?>
-                <a href="?<?= http_build_query(array_merge($_GET, ['page' => $i])) ?>" 
-                   class="btn-sm px-3 <?= $i == $pagination['current_page'] ? 'btn-primary font-bold' : 'btn-secondary font-normal' ?>">
-                    <?= $i ?>
-                </a>
-                <?php endfor; ?>
-
-                <?php if ($pagination['current_page'] < $pagination['last_page']): ?>
-                <a href="?<?= http_build_query(array_merge($_GET, ['page' => $pagination['current_page'] + 1])) ?>" class="btn btn-secondary btn-sm">Suivant</a>
-                <?php endif; ?>
+            <div class="flex flex-wrap items-center gap-3">
+            <?= render_per_page_selector($pagination['per_page'] ?? null, $_GET) ?>
+            <?= render_pagination(
+                $pagination['current_page'],
+                $pagination['last_page'],
+                $_GET,
+                [
+                    'previous_label' => 'Précédent',
+                    'button_class' => 'btn btn-secondary btn-sm',
+                    'active_class' => 'btn-primary btn-sm font-bold',
+                    'disabled_class' => 'btn btn-secondary btn-sm opacity-50 cursor-not-allowed'
+                ]
+            ) ?>
             </div>
         </div>
         <?php endif; ?>

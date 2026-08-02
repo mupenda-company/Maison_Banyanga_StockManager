@@ -23,11 +23,13 @@ class VehiculeController extends Controller
         $this->requirePermission('vehicules.voir');
         
         $vehicules = $this->vehiculeModel->getWithAgent();
+        $pagination = paginate_array($vehicules, $_GET['page'] ?? 1, pagination_per_page(5));
         $agents = $this->userModel->getByRole(ROLE_VENDEUR);
         
         $this->view('vehicules/index', [
-            'vehicules' => $vehicules,
-            'agents' => $agents
+            'vehicules' => $pagination['data'],
+            'agents' => $agents,
+            'pagination' => $pagination
         ]);
     }
 
@@ -116,13 +118,15 @@ class VehiculeController extends Controller
             $entrepot = (new Emplacement())->getPrincipal();
             $stockEntrepot = $entrepot ? (new Stock())->getByEmplacement($entrepot['id']) : [];
 
+            $pagination = paginate_array($vehicules, $_GET['page'] ?? 1, pagination_per_page(5));
             $this->view('vehicules/inventaire', [
-                'vehicules' => $vehicules,
+                'vehicules' => $pagination['data'],
                 'totaux' => $totaux,
                 'produits' => $produits,
                 'print_mode' => false,
                 'can_edit_inventory' => $canEditInventory,
                 'stock_entrepot' => $stockEntrepot,
+                'pagination' => $pagination,
             ]);
         }
     }

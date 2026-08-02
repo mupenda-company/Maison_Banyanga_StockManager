@@ -53,12 +53,15 @@ class EmpruntEmballageController extends Controller
             return;
         }
 
+        $pagination = paginate_array($emprunts, $_GET['page'] ?? 1, pagination_per_page(5));
+
         $this->view('emballages/emprunts', [
-            'emprunts' => $emprunts,
+            'emprunts' => $pagination['data'],
             'clients' => $this->clientModel->all('nom'),
             'produits' => $this->produitModel->getActive(),
             'emplacements' => $this->emplacementModel->getFixes(),
-            'filters' => $filters
+            'filters' => $filters,
+            'pagination' => $pagination
         ]);
     }
 

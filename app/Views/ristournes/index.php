@@ -44,6 +44,7 @@ ob_start();
 <div class="card mb-6 no-print">
     <div class="card-body">
         <form method="GET" class="flex flex-wrap items-end gap-4">
+            <input type="hidden" name="per_page" value="<?= (int) ($pagination['per_page'] ?? pagination_per_page(5)) ?>">
             <div class="w-48">
                 <label class="label">Mois</label>
                 <select name="mois" class="input">
@@ -140,6 +141,13 @@ ob_start();
                 </tbody>
             </table>
         </div>
+        <?php if (!$printMode && !empty($pagination)): ?>
+            <?= render_pagination_footer($pagination, 'ristourne(s)', $_GET, [
+                'button_class' => 'btn btn-sm btn-secondary',
+                'active_class' => 'btn btn-sm btn-primary font-bold',
+                'disabled_class' => 'btn btn-sm btn-secondary opacity-50 cursor-not-allowed'
+            ]) ?>
+        <?php endif; ?>
     </div>
 </div>
 

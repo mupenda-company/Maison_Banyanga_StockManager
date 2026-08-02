@@ -27,6 +27,7 @@ ob_start();
         <div class="card-header flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Liste des clients</h2>
             <form method="get" class="grid w-full min-w-0 grid-cols-1 sm:grid-cols-2 xl:flex xl:w-auto xl:items-center gap-3">
+                <input type="hidden" name="per_page" value="<?= (int) ($pagination['per_page'] ?? pagination_per_page(5)) ?>">
                 <input
                     type="search"
                     name="q"
@@ -129,6 +130,13 @@ ob_start();
                 </table>
             </div>
         </div>
+        <?php if (!empty($pagination)): ?>
+            <?= render_pagination_footer($pagination, 'client(s)', $_GET, [
+                'button_class' => 'btn btn-sm btn-secondary',
+                'active_class' => 'btn btn-sm btn-primary font-bold',
+                'disabled_class' => 'btn btn-sm btn-secondary opacity-50 cursor-not-allowed'
+            ]) ?>
+        <?php endif; ?>
     </div>
 
     <!-- Modal Client -->

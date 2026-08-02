@@ -25,6 +25,7 @@ if (!empty($filters['categorie'])) {
     $baseQuery['categorie'] = $filters['categorie'];
 }
 if (!empty($filters['date_stock'])) { $baseQuery['date_stock'] = $filters['date_stock']; }
+if (!empty($_GET['per_page'])) { $baseQuery['per_page'] = $_GET['per_page']; }
 $printUrl = '?' . http_build_query(array_merge($baseQuery, ['print' => 1]));
 $exportUrl = '?' . http_build_query(array_merge($baseQuery, ['export' => 'excel']));
 ob_start();
@@ -77,6 +78,7 @@ ob_start();
 <div class="card mb-6 no-print">
     <div class="card-body">
         <form method="GET" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 items-end">
+            <input type="hidden" name="per_page" value="<?= (int) ($pagination['per_page'] ?? pagination_per_page(5)) ?>">
             <div>
                 <label class="label">Produit</label>
                 <select name="produit_id" class="input w-full">
@@ -256,31 +258,24 @@ ob_start();
         </div>
 
         <!-- Pagination -->
-        <?php if (!$printMode && $pagination['last_page'] > 1): ?>
+        <?php if (!$printMode && !empty($pagination)): ?>
         <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between no-print">
             <p class="text-sm text-gray-500">
                 Page <span class="font-bold text-gray-900 dark:text-white"><?= $pagination['current_page'] ?></span> sur <?= $pagination['last_page'] ?>
             </p>
-            <div class="flex space-x-1">
-                <?php if ($pagination['current_page'] > 1): ?>
-                <a href="?<?= http_build_query(array_merge($baseQuery, ['page' => $pagination['current_page'] - 1])) ?>" class="btn-secondary btn-sm">Précédent</a>
-                <?php endif; ?>
-
-                <?php 
-                $start = max(1, $pagination['current_page'] - 2);
-                $end = min($pagination['last_page'], $start + 4);
-                if ($end - $start < 4) $start = max(1, $end - 4);
-                
-                for ($i = $start; $i <= $end; $i++): ?>
-                <a href="?<?= http_build_query(array_merge($baseQuery, ['page' => $i])) ?>" 
-                   class="btn-sm px-3 <?= $i == $pagination['current_page'] ? 'btn-primary font-bold' : 'btn-secondary font-normal' ?>">
-                    <?= $i ?>
-                </a>
-                <?php endfor; ?>
-
-                <?php if ($pagination['current_page'] < $pagination['last_page']): ?>
-                <a href="?<?= http_build_query(array_merge($baseQuery, ['page' => $pagination['current_page'] + 1])) ?>" class="btn-secondary btn-sm">Suivant</a>
-                <?php endif; ?>
+            <div class="flex flex-wrap items-center gap-3">
+            <?= render_per_page_selector($pagination['per_page'] ?? null, $baseQuery) ?>
+            <?= render_pagination(
+                $pagination['current_page'],
+                $pagination['last_page'],
+                $baseQuery,
+                [
+                    'previous_label' => 'Précédent',
+                    'button_class' => 'btn-secondary btn-sm',
+                    'active_class' => 'btn-primary btn-sm font-bold',
+                    'disabled_class' => 'btn-secondary btn-sm opacity-50 cursor-not-allowed'
+                ]
+            ) ?>
             </div>
         </div>
         <?php endif; ?>

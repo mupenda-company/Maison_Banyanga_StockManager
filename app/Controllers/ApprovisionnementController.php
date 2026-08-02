@@ -71,8 +71,8 @@ class ApprovisionnementController extends Controller
             return;
         }
 
-        $page = (int) ($_GET['page'] ?? 1);
-        $approvisionnements = $this->approvisionnementModel->getAllPaginated($page, 5, $filters);
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+        $approvisionnements = $this->approvisionnementModel->getAllPaginated($page, pagination_per_page(5), $filters);
         
         $this->view('approvisionnements/index', [
             'approvisionnements' => $approvisionnements,

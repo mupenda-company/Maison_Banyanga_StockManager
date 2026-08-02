@@ -35,8 +35,9 @@ class VenteController extends Controller
             'emplacement_id' => $_GET['emplacement_id'] ?? null
         ];
         
-        $page = (int) ($_GET['page'] ?? 1);
-        $ventes = $this->venteModel->getAllWithClient($page, 20, $filters);
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+        $perPage = pagination_per_page(5);
+        $ventes = $this->venteModel->getAllWithClient($page, $perPage, $filters);
         
         $clients = $this->clientModel->getAllWithZone();
         $emplacements = $this->emplacementModel->all('type, nom');

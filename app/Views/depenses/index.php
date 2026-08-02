@@ -72,6 +72,7 @@ ob_start();
 <div class="card mb-6">
     <div class="card-body">
         <form method="GET" class="flex flex-wrap gap-4 items-end">
+            <input type="hidden" name="per_page" value="<?= (int) ($pagination['per_page'] ?? pagination_per_page(5)) ?>">
             <div>
                 <label class="label">Catégorie</label>
                 <select name="categorie" class="input">
@@ -169,6 +170,13 @@ ob_start();
             </table>
         </div>
     </div>
+    <?php if (!empty($pagination)): ?>
+        <?= render_pagination_footer($pagination, 'dépense(s)', $_GET, [
+            'button_class' => 'btn btn-sm btn-secondary',
+            'active_class' => 'btn btn-sm btn-primary font-bold',
+            'disabled_class' => 'btn btn-sm btn-secondary opacity-50 cursor-not-allowed'
+        ]) ?>
+    <?php endif; ?>
 </div>
 
 <script>

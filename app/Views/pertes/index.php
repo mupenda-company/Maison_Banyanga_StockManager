@@ -7,6 +7,7 @@ foreach (['type', 'date_debut', 'date_fin', 'produit_id', 'emplacement_id', 'age
         $baseQuery[$key] = $_GET[$key];
     }
 }
+$allPertes = $allPertes ?? $pertes;
 $printUrl = '?' . http_build_query(array_merge($baseQuery, ['print' => 1]));
 $exportUrl = '?' . http_build_query(array_merge($baseQuery, ['export' => 'excel']));
 ob_start();
@@ -52,6 +53,7 @@ ob_start();
 <div class="card mb-6 no-print">
     <div class="card-body">
         <form method="GET" class="flex flex-wrap gap-4 items-end">
+            <input type="hidden" name="per_page" value="<?= (int) ($pagination['per_page'] ?? pagination_per_page(5)) ?>">
             <div>
                 <label class="label">Type</label>
                 <select name="type" class="input">
@@ -229,6 +231,13 @@ ob_start();
         </div>
         <?php endif; ?>
     </div>
+    <?php if (!$printMode && !empty($pagination)): ?>
+        <?= render_pagination_footer($pagination, 'perte(s)', $_GET, [
+            'button_class' => 'btn btn-sm btn-secondary',
+            'active_class' => 'btn btn-sm btn-primary font-bold',
+            'disabled_class' => 'btn btn-sm btn-secondary opacity-50 cursor-not-allowed'
+        ]) ?>
+    <?php endif; ?>
 </div>
 
 <script>
@@ -272,7 +281,6 @@ window.addEventListener('afterprint', function () { if (window.opener) window.cl
 $content = ob_get_clean();
 require_once ROOT_PATH . '/app/Views/layouts/app.php';
 ?>
-
 
 
 

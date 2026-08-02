@@ -85,8 +85,18 @@ ob_start();
         </div>
     </div>
     <?php endforeach; ?>
-    <?php endif; ?>
+<?php endif; ?>
 </div>
+
+<?php if (!empty($pagination)): ?>
+    <div class="mt-6">
+        <?= render_pagination_footer($pagination, 'zone(s)', $_GET, [
+            'button_class' => 'btn btn-sm btn-secondary',
+            'active_class' => 'btn btn-sm btn-primary font-bold',
+            'disabled_class' => 'btn btn-sm btn-secondary opacity-50 cursor-not-allowed'
+        ]) ?>
+    </div>
+<?php endif; ?>
 
 <!-- Modal création/édition -->
 <div x-data="zoneModal" x-show="isOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">

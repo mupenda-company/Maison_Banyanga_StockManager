@@ -39,12 +39,16 @@ class ManquantController extends Controller
             return;
         }
 
+        $pagination = paginate_array($rows, $_GET['page'] ?? 1, pagination_per_page(5));
+
         $this->view('manquants/index', [
-            'manquants' => $rows,
+            'manquants' => $pagination['data'],
+            'allManquants' => $rows,
             'resume' => $this->model->getSummaryByAgent($filters),
             'agents' => (new User())->getActive(),
             'produits' => (new Produit())->getActive(),
             'filters' => $filters,
+            'pagination' => $pagination,
             'print_mode' => isset($_GET['print']),
         ]);
     }

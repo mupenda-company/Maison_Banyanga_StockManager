@@ -2,15 +2,16 @@
 $pageTitle = 'Manquants agents';
 $printMode = !empty($print_mode);
 $query = array_filter($filters, fn($v) => $v !== null && $v !== '');
+$allManquants = $allManquants ?? $manquants;
 $periodeLabel = date('d/m/Y', strtotime($filters['date_debut'])) . ' au ' . date('d/m/Y', strtotime($filters['date_fin']));
-$totalMontant = array_sum(array_map(fn($m) => (float) ($m['montant'] ?? 0), $manquants));
-$totalPaye = array_sum(array_map(fn($m) => (float) ($m['montant_paye'] ?? 0), $manquants));
-$totalReste = array_sum(array_map(fn($m) => (float) ($m['reste_montant'] ?? 0), $manquants));
-$totalCaissesReglees = array_sum(array_map(fn($m) => (float) ($m['quantite_caisses_reglee'] ?? 0), $manquants));
-$totalResteCaisses = array_sum(array_map(fn($m) => (float) ($m['reste_caisses'] ?? max(0, (float)($m['quantite_caisses'] ?? 0) - (float)($m['quantite_caisses_reglee'] ?? 0))), $manquants));
-$totalEmballages = array_sum(array_map(fn($m) => (float) ($m['quantite_emballages'] ?? 0), $manquants));
-$totalEmballagesRegles = array_sum(array_map(fn($m) => (float) ($m['quantite_emballages_reglee'] ?? 0), $manquants));
-$totalResteEmballages = array_sum(array_map(fn($m) => (float) ($m['reste_emballages'] ?? max(0, (float)($m['quantite_emballages'] ?? 0) - (float)($m['quantite_emballages_reglee'] ?? 0))), $manquants));
+$totalMontant = array_sum(array_map(fn($m) => (float) ($m['montant'] ?? 0), $allManquants));
+$totalPaye = array_sum(array_map(fn($m) => (float) ($m['montant_paye'] ?? 0), $allManquants));
+$totalReste = array_sum(array_map(fn($m) => (float) ($m['reste_montant'] ?? 0), $allManquants));
+$totalCaissesReglees = array_sum(array_map(fn($m) => (float) ($m['quantite_caisses_reglee'] ?? 0), $allManquants));
+$totalResteCaisses = array_sum(array_map(fn($m) => (float) ($m['reste_caisses'] ?? max(0, (float)($m['quantite_caisses'] ?? 0) - (float)($m['quantite_caisses_reglee'] ?? 0))), $allManquants));
+$totalEmballages = array_sum(array_map(fn($m) => (float) ($m['quantite_emballages'] ?? 0), $allManquants));
+$totalEmballagesRegles = array_sum(array_map(fn($m) => (float) ($m['quantite_emballages_reglee'] ?? 0), $allManquants));
+$totalResteEmballages = array_sum(array_map(fn($m) => (float) ($m['reste_emballages'] ?? max(0, (float)($m['quantite_emballages'] ?? 0) - (float)($m['quantite_emballages_reglee'] ?? 0))), $allManquants));
 $customStyle = "
 @media print {
     @page { size: A4 portrait; margin: 10mm; }
@@ -59,6 +60,7 @@ ob_start();
     <div class="card mb-6 no-print">
         <div class="card-body">
             <form method="GET" class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                <input type="hidden" name="per_page" value="<?= (int) ($pagination['per_page'] ?? pagination_per_page(5)) ?>">
                 <div>
                     <label class="label">Agent</label>
                     <select name="agent_id" class="input">
@@ -105,7 +107,7 @@ ob_start();
     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
         <div class="stat-card dark:bg-gray-800 dark:border-gray-700">
             <p class="stat-label dark:text-gray-400">Manquants</p>
-            <p class="stat-value text-gray-900 dark:text-white"><?= count($manquants) ?></p>
+            <p class="stat-value text-gray-900 dark:text-white"><?= count($allManquants) ?></p>
         </div>
         <div class="stat-card border-l-4 border-blue-500 dark:bg-gray-800 dark:border-gray-700">
             <p class="stat-label dark:text-gray-400">Reste caisses</p>
@@ -219,6 +221,13 @@ ob_start();
             </tbody>
         </table>
     </div>
+    <?php if (!$printMode && !empty($pagination)): ?>
+        <?= render_pagination_footer($pagination, 'manquant(s)', $_GET, [
+            'button_class' => 'btn btn-sm btn-secondary',
+            'active_class' => 'btn btn-sm btn-primary font-bold',
+            'disabled_class' => 'btn btn-sm btn-secondary opacity-50 cursor-not-allowed'
+        ]) ?>
+    <?php endif; ?>
 
     <div x-show="payment.open" class="fixed inset-0 z-50 flex items-center justify-center p-4 no-print" style="display:none">
         <div class="absolute inset-0 bg-black/50" @click="payment.open=false"></div>

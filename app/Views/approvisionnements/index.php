@@ -6,6 +6,7 @@ ob_start();
 <div class="card mb-6">
     <div class="card-body py-3">
         <form method="GET" class="flex flex-wrap items-center gap-4">
+            <input type="hidden" name="per_page" value="<?= (int) ($approvisionnements['per_page'] ?? pagination_per_page(5)) ?>">
             <div class="flex items-center gap-2">
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">Du</label>
                 <input type="date" name="date_debut" value="<?= $filters['date_debut'] ?? '' ?>" class="input py-1.5 w-40">
@@ -408,22 +409,19 @@ document.addEventListener('alpine:init', () => {
                 à <?= min($approvisionnements['current_page'] * $approvisionnements['per_page'], $approvisionnements['total']) ?> 
                 sur <?= $approvisionnements['total'] ?> résultats
             </p>
-            <div class="flex space-x-1">
-                <?php if ($approvisionnements['current_page'] > 1): ?>
-                <a href="?<?= http_build_query(array_merge($_GET, ['page' => $approvisionnements['current_page'] - 1])) ?>" class="btn-secondary btn-sm">Précédent</a>
-                <?php endif; ?>
-
-                <?php 
-                for ($i = 1; $i <= $approvisionnements['last_page']; $i++): ?>
-                <a href="?<?= http_build_query(array_merge($_GET, ['page' => $i])) ?>" 
-                   class="btn-sm px-3 <?= $i == $approvisionnements['current_page'] ? 'btn-primary' : 'btn-secondary' ?>">
-                    <?= $i ?>
-                </a>
-                <?php endfor; ?>
-
-                <?php if ($approvisionnements['current_page'] < $approvisionnements['last_page']): ?>
-                <a href="?<?= http_build_query(array_merge($_GET, ['page' => $approvisionnements['current_page'] + 1])) ?>" class="btn-secondary btn-sm">Suivant</a>
-                <?php endif; ?>
+            <div class="flex flex-wrap items-center gap-3">
+            <?= render_per_page_selector($approvisionnements['per_page'] ?? null, $_GET) ?>
+            <?= render_pagination(
+                $approvisionnements['current_page'],
+                $approvisionnements['last_page'],
+                $_GET,
+                [
+                    'previous_label' => 'Précédent',
+                    'button_class' => 'btn-secondary btn-sm',
+                    'active_class' => 'btn-primary btn-sm font-bold',
+                    'disabled_class' => 'btn-secondary btn-sm opacity-50 cursor-not-allowed'
+                ]
+            ) ?>
             </div>
         </div>
     </div>

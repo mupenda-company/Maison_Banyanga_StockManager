@@ -55,14 +55,16 @@ class ClientController extends Controller
         }
 
         $zones = $this->zoneModel->all();
+        $pagination = paginate_array($clients, $_GET['page'] ?? 1, pagination_per_page(5));
         
         $this->view('clients/index', [
-            'clients' => $clients,
+            'clients' => $pagination['data'],
             'zones' => $zones,
             'search' => $search,
             'selectedZoneId' => $zoneId,
             'activite' => $activite,
             'stats' => $stats,
+            'pagination' => $pagination,
         ]);
     }
 

@@ -6,26 +6,27 @@ ob_start();
 <div class="card">
     <div class="card-header flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Liste des produits</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full lg:flex lg:w-auto lg:items-center">
+        <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full lg:flex lg:w-auto lg:items-center">
+            <input type="hidden" name="per_page" value="<?= (int) ($pagination['per_page'] ?? pagination_per_page(5)) ?>">
             <!-- Filtre catégorie -->
-            <select class="input w-full lg:w-auto" onchange="window.location.href='?categorie='+this.value">
+            <select name="categorie" class="input w-full lg:w-auto" onchange="this.form.submit()">
                 <option value="">Toutes les catégories</option>
                 <?php foreach ($categories as $cat): ?>
-                <option value="<?= htmlspecialchars($cat['categorie']) ?>" <?= ($_GET['categorie'] ?? '') === $cat['categorie'] ? 'selected' : '' ?>>
+                <option value="<?= htmlspecialchars($cat['categorie']) ?>" <?= ($selectedCategorie ?? '') === $cat['categorie'] ? 'selected' : '' ?>>
                     <?= htmlspecialchars($cat['categorie']) ?>
                 </option>
                 <?php endforeach; ?>
             </select>
             
             <?php if (can('produits.creer')): ?>
-            <button onclick="openProduitModal()" class="btn btn-primary w-full lg:w-auto">
+            <button type="button" onclick="openProduitModal()" class="btn btn-primary w-full lg:w-auto">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
                 Nouveau produit
             </button>
             <?php endif; ?>
-        </div>
+        </form>
     </div>
     <div class="card-body p-0">
         <div class="table-container">
@@ -156,6 +157,13 @@ ob_start();
             </table>
         </div>
     </div>
+    <?php if (!empty($pagination)): ?>
+        <?= render_pagination_footer($pagination, 'produit(s)', $_GET, [
+            'button_class' => 'btn btn-sm btn-secondary',
+            'active_class' => 'btn btn-sm btn-primary font-bold',
+            'disabled_class' => 'btn btn-sm btn-secondary opacity-50 cursor-not-allowed'
+        ]) ?>
+    <?php endif; ?>
 </div>
 
 <!-- Modal Produit -->
@@ -219,7 +227,7 @@ ob_start();
                                 <input type="text" x-model="form.famille_emballage" class="input" list="familles-emballages"
                                        placeholder="Ex. STANDARD_72CL_12" required>
                                 <datalist id="familles-emballages">
-                                    <?php foreach (array_unique(array_filter(array_column($produits, 'famille_emballage'))) as $famille): ?>
+                                    <?php foreach (array_unique(array_filter(array_column($allProduits ?? $produits, 'famille_emballage'))) as $famille): ?>
                                         <option value="<?= htmlspecialchars($famille) ?>"></option>
                                     <?php endforeach; ?>
                                 </datalist>

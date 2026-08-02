@@ -62,7 +62,20 @@ class MissionController extends Controller
             $params['date_depart'] = $filters['date'];
         }
         
-        $page = (int) ($_GET['page'] ?? 1);
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+        $perPage = pagination_per_page(5);
+        $total = (int) $this->db->fetchColumn(
+            "SELECT COUNT(*)
+             FROM missions m
+             JOIN vehicules v ON m.vehicule_id = v.id
+             LEFT JOIN users u ON v.agent_responsable_id = u.id
+             LEFT JOIN zones z ON m.zone_id = z.id
+             LEFT JOIN clients c ON m.client_id = c.id
+             WHERE " . implode(' AND ', $conditions),
+            $params
+        );
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $lastPage);
         
         $missions = $this->db->fetchAll(
             "SELECT m.*, v.immatriculation, u.nom as agent_nom, u.prenom as agent_prenom, z.nom as zone_nom, c.nom as client_nom,
@@ -84,7 +97,7 @@ class MissionController extends Controller
              LEFT JOIN clients c ON m.client_id = c.id
              WHERE " . implode(' AND ', $conditions) . "
              ORDER BY m.date_depart DESC
-             LIMIT 20 OFFSET " . (($page - 1) * 20)
+             LIMIT {$perPage} OFFSET " . (($page - 1) * $perPage)
             , $params
         );
         
@@ -93,7 +106,13 @@ class MissionController extends Controller
         $this->view('missions/index', [
             'missions' => $missions,
             'vehicules' => $vehicules,
-            'filters' => $filters
+            'filters' => $filters,
+            'pagination' => [
+                'current_page' => $page,
+                'last_page' => $lastPage,
+                'total' => $total,
+                'per_page' => $perPage
+            ]
         ]);
     }
 
