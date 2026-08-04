@@ -97,6 +97,14 @@ class Vente extends Model
             $where .= " AND v.client_id = :client_id";
             $params['client_id'] = $filters['client_id'];
         }
+
+        if (!empty($filters['client_search'])) {
+            $where .= " AND (c.nom LIKE :client_search_nom OR c.numero_client LIKE :client_search_numero OR c.telephone LIKE :client_search_tel)";
+            $clientSearch = '%' . $filters['client_search'] . '%';
+            $params['client_search_nom'] = $clientSearch;
+            $params['client_search_numero'] = $clientSearch;
+            $params['client_search_tel'] = $clientSearch;
+        }
         
         if (!empty($filters['date_debut'])) {
             $where .= " AND v.date_vente >= :date_debut";
@@ -122,13 +130,18 @@ class Vente extends Model
         
         $offset = ($page - 1) * $perPage;
         
-        $countSql = "SELECT COUNT(*) FROM {$this->table} v WHERE {$where}";
+        $countSql = "SELECT COUNT(*)
+                     FROM {$this->table} v
+                     LEFT JOIN clients c ON v.client_id = c.id
+                     WHERE {$where}";
         $total = (int) $this->db->fetchColumn($countSql, $params);
         
         $sql = "SELECT v.*, c.nom as client_nom, c.telephone as client_telephone,
+                       z.nom as zone_nom,
                        e.nom as emplacement_nom, e.type as emplacement_type
                 FROM {$this->table} v
                 LEFT JOIN clients c ON v.client_id = c.id
+                LEFT JOIN zones z ON c.zone_id = z.id
                 LEFT JOIN emplacements e ON v.emplacement_id = e.id
                 WHERE {$where}
                 ORDER BY v.date_vente DESC

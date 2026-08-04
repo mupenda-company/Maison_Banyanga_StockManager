@@ -42,6 +42,7 @@ $approvisionnementsUrl = url('approvisionnements');
             return {
                 date: '<?= $approvisionnement['date_approvisionnement'] ?>',
                 fournisseur: <?= json_encode($approvisionnement['fournisseur'] ?? 'Bralima') ?>,
+                montantDeposeFournisseur: <?= json_encode((float) ($approvisionnement['montant_depose_fournisseur'] ?? 0)) ?>,
                 type_achat: <?= json_encode($approvisionnement['details'][0]['type_achat'] ?? 'deposer') ?>,
                 notes: <?= json_encode($approvisionnement['notes'] ?? '') ?>,
                 lignes: <?= json_encode(array_map(function($d) {
@@ -127,6 +128,7 @@ $approvisionnementsUrl = url('approvisionnements');
                         await App.api('<?= url('api/approvisionnements/' . $approvisionnement['id']) ?>', 'PUT', {
                             date_approvisionnement: this.date,
                             fournisseur: this.fournisseur,
+                            montant_depose_fournisseur: parseFloat(this.montantDeposeFournisseur || 0),
                             notes: this.notes,
                             details: details
                         });
@@ -171,6 +173,21 @@ $approvisionnementsUrl = url('approvisionnements');
                             <option value="deposer">Prix achat a deposer</option>
                             <option value="enlever">Prix achat a enlever</option>
                         </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800 p-4">
+                        <p class="text-xs uppercase text-gray-500">Solde fournisseur avant recalcul</p>
+                        <p class="text-lg font-bold text-blue-700"><?= format_money_converted($approvisionnement['solde_fournisseur_avant'] ?? 0) ?></p>
+                    </div>
+                    <div class="rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800 p-4">
+                        <label class="label">Montant a deposer chez le fournisseur</label>
+                        <input type="number" min="0" step="0.01" x-model.number="montantDeposeFournisseur" class="input">
+                    </div>
+                    <div class="rounded-lg border border-gray-200 bg-gray-50 dark:bg-gray-800 dark:border-gray-700 p-4">
+                        <p class="text-xs uppercase text-gray-500">Ancien solde apres operation</p>
+                        <p class="text-lg font-bold text-gray-700 dark:text-gray-200"><?= format_money_converted($approvisionnement['solde_fournisseur_apres'] ?? 0) ?></p>
                     </div>
                 </div>
 

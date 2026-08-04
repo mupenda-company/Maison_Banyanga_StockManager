@@ -485,19 +485,34 @@ document.addEventListener('alpine:init', () => {
             return v.stock;
         },
 
-        selectedProduitStock() {
+        resetLines() {
+            this.form.lignes = [{ produit_id: '', caisses_pleine: 0, caisses_vide: 0 }];
+        },
+
+        addLine() {
+            this.form.lignes.push({ produit_id: '', caisses_pleine: 0, caisses_vide: 0 });
+        },
+
+        removeLine(index) {
+            if (this.form.lignes.length > 1) {
+                this.form.lignes.splice(index, 1);
+            }
+        },
+
+        selectedProduitStock(line = null) {
             const stock = this.sourceStock();
-            const ligne = stock.find(s => String(s.produit_id) === String(this.form.produit_id));
+            const produitId = line ? line.produit_id : this.form.produit_id;
+            const ligne = stock.find(s => String(s.produit_id) === String(produitId));
             return ligne || null;
         },
 
-        maxCaissesPleine() {
-            const s = this.selectedProduitStock();
+        maxCaissesPleine(line = null) {
+            const s = this.selectedProduitStock(line);
             return s ? Math.max(0, Math.round(parseFloat(s.caisses_pleine || 0))) : 0;
         },
 
-        maxCaissesVide() {
-            const s = this.selectedProduitStock();
+        maxCaissesVide(line = null) {
+            const s = this.selectedProduitStock(line);
             return s ? Math.max(0, Math.round(parseFloat(s.caisses_vide || 0))) : 0;
         },
 

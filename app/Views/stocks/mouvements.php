@@ -117,11 +117,11 @@ ob_start();
 
 <!-- Liste des mouvements -->
 <div class="card">
-    <div class="card-header flex items-center justify-between">
+    <div class="card-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h2 class="text-lg font-semibold">Historique des mouvements</h2>
-        <div class="flex gap-2 no-print">
+        <div class="flex flex-wrap gap-2 no-print w-full sm:w-auto justify-start sm:justify-end">
             <?php if (can($permissionPrefix . '.imprimer')): ?>
-            <button type="button" onclick="(function(){var url='<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>';var w=window.open(url,'_blank');if(!w){window.location.href=url;}})()" class="btn btn-sm btn-secondary mr-2">
+            <button type="button" onclick="(function(){var url='<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>';var w=window.open(url,'_blank');if(!w){window.location.href=url;}})()" class="btn btn-sm btn-secondary">
                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
                 </svg>
@@ -129,7 +129,7 @@ ob_start();
             </button>
             <?php endif; ?>
             <?php if (can($permissionPrefix . '.exporter')): ?>
-            <a href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-sm btn-secondary mr-2">
+            <a href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-sm btn-secondary">
                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
@@ -137,7 +137,7 @@ ob_start();
             </a>
             <?php endif; ?>
             <?php if (can($permissionPrefix . '.transferer')): ?>
-            <button onclick="openTransfertModal()" class="btn btn-sm btn-primary mr-2">
+            <button onclick="openTransfertModal()" class="btn btn-sm btn-primary">
                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
                 </svg>

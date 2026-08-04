@@ -139,13 +139,54 @@ class StockController extends Controller
             $stocks[$stock['produit_id']] = $stock;
         }
 
+        $initialSnapshots = $this->stockModel->getInitialSnapshotsByEmplacement((int) $emplacementPrincipal['id'], $modeStock);
+        if (isset($_GET['export']) && $_GET['export'] === 'excel') {
+            $this->requireStockOrEmballagePermission('exporter');
+            $this->exportInventaireInitialExcel($initialSnapshots, $modeStock);
+            return;
+        }
+
         $this->view('stocks/inventaire_initial', [
             'produits' => $produits,
             'emplacement' => $emplacementPrincipal,
             'stocks' => $stocks,
-            'initialSnapshots' => $this->stockModel->getInitialSnapshotsByEmplacement((int) $emplacementPrincipal['id'], $modeStock),
-            'emballageMode' => $this->isEmballageRoute()
+            'initialSnapshots' => $initialSnapshots,
+            'emballageMode' => $this->isEmballageRoute(),
+            'print_mode' => isset($_GET['print']) && (string) $_GET['print'] === '1'
         ]);
+    }
+
+    private function exportInventaireInitialExcel(array $snapshots, string $modeStock): void
+    {
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet()->setTitle('Comparaison initiale');
+        $headers = ['Produit', 'Code', 'Initial (cs)', 'Aujourd hui (cs)', 'Difference (cs)', 'Derniere base', 'Motif'];
+        $sheet->fromArray($headers, null, 'A1');
+        $this->styleHeaderRow($sheet, count($headers));
+
+        $row = 2;
+        $totalInitial = 0;
+        $totalActuel = 0;
+        foreach ($snapshots as $snapshot) {
+            $initial = (int) ($snapshot['caisses_initiales'] ?? 0);
+            $actuel = $modeStock === 'emballage'
+                ? (int) round((float) ($snapshot['caisses_vide_actuelles'] ?? 0))
+                : (int) round((float) ($snapshot['caisses_pleine_actuelles'] ?? 0));
+            $totalInitial += $initial;
+            $totalActuel += $actuel;
+            $sheet->fromArray([
+                $snapshot['produit_nom'] ?? '',
+                $snapshot['produit_code'] ?? '',
+                $initial,
+                $actuel,
+                $actuel - $initial,
+                !empty($snapshot['updated_at']) ? date('d/m/Y H:i', strtotime($snapshot['updated_at'])) : '',
+                $snapshot['motif'] ?? '',
+            ], null, 'A' . $row++);
+        }
+        $sheet->fromArray(['TOTAL', '', $totalInitial, $totalActuel, $totalActuel - $totalInitial, '', ''], null, 'A' . $row);
+        $sheet->getStyle('A' . $row . ':G' . $row)->getFont()->setBold(true);
+        $this->sendXlsx($spreadsheet, 'comparaison_inventaire_initial_' . $modeStock . '_' . date('Y-m-d_H-i') . '.xlsx');
     }
 
     /**
@@ -719,6 +760,7 @@ class StockController extends Controller
         $sheet->fromArray($headers, null, 'A1');
 
         $row = 2;
+        $totalCaissesMouvements = 0;
         foreach ($data as $m) {
             $produit     = new Produit();
             $p           = $produit->find($m['produit_id']);
@@ -730,6 +772,7 @@ class StockController extends Controller
                     ? abs((float) $m['quantite_caisses_reference'])
                     : abs($m['quantite'] / $btlParCaisse);
             }
+            $totalCaissesMouvements += abs((float) $caisses);
 
             $emplacement = $m['emplacement_source'] ?? ($m['emplacement_nom'] ?? '');
             if (($m['type_mouvement'] ?? '') === 'transfert' && !empty($m['emplacement_dest'])) {
@@ -746,6 +789,8 @@ class StockController extends Controller
                 $m['user_nom'],
             ], null, 'A' . $row++);
         }
+        $sheet->fromArray(['TOTAL', '', '', '', (int) round($totalCaissesMouvements), '', ''], null, 'A' . $row);
+        $sheet->getStyle('A' . $row . ':G' . $row)->getFont()->setBold(true);
 
         $this->styleHeaderRow($sheet, count($headers));
         $this->sendXlsx($spreadsheet, 'mouvements_stock_' . date('Y-m-d_H-i') . '.xlsx');

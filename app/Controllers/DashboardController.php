@@ -69,17 +69,16 @@ class DashboardController extends Controller
             ]
         );
         
-        // Produits en alerte
-        $produitsAlerteAll = $this->produitModel->getAlertProducts();
-        $nbProduitsAlerte = count($produitsAlerteAll);
-        $produitsAlerte = array_slice($produitsAlerteAll, 0, 5);
+        // Produits en alerte: meme source que l'icone d'alerte.
+        $nbProduitsAlerte = $this->alerteModel->countStockAlerts();
+        $produitsAlerte = $this->alerteModel->getStockAlerts(5);
 
         // Totaux de stock
         $stockTotaux = $this->stockModel->getInventaireTotaux();
         
         // Alertes non lues
-        $alertes = $this->alerteModel->getNonLues(5);
-        $nbAlertes = $this->alerteModel->countNonLues();
+        $alertes = $produitsAlerte;
+        $nbAlertes = $nbProduitsAlerte;
         
         // Missions en cours
         $missionsEnCours = array_slice($this->missionModel->getEnCours(), 0, 5);

@@ -1,11 +1,29 @@
 <?php 
 $emballageMode = !empty($emballageMode);
+$printMode = !empty($print_mode);
 $pageTitle = $emballageMode ? 'Stock initial emballages' : 'Inventaire initial';
 $returnUrl = $emballageMode ? url('emballages') : url('stocks');
+$printUrl = '?' . http_build_query(array_merge($_GET, ['print' => 1]));
+$exportUrl = '?' . http_build_query(array_merge($_GET, ['export' => 'excel']));
 ob_start();
 ?>
 
+<?php if ($printMode): ?>
+<style>
+@media print {
+    .no-print { display: none !important; }
+    body { background: white !important; }
+}
+</style>
+<div class="no-print fixed bottom-4 right-4 z-50 flex gap-2">
+    <button type="button" onclick="window.print()" class="btn btn-primary">Imprimer</button>
+    <button type="button" onclick="window.close()" class="btn btn-secondary">Fermer</button>
+</div>
+<script>window.addEventListener('load', function(){ window.print(); });</script>
+<?php endif; ?>
+
 <div class="max-w-6xl mx-auto">
+    <?php if (!$printMode): ?>
     <div class="card">
         <div class="card-header">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white"><?= $emballageMode ? 'Stock initial emballages du dépôt principal' : 'Inventaire initial du dépôt principal' ?></h2>
@@ -96,13 +114,22 @@ ob_start();
             </form>
         </div>
     </div>
+    <?php endif; ?>
 
     <div class="card mt-6">
-        <div class="card-header">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Comparaison avec l'inventaire initial</h3>
+        <div class="card-header flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Comparaison avec l'inventaire initial</h3>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 <?= $emballageMode ? 'Base initiale des emballages vides comparee avec le stock vide actuel.' : 'Base initiale des produits pleins comparee avec le stock plein actuel.' ?>
             </p>
+            </div>
+            <?php if (!$printMode): ?>
+            <div class="flex flex-wrap gap-2 no-print">
+                <button type="button" onclick="window.open('<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>','_blank')" class="btn btn-secondary btn-sm">Imprimer</button>
+                <a href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary btn-sm">Exporter</a>
+            </div>
+            <?php endif; ?>
         </div>
         <div class="card-body p-0">
             <div class="table-container">
@@ -122,13 +149,17 @@ ob_start();
                             <td colspan="5" class="p-8 text-center text-gray-500">Aucune base initiale enregistree pour le moment.</td>
                         </tr>
                         <?php else: ?>
-                            <?php foreach ($initialSnapshots as $snapshot): ?>
                             <?php
+                            $totalInitial = 0;
+                            $totalActuel = 0;
+                            foreach ($initialSnapshots as $snapshot):
                                 $initial = (int) ($snapshot['caisses_initiales'] ?? 0);
                                 $actuel = $emballageMode
                                     ? (int) round((float) ($snapshot['caisses_vide_actuelles'] ?? 0))
                                     : (int) round((float) ($snapshot['caisses_pleine_actuelles'] ?? 0));
                                 $difference = $actuel - $initial;
+                                $totalInitial += $initial;
+                                $totalActuel += $actuel;
                             ?>
                             <tr>
                                 <td>
@@ -148,6 +179,15 @@ ob_start();
                                 </td>
                             </tr>
                             <?php endforeach; ?>
+                            <tr class="bg-gray-100 dark:bg-gray-700 font-black">
+                                <td>TOTAL</td>
+                                <td class="text-right"><?= format_caisses($totalInitial) ?> cs</td>
+                                <td class="text-right text-primary-600"><?= format_caisses($totalActuel) ?> cs</td>
+                                <td class="text-right <?= ($totalActuel - $totalInitial) === 0 ? 'text-green-600' : (($totalActuel - $totalInitial) > 0 ? 'text-blue-600' : 'text-red-600') ?>">
+                                    <?= (($totalActuel - $totalInitial) > 0 ? '+' : '') . format_caisses($totalActuel - $totalInitial) ?> cs
+                                </td>
+                                <td></td>
+                            </tr>
                         <?php endif; ?>
                     </tbody>
                 </table>

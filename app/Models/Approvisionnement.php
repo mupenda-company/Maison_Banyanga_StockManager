@@ -493,8 +493,14 @@ class Approvisionnement extends Model
                  WHERE fournisseur = :fournisseur FOR UPDATE",
                 ['fournisseur' => $ancienFournisseur]
             );
+            $ancienDepose = (float) ($ancienAppro['montant_depose_fournisseur'] ?? 0);
+            $nouveauDepose = max(0, (float) ($data['montant_depose_fournisseur'] ?? $ancienDepose));
+            $soldeAvantRecalcule = round(
+                $soldeCourant + (float) ($ancienAppro['total_ht'] ?? 0) - $ancienDepose,
+                2
+            );
             $nouveauSolde = round(
-                $soldeCourant + (float) ($ancienAppro['total_ht'] ?? 0) - (float) $data['total_ht'],
+                $soldeAvantRecalcule + $nouveauDepose - (float) $data['total_ht'],
                 2
             );
             if ($nouveauSolde < -0.001) {
@@ -512,6 +518,8 @@ class Approvisionnement extends Model
                 'fournisseur' => $data['fournisseur'] ?? 'Bralima',
                 'notes' => $data['notes'] ?? '',
                 'total_ht' => $data['total_ht'],
+                'solde_fournisseur_avant' => $soldeAvantRecalcule,
+                'montant_depose_fournisseur' => $nouveauDepose,
                 'montant_utilise_fournisseur' => $data['total_ht'],
                 'solde_fournisseur_apres' => $nouveauSolde
             ]);

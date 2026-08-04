@@ -525,7 +525,8 @@
                                 </svg>
                                 <?php 
                                 $alerteModel = new Alerte();
-                                $nbAlertes = $alerteModel->countNonLues();
+                                $alerteModel->checkStockAlerts();
+                                $nbAlertes = $alerteModel->countStockAlerts();
                                 ?>
                                 <?php if ($nbAlertes > 0): ?>
                                 <span class="absolute top-0 right-0 -mt-1 -mr-1 px-2 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full">
@@ -545,15 +546,17 @@
                                     <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">Alertes</h3>
                                     <div class="space-y-2 max-h-64 overflow-y-auto">
                                         <?php 
-                                        $alertes = $alerteModel->getNonLues(5);
+                                        $alertes = $alerteModel->getStockAlerts(5);
                                         if (empty($alertes)): 
                                         ?>
                                         <p class="text-sm text-gray-500 dark:text-gray-400">Aucune alerte</p>
                                         <?php else: ?>
                                             <?php foreach ($alertes as $alerte): ?>
                                             <div class="p-2 rounded bg-<?= $alerte['niveau'] === 'danger' ? 'red' : ($alerte['niveau'] === 'warning' ? 'yellow' : 'blue') ?>-50 dark:bg-<?= $alerte['niveau'] === 'danger' ? 'red' : ($alerte['niveau'] === 'warning' ? 'yellow' : 'blue') ?>-900/50">
-                                                <p class="text-sm font-medium text-gray-900 dark:text-white"><?= htmlspecialchars($alerte['titre']) ?></p>
-                                                <p class="text-xs text-gray-600 dark:text-gray-300"><?= htmlspecialchars($alerte['message']) ?></p>
+                                                <p class="text-sm font-medium text-gray-900 dark:text-white"><?= htmlspecialchars($alerte['nom'] ?? $alerte['titre']) ?></p>
+                                                <p class="text-xs text-gray-600 dark:text-gray-300">
+                                                    <?= htmlspecialchars(($alerte['emplacement_nom'] ?? 'Depot') . ' : ' . format_caisses($alerte['stock_plein'] ?? 0) . ' cs / seuil ' . format_caisses($alerte['seuil_alerte'] ?? 0) . ' cs') ?>
+                                                </p>
                                             </div>
                                             <?php endforeach; ?>
                                         <?php endif; ?>

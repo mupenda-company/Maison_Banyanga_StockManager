@@ -10,7 +10,7 @@ ob_start();
         <p class="text-gray-500 dark:text-gray-400">Gestion des ventes et factures</p>
     </div>
     <div class="flex flex-wrap gap-2">
-        <?php if (can('ventes.imprimer')): ?><a href="<?= url('ventes/print?' . http_build_query($filters)) ?>" target="_blank" class="btn btn-secondary">
+        <?php if (can('ventes.imprimer')): ?><a href="<?= url('ventes/print?' . http_build_query($filters)) ?>" target="_blank" class="btn btn-success">
             Imprimer
         </a><?php endif; ?>
         <?php if (can('ventes.exporter')): ?><a href="<?= url('ventes/export?' . http_build_query($filters)) ?>" class="btn btn-success">
@@ -36,17 +36,28 @@ ob_start();
 <!-- Filters -->
 <div class="card mb-6">
     <div class="card-body">
-        <form method="GET" class="flex flex-wrap items-end gap-4">
+        <form method="GET" class="flex flex-wrap items-end gap-4" x-data="venteIndexFilters()">
             <input type="hidden" name="per_page" value="<?= (int) ($ventes['per_page'] ?? pagination_per_page(5)) ?>">
             <div class="flex-1 min-w-[200px]">
+                <label class="label">Recherche client</label>
+                <input type="search" name="client_search" x-model="clientSearch" class="input" value="<?= htmlspecialchars($filters['client_search'] ?? '') ?>" placeholder="Nom, code ou telephone">
+            </div>
+            <div class="flex-1 min-w-[200px]">
                 <label class="label">Client</label>
-                <select name="client_id" class="input">
+                <select name="client_id" x-model="clientId" class="input">
                     <option value="">Tous les clients</option>
-                    <?php foreach ($clients as $client): ?>
-                    <option value="<?= $client['id'] ?>" <?= ($filters['client_id'] ?? '') == $client['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($client['nom']) ?>
-                    </option>
-                    <?php endforeach; ?>
+                    <template x-for="client in filteredClients()" :key="client.id">
+                        <option :value="String(client.id)" x-text="client.nom + (client.zone_nom ? ' (' + client.zone_nom + ')' : '')"></option>
+                    </template>
+                </select>
+            </div>
+            <div class="w-44">
+                <label class="label">Statut</label>
+                <select name="statut" class="input">
+                    <option value="">Tous</option>
+                    <option value="validee" <?= ($filters['statut'] ?? '') === 'validee' ? 'selected' : '' ?>>Validée</option>
+                    <option value="annulee" <?= ($filters['statut'] ?? '') === 'annulee' ? 'selected' : '' ?>>Annulée</option>
+                    <option value="en_attente" <?= ($filters['statut'] ?? '') === 'en_attente' ? 'selected' : '' ?>>En attente</option>
                 </select>
             </div>
             <div class="flex-1 min-w-[200px]">
@@ -198,6 +209,33 @@ ob_start();
 </div>
 
 <script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('venteIndexFilters', () => ({
+        clientSearch: <?= json_encode($filters['client_search'] ?? '') ?>,
+        clientId: <?= json_encode((string) ($filters['client_id'] ?? '')) ?>,
+        clients: <?= json_encode($clients, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+        filteredClients() {
+            const term = (this.clientSearch || '').trim().toLowerCase();
+            const allClients = Array.isArray(this.clients) ? this.clients : [];
+            if (!term) {
+                return allClients;
+            }
+            const filtered = allClients.filter((client) => {
+                const haystack = [client.nom, client.numero_client, client.telephone, client.zone_nom, client.email, client.adresse]
+                    .filter(Boolean)
+                    .join(' ')
+                    .toLowerCase();
+                return haystack.includes(term);
+            });
+            const selected = allClients.find((client) => String(client.id) === String(this.clientId));
+            if (selected && !filtered.some((client) => String(client.id) === String(selected.id))) {
+                filtered.unshift(selected);
+            }
+            return filtered;
+        }
+    }));
+});
+
 async function annulerVente(id) {
     const ok = await App.confirm({
         title: 'Annuler la vente ?',

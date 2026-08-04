@@ -630,6 +630,7 @@ class ApprovisionnementController extends Controller
             [
                 'date_approvisionnement' => $data['date_approvisionnement'],
                 'fournisseur' => $data['fournisseur'] ?? 'Bralima',
+                'montant_depose_fournisseur' => max(0, (float) ($data['montant_depose_fournisseur'] ?? 0)),
                 'notes' => $data['notes'] ?? '',
                 'total_ht' => $totalHt
             ],

@@ -30,9 +30,11 @@ class VenteController extends Controller
         
         $filters = [
             'client_id' => $_GET['client_id'] ?? null,
+            'client_search' => trim((string) ($_GET['client_search'] ?? '')),
             'date_debut' => $_GET['date_debut'] ?? null,
             'date_fin' => $_GET['date_fin'] ?? null,
-            'emplacement_id' => $_GET['emplacement_id'] ?? null
+            'emplacement_id' => $_GET['emplacement_id'] ?? null,
+            'statut' => $_GET['statut'] ?? null
         ];
         
         $page = max(1, (int) ($_GET['page'] ?? 1));
@@ -846,15 +848,24 @@ class VenteController extends Controller
 
         $dateDebut = !empty($_GET['date_debut']) ? $_GET['date_debut'] : date('Y-m-01');
         $dateFin = !empty($_GET['date_fin']) ? $_GET['date_fin'] : date('Y-m-d');
-        $conditions = [
-            "v.statut = 'validee'",
-            'DATE(v.date_vente) BETWEEN :date_debut AND :date_fin',
-        ];
+        $conditions = ['DATE(v.date_vente) BETWEEN :date_debut AND :date_fin'];
         $paramsSql = ['date_debut' => $dateDebut, 'date_fin' => $dateFin];
+        $statut = $_GET['statut'] ?? 'validee';
+        if (in_array($statut, ['en_attente', 'validee', 'annulee'], true)) {
+            $conditions[] = 'v.statut = :statut';
+            $paramsSql['statut'] = $statut;
+        }
 
         if (!empty($_GET['client_id'])) {
             $conditions[] = 'v.client_id = :client_id';
             $paramsSql['client_id'] = (int) $_GET['client_id'];
+        }
+        if (!empty($_GET['client_search'])) {
+            $conditions[] = '(c.nom LIKE :client_search_nom OR c.numero_client LIKE :client_search_numero OR c.telephone LIKE :client_search_tel)';
+            $clientSearch = '%' . trim((string) $_GET['client_search']) . '%';
+            $paramsSql['client_search_nom'] = $clientSearch;
+            $paramsSql['client_search_numero'] = $clientSearch;
+            $paramsSql['client_search_tel'] = $clientSearch;
         }
         if (!empty($_GET['emplacement_id'])) {
             $conditions[] = 'v.emplacement_id = :emplacement_id';
@@ -893,7 +904,9 @@ class VenteController extends Controller
         $dateDebut = $_GET['date_debut'] ?? date('Y-m-01');
         $dateFin = $_GET['date_fin'] ?? date('Y-m-d');
         $clientId = $_GET['client_id'] ?? null;
+        $clientSearch = trim((string) ($_GET['client_search'] ?? ''));
         $emplacementId = $_GET['emplacement_id'] ?? null;
+        $statut = $_GET['statut'] ?? 'validee';
         
         $params = [
             'date_debut' => $dateDebut,
@@ -905,11 +918,24 @@ class VenteController extends Controller
             $clientClause = ' AND v.client_id = :client_id ';
             $params['client_id'] = (int) $clientId;
         }
+        $clientSearchClause = '';
+        if ($clientSearch !== '') {
+            $clientSearchClause = ' AND (c.nom LIKE :client_search_nom OR c.numero_client LIKE :client_search_numero OR c.telephone LIKE :client_search_tel) ';
+            $clientSearchLike = '%' . $clientSearch . '%';
+            $params['client_search_nom'] = $clientSearchLike;
+            $params['client_search_numero'] = $clientSearchLike;
+            $params['client_search_tel'] = $clientSearchLike;
+        }
         
         $emplacementClause = '';
         if ($emplacementId) {
             $emplacementClause = ' AND v.emplacement_id = :emplacement_id ';
             $params['emplacement_id'] = (int) $emplacementId;
+        }
+        $statutClause = '';
+        if (in_array($statut, ['en_attente', 'validee', 'annulee'], true)) {
+            $statutClause = ' AND v.statut = :statut ';
+            $params['statut'] = $statut;
         }
         
         // Récupérer tous les produits
@@ -925,8 +951,7 @@ class VenteController extends Controller
             JOIN ventes v ON v.client_id = c.id
             JOIN vente_details vd ON vd.vente_id = v.id
             WHERE DATE(v.date_vente) BETWEEN :date_debut AND :date_fin
-            AND v.statut = 'validee'
-            " . $clientClause . $emplacementClause . "
+            " . $statutClause . $clientClause . $clientSearchClause . $emplacementClause . "
             GROUP BY c.id, c.nom
             HAVING total_caisses >= 1
             ORDER BY c.nom",
@@ -938,8 +963,9 @@ class VenteController extends Controller
         $ventes = $this->db->fetchAll(
             "SELECT v.client_id, v.total_ttc
              FROM ventes v
+             JOIN clients c ON c.id = v.client_id
              WHERE DATE(v.date_vente) BETWEEN :date_debut AND :date_fin
-             AND v.statut = 'validee'" . $clientClause . $emplacementClause,
+             " . $statutClause . $clientClause . $clientSearchClause . $emplacementClause,
             $params
         );
         

@@ -47,6 +47,7 @@
             </tr>
         </thead>
         <tbody>
+            <?php $totalCaissesMouvements = 0; ?>
             <?php if (empty($mouvements)): ?>
                 <tr><td colspan="7" class="center">Aucun mouvement trouve</td></tr>
             <?php else: foreach ($mouvements as $mvt):
@@ -62,6 +63,7 @@
                 if (($mvt['type_mouvement'] ?? '') === 'transfert' && !empty($mvt['emplacement_dest'])) {
                     $emplacement .= ' -> ' . $mvt['emplacement_dest'];
                 }
+                $totalCaissesMouvements += abs($caisses);
             ?>
                 <tr>
                     <td><?= !empty($mvt['created_at']) ? date('d/m/Y H:i', strtotime($mvt['created_at'])) : '' ?></td>
@@ -74,6 +76,15 @@
                 </tr>
             <?php endforeach; endif; ?>
         </tbody>
+        <?php if (!empty($mouvements)): ?>
+        <tfoot>
+            <tr>
+                <td colspan="4"><strong>TOTAL</strong></td>
+                <td class="num"><strong><?= format_caisses($totalCaissesMouvements) ?> cs</strong></td>
+                <td colspan="2"></td>
+            </tr>
+        </tfoot>
+        <?php endif; ?>
     </table>
     <?php print_report_scripts(); ?>
 </div>

@@ -53,6 +53,43 @@ class Alerte extends Model
         );
     }
 
+    /**
+     * Recuperer les alertes stock actives avec les memes donnees partout.
+     */
+    public function getStockAlerts($limit = 20)
+    {
+        return $this->db->fetchAll(
+            "SELECT a.*, p.nom, p.code, p.seuil_alerte,
+                    e.nom as emplacement_nom,
+                    COALESCE(s.caisses_pleine, 0) as stock_plein
+             FROM {$this->table} a
+             JOIN produits p ON p.id = a.produit_id
+             JOIN emplacements e ON e.id = a.emplacement_id
+             LEFT JOIN stocks s ON s.produit_id = a.produit_id AND s.emplacement_id = a.emplacement_id
+             WHERE a.type = 'stock_bas'
+               AND a.resolved_at IS NULL
+               AND p.actif = 1
+             ORDER BY stock_plein ASC, a.created_at DESC
+             LIMIT :limit",
+            ['limit' => $limit]
+        );
+    }
+
+    /**
+     * Compter les alertes stock actives.
+     */
+    public function countStockAlerts()
+    {
+        return (int) $this->db->fetchColumn(
+            "SELECT COUNT(*)
+             FROM {$this->table} a
+             JOIN produits p ON p.id = a.produit_id
+             WHERE a.type = 'stock_bas'
+               AND a.resolved_at IS NULL
+               AND p.actif = 1"
+        );
+    }
+
     public function marquerLue($id)
     {
         return $this->update($id, ['lu' => 1]);
@@ -111,6 +148,26 @@ class Alerte extends Model
                         $stock['seuil_alerte']
                     );
                     $alertesGenerees++;
+                } else {
+                    $produit = (new Produit())->find($stock['produit_id']);
+                    $emplacement = (new Emplacement())->find($stock['emplacement_id']);
+                    $this->db->query(
+                        "UPDATE {$this->table}
+                         SET titre = :titre,
+                             message = :message,
+                             niveau = :niveau
+                         WHERE type = 'stock_bas'
+                           AND produit_id = :produit_id
+                           AND emplacement_id = :emplacement_id
+                           AND resolved_at IS NULL",
+                        [
+                            'titre' => 'Stock bas - ' . ($produit['nom'] ?? 'Produit'),
+                            'message' => 'Le stock de ' . ($produit['nom'] ?? 'Produit') . ' a ' . ($emplacement['nom'] ?? 'emplacement') . ' est de ' . $quantiteCaisses . ' caisse(s) (seuil: ' . $stock['seuil_alerte'] . ').',
+                            'niveau' => $quantiteCaisses <= 0 ? 'danger' : 'warning',
+                            'produit_id' => $stock['produit_id'],
+                            'emplacement_id' => $stock['emplacement_id'],
+                        ]
+                    );
                 }
             } else {
                 $this->db->query(

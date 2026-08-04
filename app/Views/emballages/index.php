@@ -147,7 +147,10 @@ ob_start();
     <div class="card">
         <div class="card-header flex items-center justify-between">
             <h3 class="font-bold dark:text-white">Dettes d'emballages clients</h3>
-            <span class="text-xs text-gray-400">Periode filtree</span>
+            <div class="flex items-center gap-3">
+                <span class="text-xs text-gray-400">Periode filtree</span>
+                <a href="<?= url('emballages/suivi') ?>" class="text-sm text-primary-600 hover:text-primary-700">Voir tout</a>
+            </div>
         </div>
         <div class="card-body p-0">
             <div class="table-container">
