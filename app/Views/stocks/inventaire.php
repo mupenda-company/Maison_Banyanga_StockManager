@@ -24,6 +24,9 @@ if (!empty($filters['emplacement_id'])) {
 if (!empty($filters['categorie'])) {
     $baseQuery['categorie'] = $filters['categorie'];
 }
+if (!empty($filters['stock_type'])) {
+    $baseQuery['stock_type'] = $filters['stock_type'];
+}
 if (!empty($filters['date_stock'])) { $baseQuery['date_stock'] = $filters['date_stock']; }
 if (!empty($_GET['per_page'])) { $baseQuery['per_page'] = $_GET['per_page']; }
 $printUrl = '?' . http_build_query(array_merge($baseQuery, ['print' => 1]));
@@ -77,7 +80,7 @@ ob_start();
 <!-- Filtres -->
 <div class="card mb-6 no-print">
     <div class="card-body">
-        <form method="GET" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 items-end">
+        <form method="GET" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4 items-end">
             <input type="hidden" name="per_page" value="<?= (int) ($pagination['per_page'] ?? pagination_per_page(5)) ?>">
             <div>
                 <label class="label">Produit</label>
@@ -120,6 +123,15 @@ ob_start();
             <div>
                 <label class="label">Stock à la date</label>
                 <input type="date" name="date_stock" max="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($filters['date_stock'] ?? '') ?>" class="input w-full">
+            </div>
+
+            <div>
+                <label class="label">Type</label>
+                <select name="stock_type" class="input w-full">
+                    <option value="">Tout</option>
+                    <option value="produit" <?= ($filters['stock_type'] ?? '') === 'produit' ? 'selected' : '' ?>>Produits</option>
+                    <option value="emballage" <?= ($filters['stock_type'] ?? '') === 'emballage' ? 'selected' : '' ?>>Emballages</option>
+                </select>
             </div>
 
             <div class="flex flex-col sm:flex-row gap-2 xl:justify-end">
@@ -285,14 +297,13 @@ ob_start();
 <?php 
 if ($printMode):
 ?>
+<div class="no-print fixed bottom-4 right-4 z-50 flex gap-2">
+    <button type="button" onclick="window.print()" class="btn btn-primary">Imprimer</button>
+    <button type="button" onclick="window.close()" class="btn btn-secondary">Fermer</button>
+</div>
 <script>
     window.addEventListener('load', function () {
         window.print();
-    });
-    window.addEventListener('afterprint', function () {
-        if (window.opener) {
-            window.close();
-        }
     });
 </script>
 <?php

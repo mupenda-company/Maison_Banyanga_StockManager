@@ -82,7 +82,6 @@ if (!function_exists('print_report_scripts')) {
         </div>
         <script>
             window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 250); });
-            window.addEventListener('afterprint', function () { if (window.opener) window.close(); });
         </script>
         <?php
     }

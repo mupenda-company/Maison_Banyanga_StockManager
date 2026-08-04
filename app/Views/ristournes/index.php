@@ -200,7 +200,7 @@ ob_start();
             </div>
             <div class="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-4 mb-5">
                 <label class="label">Produit sur lequel le client ajoutera le complément</label>
-                <select id="ristourneComplementProduct" class="input">
+                <select id="ristourneComplementProduct" class="input" onchange="syncRistourneComplementSelection()">
                     <option value="">Utiliser automatiquement le premier produit principal</option>
                     <?php foreach (($produits ?? []) as $produit): ?>
                         <?php
@@ -239,24 +239,38 @@ function closeRistourneProductModal() {
 }
 
 function onRistourneProductChange() {
-    const checkboxes = Array.from(document.querySelectorAll('.ristourne-product-checkbox'));
-    const selected = checkboxes.filter(el => el.checked);
-    const selectedPrice = selected.length > 0 ? selected[0].dataset.priceCents : null;
+    syncRistourneComplementSelection();
+}
 
+function syncRistourneComplementSelection() {
+    const complementProductId = document.getElementById('ristourneComplementProduct')?.value || '';
+    const checkboxes = Array.from(document.querySelectorAll('.ristourne-product-checkbox'));
     checkboxes.forEach(el => {
-        const incompatible = selectedPrice !== null && el.dataset.priceCents !== selectedPrice && !el.checked;
-        el.disabled = incompatible;
-        el.closest('label')?.classList.toggle('opacity-40', incompatible);
-        el.closest('label')?.classList.toggle('cursor-not-allowed', incompatible);
+        const isComplement = complementProductId !== '' && String(el.value) === String(complementProductId);
+        if (isComplement) {
+            el.checked = false;
+        }
     });
 
+    const selected = checkboxes.filter(el => el.checked);
+    const selectedPrice = selected.length > 0 ? selected[0].dataset.priceCents : null;
+    checkboxes.forEach(el => {
+        const isComplement = complementProductId !== '' && String(el.value) === String(complementProductId);
+        const incompatible = selectedPrice !== null && el.dataset.priceCents !== selectedPrice && !el.checked;
+        const disabled = isComplement || incompatible;
+        el.disabled = disabled;
+        el.closest('label')?.classList.toggle('opacity-40', disabled);
+        el.closest('label')?.classList.toggle('cursor-not-allowed', disabled);
+    });
 }
 
 async function confirmCalculRistournes() {
     const mois = document.getElementById('ristourneCalcMonth')?.value || document.querySelector('select[name="mois"]').value;
     const annee = document.getElementById('ristourneCalcYear')?.value || document.querySelector('input[name="annee"]').value;
-    const productIds = Array.from(document.querySelectorAll('.ristourne-product-checkbox:checked')).map(el => el.value);
     const complementProductId = document.getElementById('ristourneComplementProduct')?.value || '';
+    const productIds = Array.from(document.querySelectorAll('.ristourne-product-checkbox:checked'))
+        .map(el => el.value)
+        .filter(id => complementProductId === '' || String(id) !== String(complementProductId));
     if (productIds.length === 0) {
         App.notify('Selectionnez au moins un produit a livrer comme ristourne', 'error');
         return;
@@ -276,7 +290,8 @@ async function confirmCalculRistournes() {
             mois,
             annee,
             produit_ids: productIds,
-            produit_complement_id: complementProductId || productIds[0]
+            produit_complement_id: complementProductId,
+            complement_auto: complementProductId === ''
         };
         const result = await App.api('/api/ristournes/calculer', 'POST', payload);
         App.notify(result.message || 'Calcul terminé avec succès', 'success');
@@ -321,6 +336,10 @@ async function payerRistourne(id) {
 </script>
 
 <?php if ($printMode): ?>
+<div class="no-print fixed bottom-4 right-4 z-50 flex gap-2">
+    <button type="button" onclick="window.print()" class="btn btn-primary">Imprimer</button>
+    <button type="button" onclick="window.close()" class="btn btn-secondary">Fermer</button>
+</div>
 <style>
 @media print {
     @page { margin: 10mm; }
@@ -332,7 +351,6 @@ async function payerRistourne(id) {
 </style>
 <script>
 window.addEventListener('load', function () { window.print(); });
-window.addEventListener('afterprint', function () { if (window.opener) window.close(); });
 </script>
 <?php endif; ?>
 

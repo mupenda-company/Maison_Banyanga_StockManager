@@ -557,7 +557,6 @@ const App = {
             printWindow.document.close();
             printWindow.onload = () => {
                 printWindow.print();
-                printWindow.close();
             };
         }
     },

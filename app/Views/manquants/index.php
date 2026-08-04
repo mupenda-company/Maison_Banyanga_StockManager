@@ -319,7 +319,13 @@ function manquantsPage() {
 }
 </script>
 
-<?php if ($printMode): ?><script>window.addEventListener('load', () => window.print());</script><?php endif; ?>
+<?php if ($printMode): ?>
+<div class="no-print fixed bottom-4 right-4 z-50 flex gap-2">
+    <button type="button" onclick="window.print()" class="btn btn-primary">Imprimer</button>
+    <button type="button" onclick="window.close()" class="btn btn-secondary">Fermer</button>
+</div>
+<script>window.addEventListener('load', () => window.print());</script>
+<?php endif; ?>
 <?php
 $content = ob_get_clean();
 require ROOT_PATH . '/app/Views/layouts/app.php';

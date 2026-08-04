@@ -25,6 +25,9 @@ if (!empty($filters['date_debut'])) {
 if (!empty($filters['date_fin'])) {
     $baseQuery['date_fin'] = $filters['date_fin'];
 }
+if (!empty($filters['stock_type'])) {
+    $baseQuery['stock_type'] = $filters['stock_type'];
+}
 if (!empty($_GET['per_page'])) {
     $baseQuery['per_page'] = $_GET['per_page'];
 }
@@ -45,7 +48,7 @@ ob_start();
 <!-- Filtres -->
 <div class="card mb-6 no-print">
     <div class="card-body">
-        <form method="GET" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4 items-end">
+        <form method="GET" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-7 gap-4 items-end">
             <input type="hidden" name="per_page" value="<?= (int) ($pagination['per_page'] ?? pagination_per_page(5)) ?>">
             <div>
                 <label class="label">Produit</label>
@@ -77,6 +80,14 @@ ob_start();
                     <option value="sortie" <?= ($filters['type'] ?? '') == 'sortie' ? 'selected' : '' ?>>Sorties</option>
                     <option value="transfert" <?= ($filters['type'] ?? '') == 'transfert' ? 'selected' : '' ?>>Transferts</option>
                     <option value="inventaire" <?= ($filters['type'] ?? '') == 'inventaire' ? 'selected' : '' ?>>Ajustements / inventaire</option>
+                </select>
+            </div>
+            <div>
+                <label class="label">Stock</label>
+                <select name="stock_type" class="input">
+                    <option value="">Tout</option>
+                    <option value="produit" <?= ($filters['stock_type'] ?? '') === 'produit' ? 'selected' : '' ?>>Produits</option>
+                    <option value="emballage" <?= ($filters['stock_type'] ?? '') === 'emballage' ? 'selected' : '' ?>>Emballages</option>
                 </select>
             </div>
             <div><label class="label">Date début</label><input type="date" name="date_debut" class="input w-full" value="<?= $filters['date_debut'] ?? '' ?>"></div>
@@ -223,7 +234,7 @@ ob_start();
                             <?php endif; ?>
                         </td>
                         <td class="text-right font-bold <?= $mvt['quantite'] > 0 ? 'text-green-600' : 'text-red-600' ?>">
-                            <?= number_format(abs($caisses), 2, '.', ' ') ?> cs
+                            <?= format_caisses(abs($caisses)) ?> cs
                             <?php if ($isInventaire): ?>
                             <div class="text-[10px] font-normal opacity-50">Stock final après ajustement</div>
                             <?php else: ?>
@@ -704,14 +715,13 @@ function openAjustementModal() {
 <?php 
 if ($printMode):
 ?>
+<div class="no-print fixed bottom-4 right-4 z-50 flex gap-2">
+    <button type="button" onclick="window.print()" class="btn btn-primary">Imprimer</button>
+    <button type="button" onclick="window.close()" class="btn btn-secondary">Fermer</button>
+</div>
 <script>
     window.addEventListener('load', function () {
         window.print();
-    });
-    window.addEventListener('afterprint', function () {
-        if (window.opener) {
-            window.close();
-        }
     });
 </script>
 <?php

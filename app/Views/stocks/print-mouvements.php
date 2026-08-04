@@ -68,7 +68,7 @@
                     <td><?= htmlspecialchars(ucfirst($mvt['type_mouvement'] ?? '')) ?></td>
                     <td><strong><?= htmlspecialchars($mvt['produit_nom'] ?? '') ?></strong><br><span class="muted"><?= htmlspecialchars($mvt['produit_code'] ?? '') ?></span></td>
                     <td><?= htmlspecialchars($emplacement) ?></td>
-                    <td class="num"><?= number_format(abs($caisses), 2, ',', ' ') ?> cs</td>
+                    <td class="num"><?= format_caisses(abs($caisses)) ?> cs</td>
                     <td><?= htmlspecialchars($mvt['user_nom'] ?? 'Systeme') ?></td>
                     <td><?= htmlspecialchars($mvt['motif'] ?? '-') ?></td>
                 </tr>

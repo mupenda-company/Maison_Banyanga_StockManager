@@ -53,6 +53,22 @@ class MouvementStock extends Model
             $where .= " AND m.type_mouvement = :type_mouvement";
             $params['type_mouvement'] = $filters['type_mouvement'];
         }
+
+        if (($filters['stock_type'] ?? null) === 'emballage') {
+            $where .= " AND (
+                LOWER(COALESCE(m.motif, '')) LIKE '%vide%'
+                OR LOWER(COALESCE(m.motif, '')) LIKE '%emballage%'
+                OR m.reference_type IN ('retour_emballage', 'dette_emballage')
+                OR (m.reference_type = 'vente' AND m.type_mouvement = 'entree')
+            )";
+        } elseif (($filters['stock_type'] ?? null) === 'produit') {
+            $where .= " AND NOT (
+                LOWER(COALESCE(m.motif, '')) LIKE '%vide%'
+                OR LOWER(COALESCE(m.motif, '')) LIKE '%emballage%'
+                OR m.reference_type IN ('retour_emballage', 'dette_emballage')
+                OR (m.reference_type = 'vente' AND m.type_mouvement = 'entree')
+            )";
+        }
         
         if (!empty($filters['date_debut'])) {
             $where .= " AND m.created_at >= :date_debut";

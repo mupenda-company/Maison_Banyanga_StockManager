@@ -262,6 +262,10 @@ async function supprimerPerte(id) {
 }
 </script>
 <?php if ($printMode): ?>
+<div class="no-print fixed bottom-4 right-4 z-50 flex gap-2">
+    <button type="button" onclick="window.print()" class="btn btn-primary">Imprimer</button>
+    <button type="button" onclick="window.close()" class="btn btn-secondary">Fermer</button>
+</div>
 <style>
 @media print {
     @page { margin: 10mm; }
@@ -273,7 +277,6 @@ async function supprimerPerte(id) {
 </style>
 <script>
 window.addEventListener('load', function () { window.print(); });
-window.addEventListener('afterprint', function () { if (window.opener) window.close(); });
 </script>
 <?php endif; ?>
 
@@ -281,8 +284,6 @@ window.addEventListener('afterprint', function () { if (window.opener) window.cl
 $content = ob_get_clean();
 require_once ROOT_PATH . '/app/Views/layouts/app.php';
 ?>
-
-
 
 
 

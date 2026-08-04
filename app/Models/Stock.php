@@ -18,6 +18,7 @@ class Stock extends Model
         parent::__construct();
         $this->ensurePhysicalStockColumns();
         $this->ensureAjustementsStockTable();
+        $this->ensureStockInitialTable();
     }
 
     private function ensurePhysicalStockColumns(): void
@@ -83,6 +84,46 @@ class Stock extends Model
         }
     }
 
+    private function ensureStockInitialTable(): void
+    {
+        $exists = (bool) $this->db->fetchColumn(
+            "SELECT COUNT(*)
+             FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'stock_initial'"
+        );
+
+        if (!$exists) {
+            $this->db->query(
+                "CREATE TABLE stock_initial (
+                    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                    produit_id INT UNSIGNED NOT NULL,
+                    emplacement_id INT UNSIGNED NOT NULL,
+                    mode_stock ENUM('produit','emballage') NOT NULL DEFAULT 'produit',
+                    caisses_initiales INT NOT NULL DEFAULT 0,
+                    quantite_initiale INT NOT NULL DEFAULT 0,
+                    motif TEXT NULL,
+                    created_by INT UNSIGNED NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY uk_stock_initial (produit_id, emplacement_id, mode_stock),
+                    INDEX idx_stock_initial_emplacement (emplacement_id),
+                    INDEX idx_stock_initial_mode (mode_stock)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+        }
+    }
+
+    private function applyStockTypeFilter(string &$where, array &$params, array $filters, string $alias = 's'): void
+    {
+        $stockType = $filters['stock_type'] ?? null;
+        if ($stockType === 'produit') {
+            $where .= " AND COALESCE({$alias}.caisses_pleine, 0) > 0";
+        } elseif ($stockType === 'emballage') {
+            $where .= " AND COALESCE({$alias}.caisses_vide, 0) > 0";
+        }
+    }
+
     /**
      * Récupérer le stock d'un produit dans un emplacement
      */
@@ -92,6 +133,57 @@ class Stock extends Model
             "SELECT * FROM {$this->table} WHERE produit_id = :produit_id AND emplacement_id = :emplacement_id",
             ['produit_id' => $produitId, 'emplacement_id' => $emplacementId]
         );
+    }
+
+    public function saveInitialSnapshot(int $produitId, int $emplacementId, string $modeStock, int $caisses, int $bouteilles, ?string $motif = null): void
+    {
+        $modeStock = $modeStock === 'emballage' ? 'emballage' : 'produit';
+        $this->db->query(
+            "INSERT INTO stock_initial
+                (produit_id, emplacement_id, mode_stock, caisses_initiales, quantite_initiale, motif, created_by)
+             VALUES
+                (:produit_id, :emplacement_id, :mode_stock, :caisses_initiales, :quantite_initiale, :motif, :created_by)
+             ON DUPLICATE KEY UPDATE
+                caisses_initiales = VALUES(caisses_initiales),
+                quantite_initiale = VALUES(quantite_initiale),
+                motif = VALUES(motif),
+                created_by = VALUES(created_by),
+                updated_at = CURRENT_TIMESTAMP",
+            [
+                'produit_id' => $produitId,
+                'emplacement_id' => $emplacementId,
+                'mode_stock' => $modeStock,
+                'caisses_initiales' => $caisses,
+                'quantite_initiale' => $bouteilles,
+                'motif' => $motif,
+                'created_by' => $_SESSION['user_id'] ?? null,
+            ]
+        );
+    }
+
+    public function getInitialSnapshotsByEmplacement(int $emplacementId, string $modeStock): array
+    {
+        $modeStock = $modeStock === 'emballage' ? 'emballage' : 'produit';
+        $rows = $this->db->fetchAll(
+            "SELECT si.*, p.nom AS produit_nom, p.code AS produit_code, p.bouteilles_par_caisses,
+                    COALESCE(s.caisses_pleine, 0) AS caisses_pleine_actuelles,
+                    COALESCE(s.caisses_vide, 0) AS caisses_vide_actuelles,
+                    COALESCE(s.quantite_pleine, 0) AS quantite_pleine_actuelle,
+                    COALESCE(s.quantite_vide, 0) AS quantite_vide_actuelle
+             FROM stock_initial si
+             JOIN produits p ON p.id = si.produit_id
+             LEFT JOIN stocks s ON s.produit_id = si.produit_id AND s.emplacement_id = si.emplacement_id
+             WHERE si.emplacement_id = :emplacement_id
+               AND si.mode_stock = :mode_stock
+             ORDER BY p.position_affichage ASC, p.nom ASC",
+            ['emplacement_id' => $emplacementId, 'mode_stock' => $modeStock]
+        );
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[(int) $row['produit_id']] = $row;
+        }
+        return $result;
     }
     
     /**
@@ -145,6 +237,11 @@ class Stock extends Model
                 return $filters['statut'] === 'critique' ? $critique : !$critique;
             }));
         }
+        if (($filters['stock_type'] ?? null) === 'produit') {
+            $rows = array_values(array_filter($rows, static fn($row) => (float) ($row['caisses_pleine'] ?? 0) > 0));
+        } elseif (($filters['stock_type'] ?? null) === 'emballage') {
+            $rows = array_values(array_filter($rows, static fn($row) => (float) ($row['caisses_vide'] ?? 0) > 0));
+        }
         return $rows;
     }
     
@@ -173,6 +270,7 @@ class Stock extends Model
                 $where .= " AND s.caisses_pleine > p.seuil_alerte";
             }
         }
+        $this->applyStockTypeFilter($where, $params, $filters);
         
         $offset = ($page - 1) * $perPage;
         
@@ -547,6 +645,7 @@ class Stock extends Model
             $where .= " AND p.categorie = :categorie";
             $params['categorie'] = $filters['categorie'];
         }
+        $this->applyStockTypeFilter($where, $params, $filters);
         
         $offset = ($page - 1) * $perPage;
         
@@ -617,6 +716,7 @@ class Stock extends Model
             $where .= " AND p.categorie = :categorie";
             $params['categorie'] = $filters['categorie'];
         }
+        $this->applyStockTypeFilter($where, $params, $filters);
         
         $sql = "SELECT 
                     COUNT(DISTINCT p.id) as nb_produits,

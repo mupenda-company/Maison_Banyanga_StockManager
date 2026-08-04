@@ -41,7 +41,8 @@ class StockController extends Controller
             'produit_id' => $_GET['produit_id'] ?? null,
             'emplacement_id' => $_GET['emplacement_id'] ?? null,
             'statut' => $_GET['statut'] ?? null,
-            'date_stock' => $_GET['date_stock'] ?? null
+            'date_stock' => $_GET['date_stock'] ?? null,
+            'stock_type' => $_GET['stock_type'] ?? null
         ];
 
         // Exporter en Excel
@@ -132,6 +133,7 @@ class StockController extends Controller
         $emplacementPrincipal = $this->emplacementModel->getPrincipal();
         $produits = $this->produitModel->getActive();
         $stocks = [];
+        $modeStock = $this->isEmballageRoute() ? 'emballage' : 'produit';
 
         foreach ($this->stockModel->getByEmplacement($emplacementPrincipal['id']) as $stock) {
             $stocks[$stock['produit_id']] = $stock;
@@ -141,6 +143,7 @@ class StockController extends Controller
             'produits' => $produits,
             'emplacement' => $emplacementPrincipal,
             'stocks' => $stocks,
+            'initialSnapshots' => $this->stockModel->getInitialSnapshotsByEmplacement((int) $emplacementPrincipal['id'], $modeStock),
             'emballageMode' => $this->isEmballageRoute()
         ]);
     }
@@ -237,6 +240,15 @@ class StockController extends Controller
                     'caisses_pleine' => $caissesPleines,
                     'caisses_vide' => $caissesVides
                 ]);
+                $caissesInitiales = $mode === 'emballage' ? $caissesVides : $caissesPleines;
+                $this->stockModel->saveInitialSnapshot(
+                    $produitId,
+                    $emplacementId,
+                    $mode === 'emballage' ? 'emballage' : 'produit',
+                    $caissesInitiales,
+                    $caissesInitiales * $btlParCaisse,
+                    $motifInventaire
+                );
 
                 $totalProduits++;
             }
@@ -356,7 +368,8 @@ class StockController extends Controller
             'produit_id' => $_GET['produit_id'] ?? null,
             'emplacement_id' => $_GET['emplacement_id'] ?? null,
             'categorie' => $_GET['categorie'] ?? null,
-            'date_stock' => $_GET['date_stock'] ?? null
+            'date_stock' => $_GET['date_stock'] ?? null,
+            'stock_type' => $_GET['stock_type'] ?? null
         ];
 
         $printMode = isset($_GET['print']) && (string)$_GET['print'] === '1';
@@ -617,6 +630,7 @@ class StockController extends Controller
             'emplacement_id' => $_GET['emplacement_id'] ?? null,
             'type_mouvement' => $type,
             'type' => $type,
+            'stock_type' => $_GET['stock_type'] ?? null,
             'date_debut' => $dateDebut,
             'date_fin' => $dateFin,
             'date' => $date
@@ -727,7 +741,7 @@ class StockController extends Controller
                 ucfirst($m['type_mouvement']),
                 $m['produit_nom'],
                 $emplacement,
-                round($caisses, 2),
+                (int) round($caisses),
                 $m['reference_id'] ? $m['reference_type'] . ' #' . $m['reference_id'] : '-',
                 $m['user_nom'],
             ], null, 'A' . $row++);

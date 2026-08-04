@@ -410,3 +410,14 @@ if (!function_exists('render_pagination_footer')) {
         return trim(ob_get_clean());
     }
 }
+
+if (!function_exists('format_caisses')) {
+    function format_caisses($value, int $decimals = 0): string
+    {
+        $number = (float) $value;
+        if ($decimals > 0 && abs($number - round($number)) > 0.0001) {
+            return number_format($number, $decimals, ',', ' ');
+        }
+        return number_format((int) round($number), 0, ',', ' ');
+    }
+}

@@ -96,6 +96,64 @@ ob_start();
             </form>
         </div>
     </div>
+
+    <div class="card mt-6">
+        <div class="card-header">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Comparaison avec l'inventaire initial</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                <?= $emballageMode ? 'Base initiale des emballages vides comparee avec le stock vide actuel.' : 'Base initiale des produits pleins comparee avec le stock plein actuel.' ?>
+            </p>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Produit</th>
+                            <th class="text-right">Initial</th>
+                            <th class="text-right">Aujourd'hui</th>
+                            <th class="text-right">Difference</th>
+                            <th>Derniere base</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($initialSnapshots ?? [])): ?>
+                        <tr>
+                            <td colspan="5" class="p-8 text-center text-gray-500">Aucune base initiale enregistree pour le moment.</td>
+                        </tr>
+                        <?php else: ?>
+                            <?php foreach ($initialSnapshots as $snapshot): ?>
+                            <?php
+                                $initial = (int) ($snapshot['caisses_initiales'] ?? 0);
+                                $actuel = $emballageMode
+                                    ? (int) round((float) ($snapshot['caisses_vide_actuelles'] ?? 0))
+                                    : (int) round((float) ($snapshot['caisses_pleine_actuelles'] ?? 0));
+                                $difference = $actuel - $initial;
+                            ?>
+                            <tr>
+                                <td>
+                                    <div class="font-medium text-gray-900 dark:text-white"><?= htmlspecialchars($snapshot['produit_nom'] ?? '') ?></div>
+                                    <div class="text-xs text-gray-500"><?= htmlspecialchars($snapshot['produit_code'] ?? '') ?></div>
+                                </td>
+                                <td class="text-right font-bold"><?= format_caisses($initial) ?> cs</td>
+                                <td class="text-right font-bold text-primary-600"><?= format_caisses($actuel) ?> cs</td>
+                                <td class="text-right font-bold <?= $difference === 0 ? 'text-green-600' : ($difference > 0 ? 'text-blue-600' : 'text-red-600') ?>">
+                                    <?= ($difference > 0 ? '+' : '') . format_caisses($difference) ?> cs
+                                </td>
+                                <td>
+                                    <div class="text-sm"><?= !empty($snapshot['updated_at']) ? date('d/m/Y H:i', strtotime($snapshot['updated_at'])) : '-' ?></div>
+                                    <?php if (!empty($snapshot['motif'])): ?>
+                                    <div class="text-xs text-gray-500"><?= htmlspecialchars($snapshot['motif']) ?></div>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>

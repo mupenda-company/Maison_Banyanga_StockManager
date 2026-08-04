@@ -266,15 +266,19 @@ class RistourneController extends Controller
             if (!is_array($ids)) {
                 $ids = [];
             }
+            $ids = array_values(array_unique(array_map('intval', $ids)));
+            $complementId = (int) ($row['produit_complement_id'] ?? 0);
+            if ($complementId > 0) {
+                $complementProductIds[$complementId] = true;
+                if (count($ids) > 1) {
+                    $ids = array_values(array_filter($ids, static fn($id) => (int) $id !== $complementId));
+                }
+            }
             foreach ($ids as $id) {
                 $id = (int) $id;
                 if ($id > 0) {
                     $productIds[$id] = true;
                 }
-            }
-            $complementId = (int) ($row['produit_complement_id'] ?? 0);
-            if ($complementId > 0) {
-                $complementProductIds[$complementId] = true;
             }
         }
 
@@ -333,6 +337,9 @@ class RistourneController extends Controller
             if ($complementProductId <= 0 || empty($produitsById[$complementProductId])) {
                 $complementProductId = 0;
             }
+            if ($complementProductId > 0 && count($selected) > 1) {
+                $selected = array_values(array_filter($selected, static fn($id) => (int) $id !== $complementProductId));
+            }
 
             $referencePrice = 0;
             foreach ($selected as $selectedId) {
@@ -345,12 +352,23 @@ class RistourneController extends Controller
             $remaining = $referencePrice > 0 ? max(0, $montant - ($baseCases * $referencePrice)) : $montant;
             $complementPrice = (float) ($produitsById[$complementProductId]['prix_caisse'] ?? 0);
             $amountToComplete = $complementPrice > 0 ? max(0, $complementPrice - $remaining) : 0;
+            $selectedEligible = array_values(array_filter($selected, static function ($selectedId) use ($produitsById) {
+                return !empty($produitsById[$selectedId]['prix_caisse']);
+            }));
+            $distributedCases = [];
+            if (!empty($selectedEligible) && $baseCases > 0) {
+                $share = intdiv($baseCases, count($selectedEligible));
+                $remainingCases = $baseCases % count($selectedEligible);
+                foreach ($selectedEligible as $index => $selectedId) {
+                    $distributedCases[$selectedId] = $share + ($index < $remainingCases ? 1 : 0);
+                }
+            }
 
             foreach ($produits as $produit) {
                 $produitId = (int) $produit['id'];
                 $prixCaisse = (float) ($produitsById[$produitId]['prix_caisse'] ?? 0);
                 $isSelected = in_array($produitId, $selected, true);
-                $caissesSansComplement = ($isSelected && $prixCaisse > 0) ? (int) floor($montant / $prixCaisse) : 0;
+                $caissesSansComplement = ($isSelected && $prixCaisse > 0) ? (int) ($distributedCases[$produitId] ?? 0) : 0;
                 $row['produits'][$produitId] = [
                     'caisses' => $caissesSansComplement,
                     'caisses_sans_complement' => $caissesSansComplement,
@@ -386,6 +404,10 @@ class RistourneController extends Controller
         }
         $produitIds = array_values(array_unique(array_filter(array_map('intval', $rawProductIds))));
         $produitComplementId = (int) ($input['produit_complement_id'] ?? 0);
+        $complementAuto = filter_var($input['complement_auto'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        if (!$complementAuto && $produitComplementId > 0) {
+            $produitIds = array_values(array_filter($produitIds, static fn($id) => (int) $id !== $produitComplementId));
+        }
         if ($produitComplementId <= 0 && !empty($produitIds)) {
             $produitComplementId = (int) $produitIds[0];
         }
@@ -406,8 +428,12 @@ class RistourneController extends Controller
                 continue;
             }
 
-            $existe = $this->db->fetch(
-                "SELECT id, statut FROM ristournes WHERE client_id = :cid AND periode_debut = :debut AND statut != 'annulee' ORDER BY id DESC LIMIT 1",
+            $existantes = $this->db->fetchAll(
+                "SELECT id, statut FROM ristournes
+                 WHERE client_id = :cid
+                   AND periode_debut = :debut
+                   AND COALESCE(statut, '') != 'annulee'
+                 ORDER BY id DESC",
                 ['cid' => $client['id'], 'debut' => $calcul['periode_debut']]
             );
 
@@ -422,27 +448,48 @@ class RistourneController extends Controller
                 'total_caisses' => $calcul['total_caisses'],
                 'produits_ristourne' => json_encode($produitIds),
                 'produit_complement_id' => $produitComplementId,
+                'statut' => 'calculee',
             ];
 
-            if (!$existe) {
-                $dataRistourne['statut'] = 'calculee';
+            if (empty($existantes)) {
                 $this->ristourneModel->create($dataRistourne);
                 $nbCrees++;
                 continue;
             }
 
-            if (($existe['statut'] ?? '') === 'calculee') {
-                $this->ristourneModel->update((int) $existe['id'], $dataRistourne);
-                $nbMaj++;
-                continue;
+            $hasEditable = false;
+            $hasLocked = false;
+            foreach ($existantes as $existante) {
+                $statut = (string) ($existante['statut'] ?? '');
+                if (in_array($statut, ['en_livraison', 'payee'], true)) {
+                    $hasLocked = true;
+                } else {
+                    $hasEditable = true;
+                }
             }
 
-            $nbVerrouilles++;
+            if ($hasEditable) {
+                $nbMaj += (int) $this->db->update(
+                    'ristournes',
+                    $dataRistourne,
+                    "client_id = :where_client_id
+                     AND periode_debut = :where_periode_debut
+                     AND COALESCE(statut, '') NOT IN ('en_livraison', 'payee', 'annulee')",
+                    [
+                        'where_client_id' => $calcul['client_id'],
+                        'where_periode_debut' => $calcul['periode_debut'],
+                    ]
+                );
+            }
+
+            if ($hasLocked) {
+                $nbVerrouilles++;
+            }
         }
 
-        $message = $nbCrees . ' ristourne(s) creee(s), ' . $nbMaj . ' mise(s) a jour pour la periode.';
+        $message = $nbCrees . ' ristourne(s) creee(s), ' . $nbMaj . ' recalculee(s)/corrigee(s) pour la periode.';
         if ($nbVerrouilles > 0) {
-            $message .= ' ' . $nbVerrouilles . ' deja en livraison/payee(s) non modifiee(s).';
+            $message .= ' ' . $nbVerrouilles . ' deja en livraison/payee(s) non modifiee(s). Annulez d abord la mission ou le paiement si vous devez les recalculer.';
         }
 
         return $this->success(null, $message);

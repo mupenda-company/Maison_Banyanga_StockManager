@@ -45,6 +45,14 @@ ob_start();
                     <option value="critique" <?= ($filters['statut'] ?? '') === 'critique' ? 'selected' : '' ?>>CRITIQUE</option>
                 </select>
             </div>
+            <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">Type</label>
+                <select name="stock_type" class="input py-1.5 w-40">
+                    <option value="">Tout</option>
+                    <option value="produit" <?= ($filters['stock_type'] ?? '') === 'produit' ? 'selected' : '' ?>>Produits</option>
+                    <option value="emballage" <?= ($filters['stock_type'] ?? '') === 'emballage' ? 'selected' : '' ?>>Emballages</option>
+                </select>
+            </div>
             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Stock a la date</label><input type="date" name="date_stock" max="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($filters['date_stock'] ?? '') ?>" class="input py-1.5 w-44">
             <div class="flex gap-2 ml-auto">
                 <button type="submit" class="btn-primary py-1.5 px-4 mr-2">Filtrer</button>
