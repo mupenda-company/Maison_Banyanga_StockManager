@@ -20,11 +20,11 @@ if ($isLocal) {
     define('DB_USER', 'root');
     define('DB_PASS', '');
 } else {
-    // Kivu distribution
+    // maison banyanga
     define('DB_HOST', 'localhost');
-    define('DB_NAME', 'suncityc_kds_bralima');
-    define('DB_USER', 'suncityc_MupendaNelson');
-    define('DB_PASS', '$6pvnBJNZ(w-hm*8');
+    define('DB_NAME', 'maisonba_bralima_logistique');
+    define('DB_USER', 'maisonba_NelsonMupenda');
+    define('DB_PASS', '?D@WiIAJU!HF^S{d');
 
 }
 define('DB_CHARSET', 'utf8mb4');
