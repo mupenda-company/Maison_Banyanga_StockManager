@@ -38,6 +38,7 @@ class RistourneController extends Controller
             exit('Le rapport avec recolte locale est desactive.');
         }
 
+        $this->ristourneModel->synchroniserStatutsLivraison();
         $ristournes = $this->ristourneModel->getAllWithDetails($filters);
         $ristournesRapport = $avecRecolteLocale
             ? $this->applyRecolteLocaleToReport($ristournes)
@@ -394,6 +395,7 @@ class RistourneController extends Controller
     public function calculer()
     {
         $this->requirePermission('ristournes.calculer');
+        $this->ristourneModel->synchroniserStatutsLivraison();
 
         $input = (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') ? $this->getJsonInput() : $_GET;
         $mois = $input['mois'] ?? date('n');
@@ -421,12 +423,14 @@ class RistourneController extends Controller
         $nbCrees = 0;
         $nbMaj = 0;
         $nbVerrouilles = 0;
+        $clientIdsRecalcules = [];
 
         foreach ($clients as $client) {
             $calcul = $this->ristourneModel->calculerRistourne($client['id'], $mois, $annee);
             if (!$calcul) {
                 continue;
             }
+            $clientIdsRecalcules[] = (int) $calcul['client_id'];
 
             $existantes = $this->db->fetchAll(
                 "SELECT id, statut FROM ristournes
@@ -487,7 +491,34 @@ class RistourneController extends Controller
             }
         }
 
+        $periodeDebut = sprintf('%04d-%02d-01', (int) $annee, (int) $mois);
+        $whereObsoletes = "periode_debut = :where_periode_debut
+            AND COALESCE(statut, '') NOT IN ('en_livraison', 'payee', 'annulee')";
+        $paramsObsoletes = ['where_periode_debut' => $periodeDebut];
+        if (!empty($clientIdsRecalcules)) {
+            $placeholders = [];
+            foreach (array_values(array_unique($clientIdsRecalcules)) as $index => $clientId) {
+                $key = 'client_recalcule_' . $index;
+                $placeholders[] = ':' . $key;
+                $paramsObsoletes[$key] = $clientId;
+            }
+            $whereObsoletes .= " AND client_id NOT IN (" . implode(',', $placeholders) . ")";
+        }
+        $nbObsoletes = (int) $this->db->update(
+            'ristournes',
+            [
+                'statut' => 'annulee',
+                'date_paiement' => null,
+                'notes' => 'Annulee automatiquement lors du recalcul du ' . date('Y-m-d H:i:s') . ' car le client n a plus de vente validee sur cette periode.'
+            ],
+            $whereObsoletes,
+            $paramsObsoletes
+        );
+
         $message = $nbCrees . ' ristourne(s) creee(s), ' . $nbMaj . ' recalculee(s)/corrigee(s) pour la periode.';
+        if ($nbObsoletes > 0) {
+            $message .= ' ' . $nbObsoletes . ' ancienne(s) ristourne(s) sans vente validee annulee(s).';
+        }
         if ($nbVerrouilles > 0) {
             $message .= ' ' . $nbVerrouilles . ' deja en livraison/payee(s) non modifiee(s). Annulez d abord la mission ou le paiement si vous devez les recalculer.';
         }

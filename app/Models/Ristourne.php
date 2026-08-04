@@ -169,7 +169,7 @@ class Ristourne extends Model
      */
     public function getAllWithDetails($filters = [])
     {
-        $where = "1=1";
+        $where = "COALESCE(r.statut, '') != 'annulee'";
         $params = [];
 
         if (!empty($filters['client_id'])) {
@@ -197,8 +197,54 @@ class Ristourne extends Model
     }
 
     /**
+     * Corriger les ristournes restees "en_livraison" alors qu'aucune mission
+     * de ristourne en cours ne les porte encore.
+     */
+    public function synchroniserStatutsLivraison()
+    {
+        $bloquees = $this->db->fetchAll(
+            "SELECT r.id,
+                    COALESCE(SUM(CASE WHEN m.statut = 'en_cours' THEN 1 ELSE 0 END), 0) AS missions_en_cours,
+                    COALESCE(SUM(CASE WHEN m.statut = 'terminee' AND mr.statut = 'livree' THEN 1 ELSE 0 END), 0) AS lignes_livrees_terminees,
+                    MAX(CASE WHEN m.statut = 'terminee' AND mr.statut = 'livree' THEN COALESCE(m.date_retour, m.updated_at, m.created_at) ELSE NULL END) AS date_livraison
+             FROM {$this->table} r
+             LEFT JOIN mission_ristournes mr ON mr.ristourne_id = r.id
+             LEFT JOIN missions m ON m.id = mr.mission_id
+             WHERE r.statut = 'en_livraison'
+             GROUP BY r.id"
+        );
+
+        $corrigees = 0;
+        foreach ($bloquees as $row) {
+            if ((int) ($row['missions_en_cours'] ?? 0) > 0) {
+                continue;
+            }
+
+            $id = (int) ($row['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+
+            if ((int) ($row['lignes_livrees_terminees'] ?? 0) > 0) {
+                $corrigees += (int) $this->db->update($this->table, [
+                    'statut' => 'payee',
+                    'date_paiement' => $row['date_livraison'] ?: date('Y-m-d H:i:s')
+                ], 'id = :where_id', ['where_id' => $id]);
+            } else {
+                $corrigees += (int) $this->db->update($this->table, [
+                    'statut' => 'calculee',
+                    'date_paiement' => null
+                ], 'id = :where_id', ['where_id' => $id]);
+            }
+        }
+
+        return $corrigees;
+    }
+
+    /**
      * Marquer comme payÃ©e
-     */    public function marquerPayee($id)
+     */
+    public function marquerPayee($id)
     {
         return $this->update($id, [
             'statut' => 'payee',
