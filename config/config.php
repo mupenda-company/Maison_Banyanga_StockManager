@@ -20,13 +20,12 @@ if ($isLocal) {
     define('DB_USER', 'root');
     define('DB_PASS', '');
 } else {
-    // mugabo
+    // Kivu distribution
     define('DB_HOST', 'localhost');
-    define('DB_NAME', 'mbmugabo_bralima_logistique');
-    define('DB_USER', 'mbmugabo_NelsonMupenda');
-    define('DB_PASS', 'B;C2.XN#(#2IOr9s');
-    
-    
+    define('DB_NAME', 'suncityc_kds_bralima');
+    define('DB_USER', 'suncityc_MupendaNelson');
+    define('DB_PASS', '$6pvnBJNZ(w-hm*8');
+
 }
 define('DB_CHARSET', 'utf8mb4');
 
