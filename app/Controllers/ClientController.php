@@ -355,7 +355,13 @@ class ClientController extends Controller
     public function printQrCodes()
     {
         $this->requireOwner();
-        $clients = $this->clientModel->getAllWithZone();
+        $activiteParam = $_GET['activite'] ?? 'tous';
+        $filters = [
+            'q' => trim((string) ($_GET['q'] ?? '')),
+            'zone_id' => $_GET['zone_id'] ?? null,
+            'activite' => in_array($activiteParam, ['tous', 'actif', 'non_actif'], true) ? $activiteParam : 'tous',
+        ];
+        $clients = $this->getClientsWithActivity($filters);
         foreach ($clients as &$client) {
             $client['qr_payload'] = $this->clientModel->qrPayload($client);
         }

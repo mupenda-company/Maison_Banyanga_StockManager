@@ -51,7 +51,7 @@ ob_start();
                 <button type="submit" class="btn btn-secondary w-full xl:w-auto">Rechercher</button>
                 <?php if (can('clients.imprimer')): ?><a href="?<?= http_build_query(array_merge($_GET, ['print' => 1])) ?>" target="_blank" class="btn btn-secondary w-full xl:w-auto">Imprimer</a><?php endif; ?>
                 <?php if (can('clients.exporter')): ?><a href="?<?= http_build_query(array_merge($_GET, ['export' => 'excel'])) ?>" class="btn btn-secondary w-full xl:w-auto">Exporter</a><?php endif; ?>
-                <?php if (is_owner()): ?><a href="<?= url('clients/qr') ?>" target="_blank" class="btn btn-secondary w-full xl:w-auto">QR clients actifs</a><?php endif; ?>
+                <?php if (is_owner()): ?><a href="<?= url('clients/qr?' . http_build_query(array_diff_key($_GET, ['page' => true, 'per_page' => true]))) ?>" target="_blank" class="btn btn-secondary w-full xl:w-auto">QR clients filtrés</a><?php endif; ?>
                 <?php if (can('clients.creer')): ?>
                 <button type="button" @click="openModal()" class="btn btn-primary w-full xl:w-auto">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
